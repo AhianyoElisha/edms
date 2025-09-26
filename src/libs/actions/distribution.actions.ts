@@ -694,7 +694,7 @@ export async function getTransactionProductList() {
       ) : { documents: [] },
       salesCategoryIds.length > 0 ? databases.listDocuments(
         appwriteConfig.database,
-        appwriteConfig.salescategory, // Update this to your actual sales category collection name
+        appwriteConfig.productioncategory, // Using production category collection
         [Query.equal('$id', salesCategoryIds), Query.limit(salesCategoryIds.length)]
       ) : { documents: [] },
       vehicleIds.length > 0 ? databases.listDocuments(

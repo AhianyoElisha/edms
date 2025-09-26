@@ -841,3 +841,266 @@ export async function getDashboardData(month?: number, year?: number) {
     return undefined;
   }
 }
+
+// ============= DELIVERY SERVICE DASHBOARD FUNCTIONS =============
+
+import type { 
+  DeliveryDashboardData, 
+  PackageTrackingType, 
+  VehicleType, 
+  DriverType, 
+  TripType, 
+  CustomerType,
+  DeliveryHistory 
+} from '@/types/apps/deliveryTypes';
+
+// Mock data generators for development - Replace with real Appwrite queries when collections are ready
+export async function getDeliveryDashboardData(month?: number, year?: number): Promise<DeliveryDashboardData | undefined> {
+  try {
+    // For now, return mock data structure that matches the expected interface
+    // TODO: Replace with actual Appwrite database queries when collections are implemented
+    
+    const mockPackageStats = {
+      active: 24,
+      delivered: 156,
+      pending: 8,
+      inTransit: 16,
+      failed: 3,
+      totalRevenue: 15420.50,
+      packages: generateMockPackages(10)
+    };
+
+    const mockVehicleStats = {
+      total: 12,
+      active: 8,
+      available: 3,
+      maintenance: 1,
+      unavailable: 0,
+      retired: 0,
+      vehicles: generateMockVehicles(12)
+    };
+
+    const mockDriverStats = {
+      total: 15,
+      active: 10,
+      onTrip: 8,
+      offline: 5,
+      averageRating: 4.2,
+      drivers: generateMockDrivers(15)
+    };
+
+    const mockTripStats = {
+      total: 45,
+      active: 8,
+      scheduled: 12,
+      completed: 25,
+      cancelled: 0,
+      totalRevenue: 18650.75,
+      totalDistance: "1,247 km",
+      trips: generateMockTrips(20)
+    };
+
+    const mockClientStats = {
+      total: 89,
+      new: 12,
+      returning: 67,
+      vip: 10,
+      totalValue: 45230.80,
+      clients: generateMockCustomers(20)
+    };
+
+    const mockRevenueData = {
+      today: 2450.30,
+      week: 12680.75,
+      month: 45230.80,
+      year: 234560.90,
+      growth: 12.5,
+      isPositive: true
+    };
+
+    const mockDeliveryMetrics = {
+      totalPackages: 207,
+      delivered: 156,
+      pending: 8,
+      inTransit: 16,
+      failed: 3,
+      onTimeRate: 94.2,
+      successRate: 97.8
+    };
+
+    const mockActivityTimeline = {
+      rows: generateMockDeliveryHistory(10),
+      total: 234
+    };
+
+    return {
+      packageStats: mockPackageStats,
+      vehicleStats: mockVehicleStats,
+      driverStats: mockDriverStats,
+      tripStats: mockTripStats,
+      clientStats: mockClientStats,
+      revenueData: mockRevenueData,
+      deliveryMetrics: mockDeliveryMetrics,
+      activityTimeline: mockActivityTimeline
+    };
+
+  } catch (error) {
+    console.error('Error fetching delivery dashboard data:', error);
+    return undefined;
+  }
+}
+
+// Mock data generators
+function generateMockPackages(count: number): PackageTrackingType[] {
+  const statuses: Array<'pending' | 'picked-up' | 'in-transit' | 'out-for-delivery' | 'delivered' | 'failed'> = 
+    ['pending', 'picked-up', 'in-transit', 'out-for-delivery', 'delivered', 'failed'];
+  
+  return Array.from({ length: count }, (_, i) => ({
+    $id: `pkg-${i + 1}`,
+    trackingNumber: `TN${String(Math.random()).slice(2, 8)}`,
+    sender: `Sender ${i + 1}`,
+    senderPhone: '+233201234567',
+    recipient: `Recipient ${i + 1}`,
+    recipientPhone: '+233207654321',
+    origin: 'Accra',
+    destination: 'Kumasi',
+    status: statuses[Math.floor(Math.random() * statuses.length)],
+    estimatedDelivery: new Date(Date.now() + Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+    currentLocation: 'Nsawam Junction',
+    driverName: 'John Doe',
+    driverPhone: '+233209876543',
+    packageType: 'Electronics',
+    weight: '2.5kg',
+    value: Math.floor(Math.random() * 1000) + 50,
+    timeline: [],
+    $createdAt: new Date().toISOString(),
+    $updatedAt: new Date().toISOString()
+  }));
+}
+
+function generateMockVehicles(count: number): VehicleType[] {
+  const types: Array<'truck' | 'van' | 'motorcycle' | 'bicycle'> = ['truck', 'van', 'motorcycle', 'bicycle'];
+  const vehicleTypes: Array<'truck' | 'van' | 'bike' | 'car'> = ['truck', 'van', 'bike', 'car'];
+  const statuses: Array<'active' | 'maintenance' | 'available' | 'unavailable' | 'retired'> = 
+    ['active', 'maintenance', 'available', 'unavailable'];
+  const brands = ['Toyota', 'Ford', 'Hyundai', 'Isuzu'];
+  const models = ['Hiace', 'Transit', 'H100', 'NPR'];
+  
+  return Array.from({ length: count }, (_, i) => ({
+    $id: `veh-${i + 1}`,
+    vehicleNumber: `VH-${(i + 1).toString().padStart(3, '0')}`,
+    licensePlate: `GH-${Math.floor(Math.random() * 9999)}-${Math.floor(Math.random() * 99)}`,
+    vehicleType: vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)],
+    type: types[Math.floor(Math.random() * types.length)],
+    brand: brands[Math.floor(Math.random() * brands.length)],
+    model: models[Math.floor(Math.random() * models.length)],
+    year: 2020 + Math.floor(Math.random() * 4),
+    status: statuses[Math.floor(Math.random() * statuses.length)],
+    ownership: Math.random() > 0.5 ? 'owned' : 'rented',
+    monthlyRentalCost: Math.random() > 0.5 ? Math.floor(Math.random() * 2000) + 1000 : 0,
+    driver: `driver-${i + 1}`,
+    driverId: `driver-${i + 1}`,
+    driverName: `Driver ${i + 1}`,
+    assignedRoute: Math.random() > 0.5 ? `route-${i + 1}` : undefined,
+    capacity: Math.floor(Math.random() * 5) + 1,
+    location: 'Accra Central',
+    batteryLevel: Math.floor(Math.random() * 100),
+    fuelLevel: Math.floor(Math.random() * 100),
+    lastMaintenance: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
+    nextMaintenance: new Date(Date.now() + Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
+    $createdAt: new Date().toISOString(),
+    $updatedAt: new Date().toISOString()
+  }));
+}
+
+function generateMockDrivers(count: number): DriverType[] {
+  const statuses: Array<'active' | 'offline' | 'on-trip'> = ['active', 'offline', 'on-trip'];
+  const vehicleTypes = ['Truck', 'Van', 'Motorcycle', 'Bicycle'];
+  
+  return Array.from({ length: count }, (_, i) => ({
+    $id: `driver-${i + 1}`,
+    name: `Driver ${i + 1}`,
+    email: `driver${i + 1}@delivery.com`,
+    phone: `+233${Math.floor(Math.random() * 900000000) + 200000000}`,
+    avatar: `/images/avatars/${(i % 8) + 1}.png`,
+    rating: Math.round((Math.random() * 2 + 3) * 10) / 10, // 3.0 to 5.0
+    totalDeliveries: Math.floor(Math.random() * 500) + 50,
+    completedDeliveries: Math.floor(Math.random() * 450) + 40,
+    onTimeDeliveries: Math.floor(Math.random() * 400) + 35,
+    vehicleId: `vehicle-${i + 1}`,
+    vehicleType: vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)],
+    status: statuses[Math.floor(Math.random() * statuses.length)],
+    todayEarnings: Math.floor(Math.random() * 500) + 100,
+    monthlyEarnings: Math.floor(Math.random() * 5000) + 1000,
+    licenseNumber: `DL-${Math.floor(Math.random() * 999999)}`,
+    licenseExpiry: new Date(Date.now() + Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString(),
+    $createdAt: new Date().toISOString(),
+    $updatedAt: new Date().toISOString()
+  }));
+}
+
+function generateMockTrips(count: number): TripType[] {
+  const statuses: Array<'scheduled' | 'in-progress' | 'completed' | 'cancelled' | 'delayed'> = 
+    ['scheduled', 'in-progress', 'completed', 'cancelled', 'delayed'];
+  
+  return Array.from({ length: count }, (_, i) => ({
+    $id: `trip-${i + 1}`,
+    tripNumber: `TR${String(Math.random()).slice(2, 6)}`,
+    driverId: `driver-${i + 1}`,
+    driverName: `Driver ${i + 1}`,
+    vehicleId: `vehicle-${i + 1}`,
+    vehicleLicense: `GH-${Math.floor(Math.random() * 9999)}-${Math.floor(Math.random() * 99)}`,
+    route: 'Accra → Kumasi → Tamale',
+    origin: 'Accra',
+    destination: 'Tamale',
+    status: statuses[Math.floor(Math.random() * statuses.length)],
+    startTime: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toISOString(),
+    estimatedArrival: new Date(Date.now() + Math.random() * 12 * 60 * 60 * 1000).toISOString(),
+    actualArrival: Math.random() > 0.5 ? new Date().toISOString() : undefined,
+    packages: [`pkg-${i + 1}`, `pkg-${i + 2}`],
+    packagesCount: Math.floor(Math.random() * 10) + 1,
+    completedDeliveries: Math.floor(Math.random() * 8),
+    revenue: Math.floor(Math.random() * 2000) + 200,
+    distance: `${Math.floor(Math.random() * 500) + 50} km`,
+    fuelCost: Math.floor(Math.random() * 200) + 30,
+    tolls: Math.floor(Math.random() * 50) + 10,
+    $createdAt: new Date().toISOString(),
+    $updatedAt: new Date().toISOString()
+  }));
+}
+
+function generateMockCustomers(count: number): CustomerType[] {
+  return Array.from({ length: count }, (_, i) => ({
+    $id: `customer-${i + 1}`,
+    name: `Customer ${i + 1}`,
+    email: `customer${i + 1}@example.com`,
+    phone: `+233${Math.floor(Math.random() * 900000000) + 200000000}`,
+    address: `Address ${i + 1}, Accra`,
+    avatar: `/images/avatars/${(i % 8) + 1}.png`,
+    totalPackages: Math.floor(Math.random() * 50) + 1,
+    totalSpent: Math.floor(Math.random() * 5000) + 100,
+    preferredDeliveryTime: '9:00 AM - 5:00 PM',
+    $createdAt: new Date().toISOString(),
+    $updatedAt: new Date().toISOString()
+  }));
+}
+
+function generateMockDeliveryHistory(count: number): DeliveryHistory[] {
+  const statuses: Array<'pending' | 'picked-up' | 'in-transit' | 'out-for-delivery' | 'delivered' | 'failed'> = 
+    ['pending', 'picked-up', 'in-transit', 'out-for-delivery', 'delivered', 'failed'];
+  
+  return Array.from({ length: count }, (_, i) => ({
+    $id: `history-${i + 1}`,
+    packageId: `pkg-${i + 1}`,
+    packageTrackingNumber: `TN${String(Math.random()).slice(2, 8)}`,
+    status: statuses[Math.floor(Math.random() * statuses.length)],
+    location: 'Accra Central',
+    timestamp: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+    description: `Package ${statuses[Math.floor(Math.random() * statuses.length)].replace('-', ' ')}`,
+    driverName: `Driver ${i + 1}`,
+    driverId: `driver-${i + 1}`,
+    completed: Math.random() > 0.3,
+    $createdAt: new Date().toISOString(),
+    $updatedAt: new Date().toISOString()
+  }));
+}

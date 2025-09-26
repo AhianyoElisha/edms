@@ -193,7 +193,7 @@ export async function getVehicleById(itemId: string) {
       itemId,
       [
         // Select all fields including relationships
-        Query.select(['*', 'staff.*', 'distributedproducts.*']),
+        Query.select(['*', 'driver.*', 'distributedproducts.*']),
       ]
     );
 

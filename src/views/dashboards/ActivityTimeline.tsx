@@ -31,9 +31,12 @@ const Timeline = styled(MuiTimeline)<TimelineProps>({
   }
 })
 
+// Import delivery types
+import type { DeliveryHistory } from '@/types/apps/deliveryTypes'
+
 type ActivityTimelineProps = {
-  history: RequisitionHistory[] | undefined
-  isLoading: boolean
+  history?: DeliveryHistory[] | undefined
+  isLoading?: boolean
 }
 
 // Helper function to format time since
@@ -74,57 +77,30 @@ const getTimeSince = (dateString: string): string => {
   }
 }
 
-// Helper function to generate activity description
-const getActivityDescription = (item: RequisitionHistory): string => {
-  return `${item.requisitionEvent} 
-                  ${item.requisitionType.includes('category') ? `${item.category}` : item.requisitionEvent.includes('spent') ? `GH₵ ${item.noOfBoxes}` : `${item.noOfBoxes} box(es) or package(s)`}
-                  ${item.requisitionType.includes('category') ? '' : item.requisitionEvent.includes('spent') ? ` on ${item.requisitionType} `: ` of ${item.category} `}
-                  ${item.requisitionEvent.includes('added') 
-                    ? 'to' 
-                    : item.requisitionEvent.includes('created') 
-                    ? 'in' 
-                    : item.requisitionEvent.includes('distributed') 
-                      ? 'into'
-                    : item.requisitionEvent.includes('spent') ? ''
-                      : 'from'} 
-                  ${item.requisitionEvent.includes('spent') ? item.category : item.requisitionType}`
+// Helper function to generate activity description for delivery service
+const getActivityDescription = (item: DeliveryHistory): string => {
+  return item.description || `Package ${item.packageTrackingNumber} status updated to ${item.status}`
 }
 
-// Function to determine timeline dot color based on event type
-const getDotColor = (event: string) => {
-  if (event.includes('added') || event.includes('created')) {
+// Function to determine timeline dot color based on delivery status
+const getDotColor = (item: DeliveryHistory) => {
+  const status = item.status?.toLowerCase()
+  if (status?.includes('delivered') || status?.includes('completed')) {
     return 'success';
-  } else if (event.includes('approved')) {
+  } else if (status?.includes('transit') || status?.includes('picked')) {
     return 'info';
-  } else if (event.includes('denied') || event.includes('rejected')) {
+  } else if (status?.includes('cancelled') || status?.includes('failed') || status?.includes('delayed')) {
     return 'error';
   } else {
     return 'warning';
   }
 }
 
-const ActivityTimeline = () => {
-  const { data: history, isLoading, error } = useRequisitionHistory()
-  
+const ActivityTimeline = ({ history, isLoading }: ActivityTimelineProps) => {
   // Limit to first 5 items if there are more
-  const displayHistory = history?.rows?.slice(0, 5);
+  const displayHistory = history?.slice(0, 5);
 
-  // Helper function to safely get role info
-  const getRoleInfo = (requisitionist: any) => {
-    if (!requisitionist?.role) return 'Unknown Role';
-    
-    // If role is an object with displayName or name
-    if (typeof requisitionist.role === 'object') {
-      return requisitionist.role.displayName || requisitionist.role.name || 'Unknown Role';
-    }
-    
-    // If role is just a string ID, we can't display it meaningfully
-    return 'Role Loading...';
-  };
 
-  const getUserName = (requisitionist: any) => {
-    return requisitionist?.name || 'Unknown User';
-  };
 
   return (
     <Card>
@@ -144,50 +120,39 @@ const ActivityTimeline = () => {
               <Typography>This may take up to 1 minute.</Typography>
             </div>
           ) :
-          error ? (
-            <Typography color="error">Failed to load activity timeline</Typography>
-          ) :
+
           !displayHistory || displayHistory.length === 0 ? (
           <Typography>No activities</Typography>
         ) : (
           <Timeline>
             {displayHistory.map((item, index) => (
-              <TimelineItem key={index}>
+              <TimelineItem key={item.$id || index}>
                 <TimelineSeparator>
-                  <TimelineDot color={getDotColor(item.requisitionEvent)} />
+                  <TimelineDot color={getDotColor(item)} />
                   {index < displayHistory.length - 1 && <TimelineConnector />}
                 </TimelineSeparator>
                 <TimelineContent>
                   <div className='flex flex-wrap items-center justify-between gap-x-2 mbe-2.5'>
                     <Typography className='font-medium' color='text.primary' style={{ textTransform: 'capitalize' }}>
-                      {`${getRoleInfo(item.requisitionist)} ${item.requisitionEvent} ${item.category}`}
+                      Package {item.packageTrackingNumber} - {item.status}
                     </Typography>
                     <Typography variant='caption'>
-                      {getTimeSince(item.$createdAt!)}
+                      {getTimeSince(item.timestamp)}
                     </Typography>
                   </div>
                   <Typography className='mbe-2'>
                     {getActivityDescription(item)}
                   </Typography>
                   <div className='flex items-center gap-2.5'>
-                    <Avatar 
-                      src={item.requisitionist?.avatar || ''} 
-                      className='is-8 bs-8'
-                      sx={{
-                        '& .MuiAvatar-img': {
-                          objectFit: 'contain' // Change to 'cover' if you want the image to fill and crop
-                        }
-                      }}
-                    />
+                    <Avatar className='is-8 bs-8'>
+                      📦
+                    </Avatar>
                     <div className='flex flex-col flex-wrap'>
                       <Typography variant='body2' className='font-medium' style={{ textTransform: 'capitalize' }}>
-                        {getUserName(item.requisitionist)} 
-                        {item.requisitionist?.role && typeof item.requisitionist.role === 'object' && 
-                          ` (${item.requisitionist.role.displayName || item.requisitionist.role.name})`
-                        }
+                        {item.driverName || 'Driver'}
                       </Typography>
                       <Typography variant='body2' style={{ textTransform: 'capitalize' }}>
-                        {getRoleInfo(item.requisitionist)}
+                        Delivery Service
                       </Typography>
                     </div>
                   </div>

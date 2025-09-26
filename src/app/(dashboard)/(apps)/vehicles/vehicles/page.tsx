@@ -1,22 +1,18 @@
-//MUI Imports
+// MUI Imports
 import Grid from '@mui/material/Grid'
 
-//Component Imports
-import LogisticsStatisticsCard from '@/views/mineralwater/vehicles/LogisticsStatisticsCard'
-import LogisticsOverviewTable from '@/views/mineralwater/vehicles/LogisticsOverviewTable'
+// Component Imports
+import VehicleOverviewTable from '@/views/delivery/vehicles/VehicleOverviewTable'
 
-const LogisticsDashboard = async () => {
+const VehiclesPage = () => {
   return (
     <Grid container spacing={6}>
       <Grid item xs={12}>
-        <LogisticsStatisticsCard />
-      </Grid>
-      <Grid item xs={12}>
-        <LogisticsOverviewTable />
+        <VehicleOverviewTable />
       </Grid>
     </Grid>
   )
 }
 
-export default LogisticsDashboard
+export default VehiclesPage
 

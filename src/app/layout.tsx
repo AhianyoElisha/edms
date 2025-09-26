@@ -1,3 +1,6 @@
+// Font Imports
+import { Inter } from 'next/font/google'
+
 // MUI Imports
 import Button from '@mui/material/Button'
 
@@ -28,13 +31,20 @@ import '@assets/iconify-icons/generated-icons.css'
 
 import { AppwriteProvider } from '@/contexts/AppwriteProvider'
 import MaintenanceBanner from './MaintenanceBanner'
+
+// Configure Inter font
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter'
+})
 import AuthWrapper from '@/contexts/AuthWrapper'
 import AttentionBanner from './AttentionBanner'
 import DynamicAttentionBanner from './DynamicAttentionBanner'
 
 export const metadata = {
-  title: 'Flow Natural Mineral Water',
-  description: 'Oh Yes! Flow Water, Our Own'
+  title: 'Ezar Delivery Services',
+  description: 'Your Trusted Logistics Partner'
 }
 
 const Layout = ({ children }: ChildrenType) => {
@@ -46,7 +56,7 @@ const Layout = ({ children }: ChildrenType) => {
       <head>
         <link rel="icon" href="/favicon.ico" />
       </head>
-      <body className='flex is-full min-bs-full flex-auto flex-col'>
+      <body className={`flex is-full min-bs-full flex-auto flex-col ${inter.className}`} style={{ fontFamily: 'var(--font-inter)' }}>
         <Providers direction='ltr'>
           <AppwriteProvider>
               <BlankLayout systemMode={systemMode}>

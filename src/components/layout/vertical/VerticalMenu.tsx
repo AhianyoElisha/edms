@@ -115,64 +115,52 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
     switch (roleName?.toLowerCase()) {
       case 'admin':
         return [
-          'dashboard.view', 'stores.view', 'stores.create', 'stores.manage',
-          'production.view', 'production.create', 'production.manage',
-          'warehouse.view', 'warehouse.create', 'sales.view', 'sales.dailysales',
-          'sales.officesales', 'sales.marketing', 'logistics.view', 'distribution.view',
-          'distribution.create', 'workers.view', 'returns.view', 'expenses.view',
-          'machinery.view', 'machinery.create', 'requisition.view', 'users.view',
-          'users.create', 'users.edit', 'roles.view', 'roles.manage',
-          'permissions.view', 'permissions.manage', 'customers.view',
-          'customers.create', 'suppliers.view', 'suppliers.create', 'reports.view'
+          'dashboard.view', 'packages.view', 'packages.create', 'packages.manage',
+          'manifests.view', 'manifests.create', 'manifests.manage',
+          'routes.view', 'routes.create', 'routes.manage', 'vehicles.view', 'vehicles.create',
+          'trips.view', 'trips.create', 'deliveries.view', 
+          'pickuplocations.view', 'dropofflocations.view',
+          'expenses.view', 'expenses.create', 'ratecards.view', 'ratecards.manage',
+          'users.view', 'users.create', 'users.edit', 'roles.view', 'roles.manage',
+          'permissions.view', 'permissions.manage', 'reports.view', 'notifications.view'
         ]
-      case 'stores manager':
-      case 'storesmanager':
-      case 'storesrep':
+      case 'operations manager':
+      case 'operationsmanager':
         return [
-          'dashboard.view', 'stores.view', 'stores.create', 'stores.manage', 
-          'requisition.view', 'customers.view', 'suppliers.view'
+          'dashboard.view', 'packages.view', 'packages.create', 'manifests.view', 
+          'manifests.create', 'routes.view', 'vehicles.view', 'users.view',
+          'trips.view', 'deliveries.view', 'expenses.view'
         ]
-      case 'production manager':
-      case 'productionmanager':
-      case 'productionrep':
+      case 'route manager':
+      case 'routemanager':
         return [
-          'dashboard.view', 'stores.view', 'production.view', 'production.create',
-          'production.manage', 'warehouse.view', 'requisition.view'
+          'dashboard.view', 'routes.view', 'routes.create', 'vehicles.view',
+          'users.view', 'trips.view', 'manifests.view', 'expenses.view'
         ]
-      case 'warehouse manager':
-      case 'warehousemanager':
-      case 'warehouserep':
+      case 'driver':
         return [
-          'dashboard.view', 'production.view', 'warehouse.view', 'warehouse.create',
-          'sales.view', 'requisition.view'
+          'dashboard.view', 'packages.view', 'manifests.view', 'deliveries.view',
+          'trips.view', 'expenses.create'
         ]
-      case 'sales representative':
-      case 'salesrepresentative':
-      case 'sachetrep':
+      case 'pickup agent':
+      case 'pickupagent':
         return [
-          'dashboard.view', 'production.view', 'warehouse.view', 'sales.view',
-          'sales.dailysales', 'workers.view', 'requisition.view', 'customers.view'
+          'dashboard.view', 'packages.view', 'packages.create', 'manifests.view',
+          'pickuplocations.view'
         ]
-      case 'marketing representative':
-      case 'marketingrepresentative':
-      case 'marketingrep':
+      case 'delivery agent':
+      case 'deliveryagent':
         return [
-          'dashboard.view', 'production.view', 'warehouse.view', 'sales.view',
-          'sales.marketing', 'workers.view', 'requisition.view', 'customers.view'
+          'dashboard.view', 'packages.view', 'deliveries.view', 'dropofflocations.view'
         ]
-      case 'logistics manager':
-      case 'logisticsmanager':
-        return [
-          'dashboard.view', 'sales.view', 'logistics.view', 'distribution.view',
-          'distribution.create', 'expenses.view', 'requisition.view'
-        ]
+
       default:
         return ['dashboard.view']
     }
   }
   
   // Get user role for admin checks
-  const isAdmin = user?.role?.name?.toLowerCase() === 'admin'
+  const isAdmin = user?.role?.name === 'admin'
 
   // Vars
   const { isBreakpointReached, transitionDuration } = verticalNavOptions
@@ -241,260 +229,204 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
           </MenuItem>
         )}
 
-        {/* Apps Pages Section */}
-        {(hasAnyPermission(['stores.view', 'stores.create', 'stores.edit', 'stores.manage']) || hasAnyPermission(['production.view', 'production.create', 'production.manage'])) && (
-          <MenuSection label={dictionary['navigation'].appsPages}>
-            {/* Stores SubMenu */}
-            {hasAnyPermission(['stores.view', 'stores.create', 'stores.edit', 'stores.manage']) && (
-              <SubMenu label={dictionary['navigation'].stores} icon={<i className='ri-shopping-bag-3-line' />}>
-                <SubMenu label={dictionary['navigation'].inventory}>
-                  {hasAnyPermission(['stores.create', 'stores.edit']) && (
-                    <MenuItem onClick={() => handleNavigation('/stores/add')}>{dictionary['navigation'].inventoryadd}</MenuItem>
-                  )}
-                  {hasAnyPermission(['stores.view', 'stores.create', 'stores.edit', 'stores.manage']) && (
-                    <MenuItem onClick={() => handleNavigation('/stores/category')}>{dictionary['navigation'].inventoryCategory}</MenuItem>
-                  )}
-                  {hasAnyPermission(['stores.view', 'stores.create', 'stores.edit', 'stores.manage']) && (
-                    <MenuItem onClick={() => handleNavigation('/stores/list')}>{dictionary['navigation'].inventorylist}</MenuItem>
-                  )}
-                </SubMenu>
-                <SubMenu label={dictionary['navigation'].requisition}>
-                  {hasAnyPermission(['stores.view', 'stores.create', 'stores.edit', 'stores.manage', 'requisition.view']) && (
-                    <MenuItem onClick={() => handleNavigation('/stores/requisitions')}>{dictionary['navigation'].productionRequisition}</MenuItem>
-                  )}
-                  {hasAnyPermission(['stores.manage', 'stores.edit']) && (
-                    <MenuItem onClick={() => handleNavigation('/stores/issue')}>{dictionary['navigation'].issue}</MenuItem>
-                  )}
-                </SubMenu>
+        {/* Package Management Section */}
+        {(hasAnyPermission(['packages.view', 'packages.create', 'packages.manage']) || hasAnyPermission(['manifests.view', 'manifests.create', 'manifests.manage'])) && (
+          <MenuSection label="Package Management">
+            {/* Packages SubMenu */}
+            {hasAnyPermission(['packages.view', 'packages.create', 'packages.manage']) && (
+              <SubMenu label="Packages" icon={<i className='ri-package-line' />}>
+                {hasAnyPermission(['packages.create']) && (
+                  <MenuItem onClick={() => handleNavigation('/packages/add')}>Create Package</MenuItem>
+                )}
+                {hasAnyPermission(['packages.view', 'packages.manage']) && (
+                  <MenuItem onClick={() => handleNavigation('/packages/list')}>Package List</MenuItem>
+                )}
+                {hasAnyPermission(['packages.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/packages/tracking')}>Package Tracking</MenuItem>
+                )}
+                {hasAnyPermission(['packages.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/packages/history')}>Package History</MenuItem>
+                )}
               </SubMenu>
             )}
 
-            {/* Production SubMenu */}
-            {hasAnyPermission(['production.view', 'production.create', 'production.manage']) && (
-              <SubMenu label={dictionary['navigation'].production} icon={<i className='ri-building-2-line' />}>
-                <SubMenu label={dictionary['navigation'].products}>
-                  {hasAnyPermission(['production.create', 'production.manage']) && (
-                    <MenuItem onClick={() => handleNavigation('/production/add')}>{dictionary['navigation'].productadd}</MenuItem>
-                  )}
-                  {hasAnyPermission(['production.view', 'production.create', 'production.manage']) && (
-                    <MenuItem onClick={() => handleNavigation('/production/category')}>{dictionary['navigation'].productCategory}</MenuItem>
-                  )}
-                  {hasAnyPermission(['production.view', 'production.create', 'production.manage']) && (
-                    <MenuItem onClick={() => handleNavigation('/production/list')}>{dictionary['navigation'].productionlist}</MenuItem>
-                  )}
-                </SubMenu>
-                <SubMenu label={dictionary['navigation'].requisition}>
-                  {hasAnyPermission(['production.view', 'production.create', 'production.manage', 'requisition.view']) && (
-                    <MenuItem onClick={() => handleNavigation('/production/store-requisitions')}>{dictionary['navigation'].storesRequisition}</MenuItem>
-                  )}
-                  {hasAnyPermission(['production.view', 'production.create', 'production.manage', 'requisition.view']) && (
-                    <MenuItem onClick={() => handleNavigation('/production/warehouse-requisitions')}>{dictionary['navigation'].warehouseRequisition}</MenuItem>
-                  )}
-                  {hasAnyPermission(['production.manage']) && (
-                    <MenuItem onClick={() => handleNavigation('/production/issue-warehouse-requisitions')}>{dictionary['navigation'].issue}</MenuItem>
-                  )}
-                </SubMenu>
+            {/* Manifests SubMenu */}
+            {hasAnyPermission(['manifests.view', 'manifests.create', 'manifests.manage']) && (
+              <SubMenu label="Manifests" icon={<i className='ri-file-list-3-line' />}>
+                {hasAnyPermission(['manifests.create']) && (
+                  <MenuItem onClick={() => handleNavigation('/manifests/create')}>Create Manifest</MenuItem>
+                )}
+                {hasAnyPermission(['manifests.view', 'manifests.manage']) && (
+                  <MenuItem onClick={() => handleNavigation('/manifests/list')}>Manifest List</MenuItem>
+                )}
+                {hasAnyPermission(['manifests.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/manifests/active')}>Active Manifests</MenuItem>
+                )}
+              </SubMenu>
+            )}
+
+            {/* Pickup & Dropoff Locations */}
+            {(hasAnyPermission(['pickuplocations.view']) || hasAnyPermission(['dropofflocations.view'])) && (
+              <SubMenu label="Locations" icon={<i className='ri-map-pin-line' />}>
+                {hasAnyPermission(['pickuplocations.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/locations/pickup')}>Pickup Locations</MenuItem>
+                )}
+                {hasAnyPermission(['dropofflocations.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/locations/dropoff')}>Dropoff Locations</MenuItem>
+                )}
               </SubMenu>
             )}
           </MenuSection>
         )}
 
-        {/* Sales Pages Section */}
-        {(hasAnyPermission(['warehouse.view', 'warehouse.create']) || hasAnyPermission(['sales.view', 'sales.dailysales', 'sales.officesales', 'sales.marketing']) || hasAnyPermission(['logistics.view']) || hasAnyPermission(['distribution.view', 'distribution.create'])) && (
-          <MenuSection label={dictionary['navigation'].salesPages}>
-            {/* Warehouse SubMenu */}
-            {hasAnyPermission(['warehouse.view', 'warehouse.create']) && (
-              <SubMenu label={dictionary['navigation'].warehouse} icon={<i className='ri-building-3-line' />}>
-                <SubMenu label={dictionary['navigation'].storage}>
-                  {hasAnyPermission(['warehouse.view', 'warehouse.create']) && (
-                    <MenuItem onClick={() => handleNavigation('/warehouse/list')}>{dictionary['navigation'].warehouselist}</MenuItem>
-                  )}
-                  {hasAnyPermission(['warehouse.view', 'warehouse.create']) && (
-                    <MenuItem onClick={() => handleNavigation('/warehouse/category')}>{dictionary['navigation'].warehouseCategory}</MenuItem>
-                  )}
-                </SubMenu>
-                <SubMenu label={dictionary['navigation'].requisition}>
-                  {hasAnyPermission(['warehouse.view', 'warehouse.create', 'requisition.view']) && (
-                    <MenuItem onClick={() => handleNavigation('/warehouse/production-requisitions')}>{dictionary['navigation'].productionRequisition}</MenuItem>
-                  )}
-                </SubMenu>
-                <SubMenu label={dictionary['navigation'].damaged}>
-                  {hasPermission('warehouse.create') && (
-                    <MenuItem onClick={() => handleNavigation('/warehouse/spoilage')}>{dictionary['navigation'].spoilage}</MenuItem>
-                  )}
-                  {hasAnyPermission(['warehouse.view', 'warehouse.create']) && (
-                    <MenuItem onClick={() => handleNavigation('/warehouse/spoilagereport')}>{dictionary['navigation'].spoilagereport}</MenuItem>
-                  )}
-                </SubMenu>
+        {/* Logistics & Operations Section */}
+        {(hasAnyPermission(['vehicles.view', 'vehicles.create']) || hasAnyPermission(['routes.view', 'routes.create']) || hasAnyPermission(['trips.view', 'trips.create'])) && (
+          <MenuSection label="Logistics & Operations">
+            {/* Vehicles SubMenu */}
+            {hasAnyPermission(['vehicles.view', 'vehicles.create']) && (
+              <SubMenu label="Vehicles" icon={<i className='ri-truck-line' />}>
+                {hasAnyPermission(['vehicles.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/vehicles')}>Vehicle Overview</MenuItem>
+                )}
+                {hasAnyPermission(['vehicles.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/vehicles/vehicles')}>Vehicle List</MenuItem>
+                )}
+                {hasAnyPermission(['vehicles.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/vehicles/fleet')}>Fleet Management</MenuItem>
+                )}
               </SubMenu>
             )}
 
-            {/* Sales SubMenu */}
-            {hasAnyPermission(['sales.view', 'sales.dailysales', 'sales.officesales', 'sales.marketing']) && (
-              <SubMenu label={dictionary['navigation'].sales} icon={<i className='ri-money-dollar-circle-line' />}>
-                {hasAnyPermission(['sales.view', 'sales.dailysales', 'sales.officesales', 'sales.marketing']) && (
-                  <MenuItem onClick={() => handleNavigation('/sales/category')}>{dictionary['navigation'].salesCategory}</MenuItem>
-                )}
-                {hasAnyPermission(['sales.view', 'sales.dailysales', 'sales.officesales', 'sales.marketing']) && (
-                  <MenuItem onClick={() => handleNavigation('/salesreport')} icon={<i className='ri-exchange-line' />}>
-                    {dictionary['navigation'].salesreport}
-                  </MenuItem>
-                )}
-                
-                {/* Sachet SubMenu */}
-                {(hasPermission('sales.dailysales') || hasPermission('sales.officesales')) && (
-                  <SubMenu label={dictionary['navigation'].sachet} icon={<i className='ri-money-dollar-circle-line' />}>
-                    {hasPermission('sales.dailysales') && (
-                      <MenuItem onClick={() => handleNavigation('/dailysales')} icon={<i className='ri-exchange-line' />}>
-                        {dictionary['navigation'].dailysalesadd}
-                      </MenuItem>
-                    )}
-                    {hasPermission('sales.officesales') && (
-                      <MenuItem onClick={() => handleNavigation('/officesales')} icon={<i className='ri-exchange-line' />}>
-                        {dictionary['navigation'].officesalesadd}
-                      </MenuItem>
-                    )}
-                    {hasPermission('workers.view') && (
-                      <SubMenu label={dictionary['navigation'].workersproduction} icon={<i className='ri-user-settings-line' />}>
-                        <MenuItem onClick={() => handleNavigation('/workersproduction')}>
-                          {dictionary['navigation'].workersproductionadd}
-                        </MenuItem>
-                        <MenuItem onClick={() => handleNavigation('/workersproduction/report')}>
-                          {dictionary['navigation'].workersproductionreport}
-                        </MenuItem>
-                        <SubMenu label={dictionary['navigation'].workers} icon={<i className='ri-user-settings-line' />}>
-                          <MenuItem onClick={() => handleNavigation('/workers/list')}>
-                            {dictionary['navigation'].workerslist}
-                          </MenuItem>
-                        </SubMenu>
-                      </SubMenu>
-                    )}
-                  </SubMenu>
-                )}
-                
-                {/* Marketing Sales SubMenu */}
-                {hasPermission('sales.marketing') && (
-                  <SubMenu label={dictionary['navigation'].marketingsales} icon={<i className='ri-exchange-line' />}>
-                    <MenuItem onClick={() => handleNavigation('/marketingsales')} icon={<i className='ri-exchange-line' />}>
-                      {dictionary['navigation'].marketingadd}
-                    </MenuItem>
-                  </SubMenu>
-                )}
 
-                {/* Logistics SubMenu */}
-                {hasPermission('logistics.view') && (
-                  <SubMenu label={dictionary['navigation'].logistics} icon={<i className='ri-truck-line' />}>
-                    <MenuItem onClick={() => handleNavigation('/vehicles/vehicles')}>{dictionary['navigation'].vehicles}</MenuItem>
-                    <MenuItem onClick={() => handleNavigation('/vehicles/fleet')}>{dictionary['navigation'].fleet}</MenuItem>
-                  </SubMenu>
-                )}
-                
-                {/* Distribution SubMenu */}
-                {(hasPermission('distribution.view') || hasPermission('distribution.create')) && (
-                  <SubMenu label={dictionary['navigation'].distribution} icon={<i className='ri-instance-line' />}>
-                    {hasPermission('distribution.create') && (
-                      <MenuItem onClick={() => handleNavigation('/distribution/add')}>{dictionary['navigation'].distributionadd}</MenuItem>
-                    )}
-                    {hasAnyPermission(['distribution.view', 'distribution.create']) && (
-                      <MenuItem onClick={() => handleNavigation('/distribution/list')}>{dictionary['navigation'].distributionlist}</MenuItem>
-                    )}
-                  </SubMenu>
-                )}
 
-                {/* Returns SubMenu */}
-                {hasPermission('returns.view') && (
-                  <SubMenu label={dictionary['navigation'].goodsreturn} icon={<i className='ri-refund-2-line' />}>
-                    <MenuItem onClick={() => handleNavigation('/returns')} icon={<i className='ri-refund-line' />}>
-                      {dictionary['navigation'].returns}
-                    </MenuItem>
-                    <MenuItem onClick={() => handleNavigation('/returns/returnsreport')}>{dictionary['navigation'].returnsreport}</MenuItem>  
-                  </SubMenu>
+            {/* Routes SubMenu */}
+            {hasAnyPermission(['routes.view', 'routes.create']) && (
+              <SubMenu label="Routes" icon={<i className='ri-route-line' />}>
+                {hasAnyPermission(['routes.create']) && (
+                  <MenuItem onClick={() => handleNavigation('/routes/add')}>Add Route</MenuItem>
                 )}
-        
-                {/* Expenses SubMenu */}
+                {hasAnyPermission(['routes.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/routes/list')}>Route List</MenuItem>
+                )}
+                {hasAnyPermission(['ratecards.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/routes/ratecards')}>Rate Cards</MenuItem>
+                )}
+              </SubMenu>
+            )}
+
+            {/* Trips SubMenu */}
+            {hasAnyPermission(['trips.view', 'trips.create']) && (
+              <SubMenu label="Trips" icon={<i className='ri-map-pin-range-line' />}>
+                {hasAnyPermission(['trips.create']) && (
+                  <MenuItem onClick={() => handleNavigation('/trips/plan')}>Plan Trip</MenuItem>
+                )}
+                {hasAnyPermission(['trips.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/trips/list')}>Trip List</MenuItem>
+                )}
+                {hasAnyPermission(['trips.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/trips/active')}>Active Trips</MenuItem>
+                )}
+              </SubMenu>
+            )}
+
+            {/* Deliveries SubMenu */}
+            {hasAnyPermission(['deliveries.view']) && (
+              <SubMenu label="Deliveries" icon={<i className='ri-truck-line' />}>
+                {hasAnyPermission(['deliveries.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/deliveries/active')}>Active Deliveries</MenuItem>
+                )}
+                {hasAnyPermission(['deliveries.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/deliveries/completed')}>Completed Deliveries</MenuItem>
+                )}
+                {hasAnyPermission(['deliveries.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/deliveries/failed')}>Failed Deliveries</MenuItem>
+                )}
+              </SubMenu>
+            )}
+
+            {/* Expenses SubMenu */}
+            {hasPermission('expenses.view') && (
+              <SubMenu label="Trip Expenses" icon={<i className='ri-coins-line' />}>
+                {hasPermission('expenses.create') && (
+                  <MenuItem onClick={() => handleNavigation('/expenses/add')}>Add Expense</MenuItem>
+                )}
                 {hasPermission('expenses.view') && (
-                  <SubMenu label={dictionary['navigation'].allexpenses} icon={<i className='ri-refund-line' />}>
-                    <MenuItem onClick={() => handleNavigation('/expenses')} icon={<i className='ri-coins-line' />}>
-                      {dictionary['navigation'].expenses}
-                    </MenuItem>
-                    <MenuItem onClick={() => handleNavigation('/expenses/expensesreport')}>
-                      {dictionary['navigation'].expensesreport}
-                    </MenuItem>
-                  </SubMenu>
+                  <MenuItem onClick={() => handleNavigation('/expenses/list')}>Expense List</MenuItem>
+                )}
+                {hasPermission('expenses.view') && (
+                  <MenuItem onClick={() => handleNavigation('/expenses/report')}>Expense Reports</MenuItem>
                 )}
               </SubMenu>
             )}
           </MenuSection>
         )}
 
-        {/* Machinery Pages Section */}
-        {(hasPermission('machinery.view') || hasPermission('machinery.create')) && (
-          <MenuSection label={dictionary['navigation'].machineryPages}>        
-            <SubMenu label={dictionary['navigation'].machinery} icon={<i className='ri-tools-line' />}>
-              {hasPermission('machinery.create') && (
-                <MenuItem onClick={() => handleNavigation('/machinery/add')}>{dictionary['navigation'].machineryAdd}</MenuItem>
-              )}
-              {hasAnyPermission(['machinery.view', 'machinery.create']) && (
-                <MenuItem onClick={() => handleNavigation('/machinery/category')}>{dictionary['navigation'].machineryCategory}</MenuItem>
-              )}
-              {hasAnyPermission(['machinery.view', 'machinery.create']) && (
-                <MenuItem onClick={() => handleNavigation('/machinery/list')}>{dictionary['navigation'].machineryList}</MenuItem>
-              )}
-            </SubMenu>
-          </MenuSection>
-        )}
 
-        {/* Requisition History Section */}
-        {hasPermission('requisition.view') && (
-          <MenuSection label={dictionary['navigation'].requisitionHistory}>
-            <MenuItem onClick={() => handleNavigation('/requisition-history')} icon={<i className='ri-file-chart-line' />}>
-              {dictionary['navigation'].requisitionHistory}
+
+        {/* Package History & Tracking Section */}
+        {hasPermission('packages.view') && (
+          <MenuSection label="Tracking & History">
+            <MenuItem onClick={() => handleNavigation('/tracking/realtime')} icon={<i className='ri-gps-line' />}>
+              Real-time Tracking
+            </MenuItem>
+            <MenuItem onClick={() => handleNavigation('/tracking/history')} icon={<i className='ri-file-chart-line' />}>
+              Delivery History
             </MenuItem>
           </MenuSection>
         )}
 
-        {/* HRM Pages Section */}
-        {(hasPermission('users.view') || hasPermission('roles.view') || hasPermission('permissions.view') || hasPermission('customers.view') || hasPermission('suppliers.view') || isAdmin) && (
-          <MenuSection label={dictionary['navigation'].hrmPages}>
-            {/* Users Management */}
+        {/* User Management Section */}
+        {(hasPermission('users.view') || hasPermission('roles.view') || hasPermission('permissions.view') || isAdmin) && (
+          <MenuSection label="User Management">
+            {/* Users Management - Includes drivers as users with driver role */}
             {(hasPermission('users.view') || isAdmin) && (
-              <MenuItem onClick={() => handleNavigation('/user/list')} icon={<i className='ri-user-settings-line' />}>
-                Users Management
-              </MenuItem>
+              <SubMenu label="Staff Management" icon={<i className='ri-user-settings-line' />}>
+                <MenuItem onClick={() => handleNavigation('/user/list')}>All Users</MenuItem>
+                <MenuItem onClick={() => handleNavigation('/user/drivers')}>Drivers</MenuItem>
+                <MenuItem onClick={() => handleNavigation('/user/add')}>Add User</MenuItem>
+              </SubMenu>
             )}
             {/* Roles Management */}
             {(hasPermission('roles.view') || isAdmin) && (
               <MenuItem onClick={() => handleNavigation('/roles')} icon={<i className='ri-group-3-line' />}>
-                {dictionary['navigation'].roles}
+                Roles & Permissions
               </MenuItem>
             )}
             {/* Permissions Management */}
             {(hasPermission('permissions.view') || isAdmin) && (
               <MenuItem onClick={() => handleNavigation('/permissions')} icon={<i className='ri-lock-2-line' />}>
-                Permissions
+                Access Control
               </MenuItem>
             )}
-            {/* Customers */}
-            {hasPermission('customers.view') && (
-              <MenuItem onClick={() => handleNavigation('/customers/list')} icon={<i className='ri-team-line' />}>
-                {dictionary['navigation'].customers}
-              </MenuItem>
-            )}
-            {/* Suppliers */}
-            {hasPermission('suppliers.view') && (
-              <MenuItem onClick={() => handleNavigation('/suppliers/list')} icon={<i className='ri-group-2-line' />}>
-                {dictionary['navigation'].suppliers}
+
+            {/* Notifications */}
+            {hasPermission('notifications.view') && (
+              <MenuItem onClick={() => handleNavigation('/notifications')} icon={<i className='ri-notification-3-line' />}>
+                Notification Center
               </MenuItem>
             )}
           </MenuSection>
         )}
 
-        {/* Daily Report Section */}
+        {/* Reports & Analytics Section */}
         {hasPermission('reports.view') && (
-          <MenuSection label={dictionary['navigation'].dailyReport}>
-            <MenuItem onClick={() => handleNavigation('/reports')} icon={<i className='ri-bar-chart-line' />}>
-              Daily Reports
-            </MenuItem>
+          <MenuSection label="Reports & Analytics">
+            <SubMenu label="Operational Reports" icon={<i className='ri-bar-chart-line' />}>
+              <MenuItem onClick={() => handleNavigation('/reports/daily')}>Daily Operations</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/reports/delivery-performance')}>Delivery Performance</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/reports/driver-performance')}>User Performance (Drivers)</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/reports/route-analysis')}>Route Analysis</MenuItem>
+            </SubMenu>
+            <SubMenu label="Financial Reports" icon={<i className='ri-money-dollar-circle-line' />}>
+              <MenuItem onClick={() => handleNavigation('/reports/revenue')}>Revenue Reports</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/reports/expenses')}>Expense Reports</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/reports/profitability')}>Profitability Analysis</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/reports/invoicing')}>Invoicing Reports</MenuItem>
+            </SubMenu>
+            <SubMenu label="Package Reports" icon={<i className='ri-package-line' />}>
+              <MenuItem onClick={() => handleNavigation('/reports/package-volume')}>Package Volume</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/reports/package-tracking')}>Package Tracking Analytics</MenuItem>
+            </SubMenu>
           </MenuSection>
         )}
 

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -32,6 +34,41 @@
   border-width: 0;
   border-style: solid;
   border-color: theme('borderColor.DEFAULT', currentColor);
+}
+
+/* Font Configuration */
+:root {
+  --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+html,
+body {
+  font-family: var(--font-inter);
+  font-feature-settings: 'cv11', 'ss01';
+  font-variation-settings: 'opsz' 32;
+}
+
+/* Ensure MUI components inherit the font */
+.MuiCssBaseline-root,
+.MuiTypography-root,
+.MuiButton-root,
+.MuiTextField-root,
+.MuiFormLabel-root,
+.MuiInputBase-root,
+.MuiCard-root,
+.MuiAppBar-root,
+.MuiDrawer-root,
+.MuiList-root,
+.MuiListItem-root,
+.MuiListItemText-root,
+.MuiTab-root,
+.MuiTableCell-root {
+  font-family: var(--font-inter) !important;
+}
+
+/* Apply to all elements to ensure complete coverage */
+* {
+  font-family: var(--font-inter);
 }
 
 html {

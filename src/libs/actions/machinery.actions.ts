@@ -15,7 +15,7 @@ if(!creator) throw new Error('creator must be provided')
       // First, fetch the category document to get current totalProducts
       const categoryList = await databases.getDocument(
         appwriteConfig.database,
-        appwriteConfig.machinerycategory,
+        appwriteConfig.productioncategory,
         machineryItem.machineryCategory);
 
       if (!categoryList) {
@@ -55,7 +55,7 @@ if(!creator) throw new Error('creator must be provided')
       // Update category with new total
       const updatedCategory = await databases.updateDocument(
         appwriteConfig.database,
-        appwriteConfig.machinerycategory,
+        appwriteConfig.productioncategory,
         category.$id, // Use the actual document ID
         {
           totalProducts: newTotalProducts,
@@ -130,7 +130,7 @@ export async function saveMachineryCategoryToDB(MachineryCategory: MachineryCate
       }));
     const newMachineryCategory = await databases.createDocument(
       appwriteConfig.database,
-      appwriteConfig.machinerycategory,
+      appwriteConfig.productioncategory,
       ID.unique(),
       {
         categoryTitle: MachineryCategory.categoryTitle,
@@ -196,7 +196,7 @@ export async function updateMachineryCategoryInDB(
     // Update the document
     const updatedMachineryCategory = await databases.updateDocument(
       appwriteConfig.database,
-      appwriteConfig.machinerycategory,
+      appwriteConfig.productioncategory,
       machineryCategory.id,
       {
         categoryTitle: machineryCategory.categoryTitle,
@@ -331,7 +331,7 @@ export async function deleteMachineryItem(machineryItemId: string, maxRetries = 
       // Get the category to update totalProducts
       const category = await databases.getDocument(
         appwriteConfig.database,
-        appwriteConfig.machinerycategory,
+        appwriteConfig.productioncategory,
         machineryItem.category.$id
       );
 
@@ -347,7 +347,7 @@ export async function deleteMachineryItem(machineryItemId: string, maxRetries = 
       // Update the category with new total
       const updatedProduct =  await databases.updateDocument(
         appwriteConfig.database,
-        appwriteConfig.machinerycategory,
+        appwriteConfig.productioncategory,
         category.$id,
         {
           totalProducts: newTotalProducts
@@ -444,7 +444,7 @@ export async function getMachineryCategoryItemById(itemId: string) {
   try {
     const machineryList = await databases.getDocument(
       appwriteConfig.database,
-      appwriteConfig.machinerycategory,
+      appwriteConfig.productioncategory,
       itemId
     );
 
@@ -461,7 +461,7 @@ export async function getMachineryCategoryList(requisition: boolean, consoleEsti
   try {
     const machineryList = await databases.listDocuments(
       appwriteConfig.database,
-      appwriteConfig.machinerycategory,
+      appwriteConfig.productioncategory,
       [Query.orderDesc('$createdAt'), Query.limit(200)]
     );
 
@@ -481,7 +481,7 @@ export async function getMachineryCategoryById(id: string) {
   try {
     const machineryCategory = await databases.getDocument(
       appwriteConfig.database,
-      appwriteConfig.machinerycategory,
+      appwriteConfig.productioncategory,
       id
     );
 

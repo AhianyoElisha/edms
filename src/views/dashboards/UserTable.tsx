@@ -114,7 +114,7 @@ const userStatusObj: UserStatusType = {
 // Column Definitions
 const columnHelper = createColumnHelper<UsersTypeWithAction>()
 
-const UserListTable = ({ tableData }: { tableData: User[] | undefined }) => {
+const UserListTable = ({ tableData }: { tableData: Users[] | undefined }) => {
   
   // States
   const [role, setRole] = useState<Users['role']>('')

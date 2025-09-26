@@ -11,7 +11,7 @@ import { appwriteConfig } from './../appwrite.config';
 
 // CREATE APPWRITE USER
 export const signInAccount = async (user: { username: string; password: string }) => {
-    const email = `${user.username}@desertlion.com`
+    const email = `${user.username}@eds.com`
   try {
     console.log(email, user.password)
     const session = await account.createEmailPasswordSession(email, user.password);

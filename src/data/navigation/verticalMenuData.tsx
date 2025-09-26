@@ -174,6 +174,32 @@ const verticalMenuData = (dictionary: Awaited<ReturnType<typeof getDictionary>>)
           {
             label: dictionary['navigation'].fleet,
             href: '/apps/logistics/fleet'
+          },
+          {
+            label: 'Manifests',
+            children: [
+              {
+                label: 'All Manifests',
+                href: '/delivery/manifests'
+              },
+              {
+                label: 'Create Manifest',
+                href: '/delivery/manifests/create'
+              }
+            ]
+          },
+          {
+            label: 'Locations',
+            children: [
+              {
+                label: 'Pickup Locations',
+                href: '/delivery/locations/pickup'
+              },
+              {
+                label: 'Dropoff Locations',
+                href: '/delivery/locations/dropoff'
+              }
+            ]
           }
         ]
       },
