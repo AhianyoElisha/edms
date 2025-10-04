@@ -40,11 +40,20 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
 
   const getTotalPackages = () => packages.length
 
-  const getPackageTypeCounts = () => {
+  const getPackageSizeCounts = () => {
     return packages.reduce((acc, pkg) => {
-      acc[pkg.packageType] = (acc[pkg.packageType] || 0) + 1
+      acc[pkg.packageSize] = (acc[pkg.packageSize] || 0) + 1
       return acc
     }, {} as Record<string, number>)
+  }
+
+  const getTotalItemCount = () => {
+    return packages.reduce((total, pkg) => {
+      if (pkg.isBin && pkg.itemCount) {
+        return total + pkg.itemCount
+      }
+      return total + 1
+    }, 0)
   }
 
   const handleSubmit = async () => {
@@ -159,11 +168,11 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <Card>
               <CardContent>
                 <Typography variant='body2' color='text.secondary'>
-                  Total Packages
+                  Total Packages/Bins
                 </Typography>
                 <Typography variant='h4' className='font-semibold'>
                   {getTotalPackages()}
@@ -174,15 +183,36 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <Card>
               <CardContent>
                 <Typography variant='body2' color='text.secondary'>
-                  Package Types
+                  Total Items
                 </Typography>
-                <div className='flex flex-wrap gap-1 mt-2'>
-                  {Object.entries(getPackageTypeCounts()).map(([type, count]) => (
-                    <Chip key={type} label={`${type}: ${count}`} size='small' color='primary' variant='tonal' />
+                <Typography variant='h4' className='font-semibold'>
+                  {getTotalItemCount()}
+                </Typography>
+                <Typography variant='caption' color='text.secondary'>
+                  Including Bin Contents
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <Card>
+              <CardContent>
+                <Typography variant='body2' color='text.secondary' className='mb-2'>
+                  By Size
+                </Typography>
+                <div className='flex flex-wrap gap-1'>
+                  {Object.entries(getPackageSizeCounts()).map(([size, count]) => (
+                    <Chip 
+                      key={size} 
+                      label={`${size.charAt(0).toUpperCase() + size.slice(1)}: ${count}`} 
+                      size='small' 
+                      color='primary' 
+                      variant='tonal' 
+                    />
                   ))}
                 </div>
               </CardContent>
@@ -238,8 +268,8 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
                             <TableCell>Type</TableCell>
                             <TableCell>Recipient</TableCell>
                             <TableCell>Phone</TableCell>
-                            <TableCell>Weight</TableCell>
-                            <TableCell>Value</TableCell>
+                            <TableCell>Item Count</TableCell>
+                            <TableCell>Notes</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -248,12 +278,23 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
                               <TableCell>{pkgIndex + 1}</TableCell>
                               <TableCell>{pkg.trackingNumber}</TableCell>
                               <TableCell>
-                                <Chip label={pkg.packageType} size='small' variant='tonal' />
+                                <Chip 
+                                  label={pkg.packageSize.charAt(0).toUpperCase() + pkg.packageSize.slice(1)} 
+                                  size='small' 
+                                  variant='tonal'
+                                  color={pkg.isBin ? 'info' : 'default'}
+                                />
                               </TableCell>
                               <TableCell>{pkg.recipientName}</TableCell>
                               <TableCell>{pkg.recipientPhone}</TableCell>
-                              <TableCell>{pkg.weight ? `${pkg.weight} kg` : '-'}</TableCell>
-                              <TableCell>{pkg.value ? `GHS ${pkg.value.toFixed(2)}` : '-'}</TableCell>
+                              <TableCell>
+                                {pkg.isBin && pkg.itemCount ? (
+                                  <Chip label={`${pkg.itemCount} items`} size='small' color='info' variant='tonal' />
+                                ) : (
+                                  <span>1</span>
+                                )}
+                              </TableCell>
+                              <TableCell>{pkg.notes || '-'}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
