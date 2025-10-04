@@ -10,7 +10,7 @@ import { Suspense } from 'react'
 
 import { useParams } from 'next/navigation'
 import { getDistributionItemById } from '@/libs/actions/distribution.actions'
-import DistributionDetails from '@/views/mineralwater/requisition-details/distribution/DistributionDetails'
+import DistributionDetails from '@/views/edms/requisition-details/distribution/DistributionDetails'
 
 
 async function DistributionContent() {

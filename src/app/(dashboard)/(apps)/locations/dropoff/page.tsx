@@ -2,7 +2,7 @@
 import Grid from '@mui/material/Grid'
 
 // Component Imports
-import DropoffLocationOverviewTable from '@/views/delivery/locations/dropoff/DropoffLocationOverviewTable'
+import DropoffLocationOverviewTable from '@/views/edms/locations/dropoff/DropoffLocationOverviewTable'
 
 const DropoffLocationsPage = () => {
   return (

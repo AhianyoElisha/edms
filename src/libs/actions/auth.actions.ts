@@ -75,3 +75,25 @@ export async function signOutAccount() {
     console.log(error);
   }
 }
+
+// ============================== GET ALL USERS
+export async function getAllUsers(roleFilter?: string): Promise<any[]> {
+  try {
+    const queries = [Query.select(['*', 'role.*'])];
+    
+    if (roleFilter) {
+      queries.push(Query.equal('role', roleFilter));
+    }
+
+    const users = await tablesDB.listRows(
+      appwriteConfig.database,
+      appwriteConfig.users,
+      queries
+    );
+
+    return users.rows || [];
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    return [];
+  }
+}

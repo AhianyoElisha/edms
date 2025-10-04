@@ -26,7 +26,9 @@ import CustomAvatar from '@core/components/mui/Avatar'
 import OptionMenu from '@core/components/option-menu'
 
 // Type Imports
-import type { TripType, TripStatusType } from '@/types/apps/deliveryTypes'
+import type { TripType } from '@/types/apps/deliveryTypes'
+
+type TripStatusType = 'planned' | 'in_progress' | 'at_pickup' | 'on_route' | 'completed' | 'cancelled'
 
 const TripSummary = ({ 
   tripData, 
@@ -39,16 +41,17 @@ const TripSummary = ({
 
   const getStatusColor = (status: TripStatusType): ThemeColor => {
     switch (status) {
-      case 'scheduled':
+      case 'planned':
         return 'info'
-      case 'in-progress':
+      case 'in_progress':
+      case 'on_route':
         return 'primary'
+      case 'at_pickup':
+        return 'warning'
       case 'completed':
         return 'success'
       case 'cancelled':
         return 'error'
-      case 'delayed':
-        return 'warning'
       default:
         return 'secondary'
     }
@@ -56,23 +59,24 @@ const TripSummary = ({
 
   const getStatusIcon = (status: TripStatusType): string => {
     switch (status) {
-      case 'scheduled':
+      case 'planned':
         return 'ri-calendar-line'
-      case 'in-progress':
+      case 'in_progress':
+      case 'on_route':
         return 'ri-truck-line'
+      case 'at_pickup':
+        return 'ri-map-pin-line'
       case 'completed':
         return 'ri-checkbox-circle-line'
       case 'cancelled':
         return 'ri-close-circle-line'
-      case 'delayed':
-        return 'ri-time-line'
       default:
         return 'ri-route-line'
     }
   }
 
   const formatStatus = (status: TripStatusType): string => {
-    return status.split('-').map(word => 
+    return status.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ')
   }
@@ -87,9 +91,9 @@ const TripSummary = ({
   }
 
   // Filter trips by status
-  const activeTrips = tripData?.filter(trip => trip.status === 'in-progress') || []
+  const activeTrips = tripData?.filter(trip => trip.status === 'in_progress' || trip.status === 'on_route' || trip.status === 'at_pickup') || []
   const completedTrips = tripData?.filter(trip => trip.status === 'completed') || []
-  const scheduledTrips = tripData?.filter(trip => trip.status === 'scheduled') || []
+  const scheduledTrips = tripData?.filter(trip => trip.status === 'planned') || []
 
   const getTabData = () => {
     switch (activeTab) {
@@ -100,10 +104,10 @@ const TripSummary = ({
     }
   }
 
-  // Calculate summary stats
-  const totalRevenue = tripData?.reduce((sum, trip) => sum + trip.revenue, 0) || 0
-  const totalPackages = tripData?.reduce((sum, trip) => sum + trip.packagesCount, 0) || 0
-  const totalDelivered = tripData?.reduce((sum, trip) => sum + trip.completedDeliveries, 0) || 0
+  // Calculate summary stats - using available fields from new TripType
+  const totalRevenue = tripData?.reduce((sum, trip) => sum + (trip.profit || 0), 0) || 0
+  const totalPackages = tripData?.reduce((sum, trip) => sum + (trip.manifests?.length || 0), 0) || 0
+  const totalDelivered = completedTrips.length
 
   return (
     <Card>
@@ -172,8 +176,11 @@ const TripSummary = ({
         {/* Trip List */}
         <div className='flex flex-col gap-4'>
           {getTabData().map((trip) => {
-            const completionRate = trip.packagesCount > 0 
-              ? Math.round((trip.completedDeliveries / trip.packagesCount) * 100) 
+            const manifestCount = Array.isArray(trip.manifests) ? trip.manifests.length : 0
+            const checkpoints = trip.checkpoints ? JSON.parse(trip.checkpoints) : []
+            const completedCheckpoints = checkpoints.filter((cp: any) => cp.status === 'completed').length
+            const completionRate = checkpoints.length > 0 
+              ? Math.round((completedCheckpoints / checkpoints.length) * 100) 
               : 0
 
             return (
@@ -193,7 +200,7 @@ const TripSummary = ({
                         Trip #{trip.tripNumber}
                       </Typography>
                       <Typography variant='body2' color='text.secondary'>
-                        {trip.driverName} • {trip.vehicleLicense}
+                        Driver ID: {trip.driver} • Vehicle ID: {trip.vehicle}
                       </Typography>
                     </div>
                     <Chip
@@ -205,27 +212,34 @@ const TripSummary = ({
                   
                   <div className='flex items-center gap-4'>
                     <Typography variant='body2' color='text.secondary'>
-                      📍 {trip.origin} → {trip.destination}
+                      📍 Route ID: {trip.route}
                     </Typography>
                     <Typography variant='body2' color='text.secondary'>
-                      🛣️ {trip.distance}
+                      🛣️ {trip.distanceTraveled ? `${trip.distanceTraveled.toFixed(1)} km` : 'N/A'}
                     </Typography>
                   </div>
                   
                   <div className='flex items-center gap-6'>
                     <div className='flex items-center gap-2'>
-                      <i className='ri-package-line text-sm' />
+                      <i className='ri-map-pin-line text-sm' />
                       <Typography variant='caption'>
-                        {trip.completedDeliveries}/{trip.packagesCount} packages ({completionRate}%)
+                        {completedCheckpoints}/{checkpoints.length} checkpoints ({completionRate}%)
+                      </Typography>
+                    </div>
+                    
+                    <div className='flex items-center gap-2'>
+                      <i className='ri-file-list-line text-sm' />
+                      <Typography variant='caption'>
+                        {manifestCount} manifest(s)
                       </Typography>
                     </div>
                     
                     <div className='flex items-center gap-2'>
                       <i className='ri-time-line text-sm' />
                       <Typography variant='caption' color='text.secondary'>
-                        {trip.status === 'completed' && trip.actualArrival
-                          ? `Completed: ${new Date(trip.actualArrival).toLocaleTimeString()}`
-                          : `ETA: ${new Date(trip.estimatedArrival).toLocaleTimeString()}`
+                        {trip.status === 'completed' && trip.endTime
+                          ? `Completed: ${new Date(trip.endTime).toLocaleTimeString()}`
+                          : `Started: ${new Date(trip.startTime).toLocaleTimeString()}`
                         }
                       </Typography>
                     </div>
@@ -234,13 +248,13 @@ const TripSummary = ({
                 
                 <div className='flex flex-col gap-1 text-right'>
                   <Typography variant='body1' className='font-medium text-success'>
-                    {formatCurrency(trip.revenue)}
+                    {formatCurrency(trip.profit || 0)}
                   </Typography>
                   <Typography variant='caption' color='text.secondary'>
-                    Revenue
+                    Profit
                   </Typography>
                   <Typography variant='caption' color='text.secondary'>
-                    Fuel: {formatCurrency(trip.fuelCost)}
+                    Status: {formatStatus(trip.status)}
                   </Typography>
                 </div>
               </div>

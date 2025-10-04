@@ -4,9 +4,9 @@
 import Grid from '@mui/material/Grid'
 
 // Component Imports
-import TotalRequisitions from '@/views/mineralwater/manage-requisitions/TotalRequisitions'
-import RequisitionStatistics from '@/views/mineralwater/manage-requisitions/ReviewsStatistics'
-import WarehouseSalesRequisitionTable from '@/views/mineralwater/manage-requisitions/sales/WarehouseSalesRequisitionTable'
+import TotalRequisitions from '@/views/edms/manage-requisitions/TotalRequisitions'
+import RequisitionStatistics from '@/views/edms/manage-requisitions/ReviewsStatistics'
+import WarehouseSalesRequisitionTable from '@/views/edms/manage-requisitions/sales/WarehouseSalesRequisitionTable'
 
 
 const WarehouseToSalesRequisitionList = () => {

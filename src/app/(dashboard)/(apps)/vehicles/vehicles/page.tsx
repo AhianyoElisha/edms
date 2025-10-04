@@ -2,7 +2,7 @@
 import Grid from '@mui/material/Grid'
 
 // Component Imports
-import VehicleOverviewTable from '@/views/delivery/vehicles/VehicleOverviewTable'
+import VehicleOverviewTable from '@/views/edms/vehicles/LogisticsOverviewTable'
 
 const VehiclesPage = () => {
   return (

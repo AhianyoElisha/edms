@@ -40,39 +40,30 @@ export type Users = {
 }
 
 
-export type Logistics = {
+// Vehicle/Logistics Types for Delivery Service
+export type Vehicle = {
   $id: string
   vehicleNumber: string
-  vehicleType: string
-  startcity: string
-  startcountry: string
-  starttown: string
-  endtown: string
-  endcountry: string
-  endcity: string
-  customers: string
-  distribution: string
+  vehicleType: 'truck' | 'van' | 'bike' | 'car'
+  brand?: string
+  model?: string
+  year?: number
+  status: 'active' | 'maintenance' | 'retired'
+  ownership: 'owned' | 'rented'
+  monthlyRentalCost?: number
+  driver?: string // Relationship to user with driver role
+  assignedRoutes?: string[] // Array of route IDs - a vehicle can serve multiple routes
   creator?: string
-  staff?: string
-  status: string
+  $createdAt?: string
+  $updatedAt?: string
 }
 
+// Alias for backward compatibility
+export type Logistics = Vehicle
 
-export type LogisticsType = {
-  $id: string
-  vehicleNumber: string
-  vehicleType: string
-  startcity: string
-  startcountry: string
-  starttown: string
-  endtown: string
-  endcountry: string
-  endcity: string
-  customers: Customer
-  distribution: DistributedItemDetailType[]
-  creator?: string
-  staff?: Users[]
-  status: string
+export type LogisticsType = Vehicle & {
+  driver?: Users
+  assignedRoutes?: any[] // Array of routes - will be defined by route types
 }
 
 export type Supplier = {

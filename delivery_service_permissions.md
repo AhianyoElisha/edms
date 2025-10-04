@@ -212,19 +212,7 @@ expenses.view, expenses.approve, expenses.report,
 reports.view, reports.daily, reports.delivery_performance, reports.route_analysis
 ```
 
-### Route Manager Role
-**Route & Fleet Management**
-```
-dashboard.view,
-routes.view, routes.create, routes.edit, routes.manage, routes.optimize, routes.analytics,
-ratecards.view, ratecards.create, ratecards.edit, ratecards.manage,
-vehicles.view, vehicles.assign, vehicles.tracking, vehicles.maintenance,
-users.view,
-trips.view, trips.create, trips.manage, trips.track,
-manifests.view, manifests.assign,
-expenses.view, expenses.approve,
-reports.view, reports.route_analysis, reports.driver_performance
-```
+
 
 ### Driver Role
 **Field Operations** (User with driver role creates packages)

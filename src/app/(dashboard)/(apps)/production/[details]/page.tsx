@@ -4,7 +4,7 @@
 import Grid from '@mui/material/Grid'
 
 // Component Imports
-import Details from '@/views/mineralwater/requisition-details/stores/Details'
+import Details from '@/views/edms/requisition-details/stores/Details'
 
 // Data Imports
 import { getAcademyData } from '@/app/server/actions'
@@ -13,7 +13,7 @@ import { Suspense } from 'react'
 import { getInventoryItemById } from '@/libs/actions/stores.actions'
 
 import { useParams } from 'next/navigation'
-import ProductionDetails from '@/views/mineralwater/requisition-details/production/ProductionDetails'
+import ProductionDetails from '@/views/edms/requisition-details/production/ProductionDetails'
 import { getProductionItemById } from '@/libs/actions/production.actions'
 
 

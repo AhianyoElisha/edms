@@ -2,7 +2,7 @@
 
 // MUI Imports
 import Grid from '@mui/material/Grid'
-import RequisitionHistoryTable from '@/views/mineralwater/manage-requisitions/requisitionHistory/RequisitionHistoryTable'
+import RequisitionHistoryTable from '@/views/edms/manage-requisitions/requisitionHistory/RequisitionHistoryTable'
 
 
 const RequisitionHistoryList = () => {

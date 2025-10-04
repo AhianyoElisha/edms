@@ -2,7 +2,7 @@
 import type { Metadata } from 'next'
 
 // Component Imports
-import CreateManifestForm from '@/views/delivery/manifests/CreateManifestForm'
+import CreateManifestForm from '@/views/edms/manifests/CreateManifestForm'
 
 export const metadata: Metadata = {
   title: 'Create Manifest - Delivery Management',

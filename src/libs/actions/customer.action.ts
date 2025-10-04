@@ -31,53 +31,60 @@ export async function saveCustomerToDB(Customer: Customer) {
 }
 
 
-export async function saveTruckOrTricycleToDB(Logistics: Logistics) {
+// Save vehicle to database (Delivery Service)
+export async function saveTruckOrTricycleToDB(vehicle: Logistics) {
   try {
-    console.log(Logistics)
-    const vehicle = await databases.createDocument(
+    console.log('Creating vehicle:', vehicle)
+    const newVehicle = await databases.createDocument(
       appwriteConfig.database,
       appwriteConfig.vehicles,
       ID.unique(),
         {
-          vehicleType: Logistics.vehicleType,
-          vehicleNumber: Logistics.vehicleNumber,
-          starttown: Logistics.starttown,
-          startcity: Logistics.startcity,
-          startcountry: Logistics.startcountry,
-          endtown: Logistics.endtown,
-          endcity: Logistics.endcity,
-          endcountry: Logistics.endcountry,
-          status: 'active',
+          vehicleNumber: vehicle.vehicleNumber,
+          vehicleType: vehicle.vehicleType,
+          brand: vehicle.brand || null,
+          model: vehicle.model || null,
+          year: vehicle.year || null,
+          status: vehicle.status || 'active',
+          ownership: vehicle.ownership,
+          monthlyRentalCost: vehicle.monthlyRentalCost || 0,
+          driver: vehicle.driver || null,
+          assignedRoutes: vehicle.assignedRoutes || [],
         }
     );
-    return vehicle;
+    return newVehicle;
   } catch (error) {
-    console.log(error);
+    console.error('Error creating vehicle:', error);
+    throw error;
   }
 }
 
 
-export async function updateTruckOrTricycleInDB(Logistics: Logistics & { id: string}) {
+// Update vehicle in database (Delivery Service)
+export async function updateTruckOrTricycleInDB(vehicle: Logistics & { id: string}) {
   try {
-    const vehicle = await databases.updateDocument(
+    console.log('Updating vehicle:', vehicle)
+    const updatedVehicle = await databases.updateDocument(
       appwriteConfig.database,
       appwriteConfig.vehicles,
-      Logistics.id,
+      vehicle.id,
         {
-          vehicleType: Logistics.vehicleType,
-          vehicleNumber: Logistics.vehicleNumber,
-          startcity: Logistics.startcity,
-          starttown: Logistics.starttown,
-          startcountry: Logistics.startcountry,
-          endtown: Logistics.endtown,
-          endcity: Logistics.endcity,
-          endcountry: Logistics.endcountry,
-          status: Logistics.status,
+          vehicleNumber: vehicle.vehicleNumber,
+          vehicleType: vehicle.vehicleType,
+          brand: vehicle.brand || null,
+          model: vehicle.model || null,
+          year: vehicle.year || null,
+          status: vehicle.status,
+          ownership: vehicle.ownership,
+          monthlyRentalCost: vehicle.monthlyRentalCost || 0,
+          driver: vehicle.driver || null,
+          assignedRoutes: vehicle.assignedRoutes || [],
       }
     );
-    return vehicle;
+    return updatedVehicle;
   } catch (error) {
-    console.log(error);
+    console.error('Error updating vehicle:', error);
+    throw error;
   }
 }
 
@@ -454,49 +461,6 @@ export async function updateUserInDB(userId: string, userData: {
     return updatedUser;
   } catch (error) {
     console.error('Error updating user:', error);
-    throw error;
-  }
-}
-
-export async function createUserAccount(userData: {
-  name: string;
-  email: string;
-  password: string;
-  phone: string;
-  role: string;
-  avatar: string;
-}) {
-  try {
-    // Create account with unique email combination
-    const username = userData.email.split('@')[0];
-    const accountEmail = `${username}@desertlion.com`;
-    
-    const newAccount = await account.create(
-      ID.unique(),
-      accountEmail,
-      userData.password,
-      userData.name
-    );
-
-    // Create user document
-    const user = await databases.createDocument(
-      appwriteConfig.database,
-      appwriteConfig.users,
-      ID.unique(),
-      {
-        name: userData.name,
-        accountId: newAccount.$id,
-        email: userData.email,
-        role: userData.role,
-        phone: userData.phone,
-        avatar: userData.avatar,
-        status: 'active'
-      }
-    );
-
-    return user;
-  } catch (error) {
-    console.error('Error creating user:', error);
     throw error;
   }
 }

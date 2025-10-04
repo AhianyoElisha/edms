@@ -87,7 +87,7 @@ const getAvatar = (
   const { avatarImage, avatarIcon, avatarText, title, avatarColor, avatarSkin } = params
 
   if (avatarImage) {
-    return <Avatar src={avatarImage} />
+    return <Avatar src={avatarImage} sx={{ '& img': { objectFit: 'contain' } }} />
   } else if (avatarIcon) {
     return (
       <CustomAvatar color={avatarColor} skin={avatarSkin || 'light-static'}>

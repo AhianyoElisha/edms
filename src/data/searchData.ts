@@ -94,7 +94,7 @@ const data: SearchData[] = [
   {
     id: '12',
     name: 'eCommerce - Product List',
-    url: '/apps/mineralwater/stores/list',
+    url: '/apps/edms/stores/list',
     icon: 'ri-file-list-line',
     section: 'Apps'
   },

@@ -4,7 +4,7 @@
 import Grid from '@mui/material/Grid'
 
 // Component Imports
-import Permissions from '@/views/mineralwater/permissions'
+import Permissions from '@/views/edms/permissions'
 
 // Data Imports
 import { getPermissionsData } from '@/app/server/actions'

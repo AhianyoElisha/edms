@@ -1,6 +1,6 @@
 'use client'
 
-import CustomerListTable from '@views/mineralwater/customers/list/CustomerListTable'
+import CustomerListTable from '@views/edms/customers/list/CustomerListTable'
 
 // Data Imports
 import LoaderDark from '@/components/layout/shared/LoaderDark'

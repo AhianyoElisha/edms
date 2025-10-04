@@ -1,5 +1,5 @@
 // Component Imports
-import TransactionDetails from '@/views/mineralwater/returns/add/TransactionDetails'
+import TransactionDetails from '@/views/edms/returns/add/TransactionDetails'
 
 const DistributionAdd = () => {
   return (

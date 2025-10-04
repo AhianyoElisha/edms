@@ -10,7 +10,7 @@ import { Suspense } from 'react'
 
 import { useParams } from 'next/navigation'
 import { getExpensesItemById } from '@/libs/actions/warehouse.actions'
-import ExpensesDetails from '@/views/mineralwater/requisition-details/expenses/ExpensesDetails'
+import ExpensesDetails from '@/views/edms/requisition-details/expenses/ExpensesDetails'
 
 
 async function ExpensesContent() {

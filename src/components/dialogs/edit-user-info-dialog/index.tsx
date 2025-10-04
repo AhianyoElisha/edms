@@ -35,13 +35,13 @@ type EditUserInfoProps = {
 // Available avatars from the characters folder
 const availableAvatars = [
   '/images/illustrations/characters/1.png',
-  '/images/illustrations/characters/2.png',
-  '/images/illustrations/characters/3.png',
-  '/images/illustrations/characters/4.png',
-  '/images/illustrations/characters/5.png',
-  '/images/illustrations/characters/6.png',
   '/images/illustrations/characters/7.png',
-  '/images/illustrations/characters/8.png'
+  '/images/illustrations/characters/8.png',
+  '/images/illustrations/characters/10.png',
+  '/images/illustrations/characters/11.png',
+  '/images/illustrations/characters/12.png',
+  '/images/illustrations/characters/13.png',
+  '/images/illustrations/characters/14.png'
 ]
 
 const EditUserInfoDialog = ({ open, setOpen, userData, onUpdate }: EditUserInfoProps) => {
@@ -75,9 +75,8 @@ const EditUserInfoDialog = ({ open, setOpen, userData, onUpdate }: EditUserInfoP
       
       toast.success('User information updated successfully')
       setOpen(false)
+      // Trigger the parent component's update callback to refresh data
       if (onUpdate) onUpdate()
-      // Reload the page to reflect changes
-      window.location.reload()
     } catch (error) {
       console.error('Error updating user info:', error)
       toast.error('Failed to update user information')
@@ -113,6 +112,11 @@ const EditUserInfoDialog = ({ open, setOpen, userData, onUpdate }: EditUserInfoP
                     className={`cursor-pointer w-16 h-16 ${
                       formData.avatar === avatar ? 'ring-4 ring-primary' : ''
                     }`}
+                    sx={{ 
+                      '& img': { 
+                        objectFit: 'contain'
+                      }
+                    }}
                   />
                 ))}
               </Box>

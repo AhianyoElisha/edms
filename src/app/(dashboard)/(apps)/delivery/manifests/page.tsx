@@ -2,7 +2,7 @@
 import type { Metadata } from 'next'
 
 // Component Imports
-import ManifestOverviewTable from '@/views/delivery/manifests/ManifestOverviewTable'
+import ManifestOverviewTable from '@/views/edms/manifests/ManifestOverviewTable'
 
 export const metadata: Metadata = {
   title: 'Manifests - Delivery Management',

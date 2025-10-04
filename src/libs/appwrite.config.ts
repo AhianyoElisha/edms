@@ -1,7 +1,7 @@
 import { Client, Account, Databases, Storage, Avatars, TablesDB } from "appwrite";
 
 export const appwriteConfig = {
-  api: 'standard_d66eacaf9cc16d0614716c5e6d9451e1d17230bd5bdf343f6a1544e8ac79bff9238d57512830ea11a4ec4b2d5dd1d9d7962f8e8eb9c2fcff76c2d05d46fe61f6a789f81f7d6a4efb10c33c448640a4648289216fdd3001642375d7d053c76c1c56241a0b2c453d80f05941a7602ba5a9a51a72ddf0a843f4f90cc0cff3cdc194',
+  api: process.env.APPWRITE_API_KEY!,
   project:'68c8989000381e194776',
   database:'68d5e82e00304125c0ae',
   roles:'68d5e8650013cd602cbd',

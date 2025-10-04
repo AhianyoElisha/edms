@@ -4,14 +4,14 @@
 import Grid from '@mui/material/Grid'
 
 // Component Imports
-import StoreProductionRequisitionTable from '@/views/mineralwater/manage-requisitions/stores/StoreProductionRequisitionTable'
+import StoreProductionRequisitionTable from '@/views/edms/manage-requisitions/stores/StoreProductionRequisitionTable'
 // import { getEcommerceData } from '@/app/server/actions'
-import TotalRequisitions from '@/views/mineralwater/manage-requisitions/TotalRequisitions'
-import RequisitionStatistics from '@/views/mineralwater/manage-requisitions/ReviewsStatistics'
+import TotalRequisitions from '@/views/edms/manage-requisitions/TotalRequisitions'
+import RequisitionStatistics from '@/views/edms/manage-requisitions/ReviewsStatistics'
 import { CategoryType, InventoryListType, RequisitionHistory } from '@/types/apps/ecommerceTypes'
 import { Suspense, useState } from 'react'
 import LoaderDark from '@/components/layout/shared/LoaderDark'
-import RequisitionHistoryTable from '@/views/mineralwater/manage-requisitions/requisitionHistory/RequisitionHistoryTable'
+import RequisitionHistoryTable from '@/views/edms/manage-requisitions/requisitionHistory/RequisitionHistoryTable'
 import { Divider } from '@mui/material'
 
 /**

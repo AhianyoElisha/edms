@@ -4,8 +4,8 @@
 import Grid from '@mui/material/Grid'
 
 // Component Imports
-import Details from '@/views/mineralwater/requisition-details/machinery/Details'
-import Sidebar from '@/views/mineralwater/requisition-details/machinery/Sidebar'
+import Details from '@/views/edms/requisition-details/machinery/Details'
+import Sidebar from '@/views/edms/requisition-details/machinery/Sidebar'
 
 // Data Imports
 import LoaderDark from '@/components/layout/shared/LoaderDark'

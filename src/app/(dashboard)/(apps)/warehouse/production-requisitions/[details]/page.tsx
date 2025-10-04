@@ -8,8 +8,8 @@ import Grid from '@mui/material/Grid'
 // Data Imports
 import LoaderDark from '@/components/layout/shared/LoaderDark'
 import { Suspense } from 'react'
-import WarehouseProductionRequisitionDetails from '@/views/mineralwater/requisition-details/warehouse/WarehouseProductionRequisitionDetails'
-import WarehouseProductionRequisitionSidebar from '@/views/mineralwater/requisition-details/warehouse/WarehouseProductionRequisitionSidebar'
+import WarehouseProductionRequisitionDetails from '@/views/edms/requisition-details/warehouse/WarehouseProductionRequisitionDetails'
+import WarehouseProductionRequisitionSidebar from '@/views/edms/requisition-details/warehouse/WarehouseProductionRequisitionSidebar'
 
 import { useParams } from 'next/navigation'
 import { getProductionCategoryItemById } from '@/libs/actions/production.actions'

@@ -4,10 +4,10 @@
 import Grid from '@mui/material/Grid'
 
 // Component Imports
-import StoreProductionRequisitionTable from '@/views/mineralwater/manage-requisitions/stores/IssuedStoreProductionRequisitionTable'
+import StoreProductionRequisitionTable from '@/views/edms/manage-requisitions/stores/IssuedStoreProductionRequisitionTable'
 // import { getEcommerceData } from '@/app/server/actions'
-import TotalRequisitions from '@/views/mineralwater/manage-requisitions/TotalRequisitions'
-import RequisitionStatistics from '@/views/mineralwater/manage-requisitions/ReviewsStatistics'
+import TotalRequisitions from '@/views/edms/manage-requisitions/TotalRequisitions'
+import RequisitionStatistics from '@/views/edms/manage-requisitions/ReviewsStatistics'
 
 
 

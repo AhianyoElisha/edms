@@ -22,7 +22,7 @@ import Box from '@mui/material/Box'
 import InputAdornment from '@mui/material/InputAdornment'
 
 // Actions
-import { createUserAccount } from '@/libs/actions/customer.action'
+import { createUserAccount } from '@/libs/actions/user.actions'
 import { getRolesList } from '@/libs/actions/roles.actions'
 import { toast } from 'react-toastify'
 
@@ -41,13 +41,13 @@ type RoleType = {
 // Available avatars from the characters folder
 const availableAvatars = [
   '/images/illustrations/characters/1.png',
-  '/images/illustrations/characters/2.png',
-  '/images/illustrations/characters/3.png',
-  '/images/illustrations/characters/4.png',
-  '/images/illustrations/characters/5.png',
-  '/images/illustrations/characters/6.png',
   '/images/illustrations/characters/7.png',
-  '/images/illustrations/characters/8.png'
+  '/images/illustrations/characters/8.png',
+  '/images/illustrations/characters/10.png',
+  '/images/illustrations/characters/11.png',
+  '/images/illustrations/characters/12.png',
+  '/images/illustrations/characters/13.png',
+  '/images/illustrations/characters/14.png'
 ]
 
 const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
@@ -57,6 +57,7 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
   const [availableRoles, setAvailableRoles] = useState<RoleType[]>([])
   const [formData, setFormData] = useState({
     name: '',
+    username: '',
     email: '',
     password: '',
     phone: '',
@@ -89,12 +90,17 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
 
     try {
       setLoading(true)
+      
+      console.log('=== Form Data Being Submitted ===');
+      console.log('Form data:', formData);
+      
       await createUserAccount(formData)
       
       toast.success('User created successfully')
       setOpen(false)
       setFormData({
         name: '',
+        username: '',
         email: '',
         password: '',
         phone: '',
@@ -102,9 +108,17 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
         avatar: availableAvatars[0]
       })
       if (onUpdate) onUpdate()
-    } catch (error) {
-      console.error('Error creating user:', error)
-      toast.error('Failed to create user')
+    } catch (error: any) {
+      console.error('=== Error in Add User Dialog ===');
+      console.error('Error:', error);
+      console.error('Error message:', error.message);
+      
+      // Show specific error message if available
+      if (error.message) {
+        toast.error(error.message)
+      } else {
+        toast.error('Failed to create user. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -137,12 +151,17 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
                     className={`cursor-pointer w-16 h-16 ${
                       formData.avatar === avatar ? 'ring-4 ring-primary' : ''
                     }`}
+                    sx={{ 
+                      '& img': { 
+                        objectFit: 'contain'
+                      }
+                    }}
                   />
                 ))}
               </Box>
             </Grid>
             
-            <Grid item xs={12} sm={6}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 label='Full Name'
@@ -156,12 +175,21 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label='Email'
-                type='email'
-                value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                placeholder='Enter email address'
+                label='Username'
+                value={formData.username}
+                onChange={e => setFormData({ ...formData, username: e.target.value.toLowerCase() })}
+                placeholder='e.g., esther'
                 required
+                helperText='Will be used as login username (username@eds.com)'
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position='end'>
+                      <Typography variant='body2' color='text.secondary'>
+                        @eds.com
+                      </Typography>
+                    </InputAdornment>
+                  )
+                }}
               />
             </Grid>
             
@@ -174,6 +202,7 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
                 onChange={e => setFormData({ ...formData, password: e.target.value })}
                 placeholder='Enter password'
                 required
+                helperText='Password for user login'
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position='end'>
@@ -188,6 +217,19 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
                     </InputAdornment>
                   )
                 }}
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label='Personal Email'
+                type='email'
+                value={formData.email}
+                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                placeholder='e.g., esthersoglo@gmail.com'
+                required
+                helperText='Personal email for contact purposes'
               />
             </Grid>
             
@@ -215,7 +257,7 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
                     <MenuItem disabled>Loading roles...</MenuItem>
                   ) : (
                     availableRoles.map((role) => (
-                      <MenuItem key={role.$id} value={role.name}>
+                      <MenuItem key={role.$id} value={role.$id}>
                         {role.displayName}
                       </MenuItem>
                     ))

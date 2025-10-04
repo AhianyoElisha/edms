@@ -1,5 +1,5 @@
 // Component Imports
-import TransactionDetails from '@/views/mineralwater/officesales/add/TransactionDetails'
+import TransactionDetails from '@/views/edms/officesales/add/TransactionDetails'
 import { Grid } from '@mui/material'
 
 const DistributionAdd = () => {

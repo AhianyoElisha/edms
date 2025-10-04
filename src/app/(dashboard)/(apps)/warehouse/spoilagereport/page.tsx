@@ -1,7 +1,7 @@
 'use client'
 
 import Grid from '@mui/material/Grid'
-import TransactionListTable from '@/views/mineralwater/warehouse/spoilagereport/TransactionListTable'
+import TransactionListTable from '@/views/edms/warehouse/spoilagereport/TransactionListTable'
 
 const DistributionListContent = () => {
   return (

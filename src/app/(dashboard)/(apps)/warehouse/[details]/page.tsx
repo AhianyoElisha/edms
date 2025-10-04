@@ -8,7 +8,7 @@ import LoaderDark from '@/components/layout/shared/LoaderDark'
 import { Suspense } from 'react'
 import { getWarehouseProductItemById } from '@/libs/actions/warehouse.actions'
 import { useParams } from 'next/navigation'
-import ProductionDetails from '@/views/mineralwater/requisition-details/warehouse/ProductionDetails'
+import ProductionDetails from '@/views/edms/requisition-details/warehouse/ProductionDetails'
 
 
 async function WarehouseContent() {

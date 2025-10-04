@@ -1,7 +1,7 @@
 'use client'
 
-import WarehouseToSalesRequisitionDetails from '@/views/mineralwater/manage-requisitions/sales/warehouse-sales/WarehouseToSalesRequisitionDetails';
-import WarehouseSalesRequisitionTable from '@/views/mineralwater/manage-requisitions/sales/SalesWarehouseRequisitionTable';
+import WarehouseToSalesRequisitionDetails from '@/views/edms/manage-requisitions/sales/warehouse-sales/WarehouseToSalesRequisitionDetails';
+import WarehouseSalesRequisitionTable from '@/views/edms/manage-requisitions/sales/SalesWarehouseRequisitionTable';
 // MUI Imports
 import Grid from '@mui/material/Grid'
 

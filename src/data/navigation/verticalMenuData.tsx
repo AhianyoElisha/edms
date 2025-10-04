@@ -165,26 +165,53 @@ const verticalMenuData = (dictionary: Awaited<ReturnType<typeof getDictionary>>)
         ]
       },
       {
-        label: dictionary['navigation'].logistics,
+        label: 'Delivery Management',
+        icon: 'ri-truck-line',
         children: [
           {
-            label: dictionary['navigation'].dashboard,
-            href: '/apps/logistics/dashboard'
+            label: 'Dashboard',
+            href: '/dashboards/logistics'
           },
           {
-            label: dictionary['navigation'].fleet,
-            href: '/apps/logistics/fleet'
-          },
-          {
-            label: 'Manifests',
+            label: 'Trips',
             children: [
               {
-                label: 'All Manifests',
-                href: '/delivery/manifests'
+                label: 'All Trips',
+                href: '/edms/trips'
               },
               {
-                label: 'Create Manifest',
-                href: '/delivery/manifests/create'
+                label: 'Create Trip',
+                href: '/edms/trips/create'
+              }
+            ]
+          },
+          {
+            label: 'Routes',
+            children: [
+              {
+                label: 'All Routes',
+                href: '/edms/routes'
+              },
+              {
+                label: 'Create Route',
+                href: '/edms/routes/create'
+              }
+            ]
+          },
+          {
+            label: 'Vehicles',
+            children: [
+              {
+                label: 'All Vehicles',
+                href: '/edms/vehicles'
+              },
+              {
+                label: 'Add Vehicle',
+                href: '/edms/vehicles/add'
+              },
+              {
+                label: 'Fleet View',
+                href: '/edms/vehicles/fleet'
               }
             ]
           },
@@ -193,13 +220,21 @@ const verticalMenuData = (dictionary: Awaited<ReturnType<typeof getDictionary>>)
             children: [
               {
                 label: 'Pickup Locations',
-                href: '/delivery/locations/pickup'
+                href: '/edms/locations/pickup'
               },
               {
                 label: 'Dropoff Locations',
-                href: '/delivery/locations/dropoff'
+                href: '/edms/locations/dropoff'
               }
             ]
+          },
+          {
+            label: 'Manifests',
+            href: '/edms/manifests'
+          },
+          {
+            label: 'Packages',
+            href: '/edms/packages'
           }
         ]
       },

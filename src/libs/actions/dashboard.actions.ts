@@ -1066,7 +1066,7 @@ function generateMockTrips(count: number): TripType[] {
     tolls: Math.floor(Math.random() * 50) + 10,
     $createdAt: new Date().toISOString(),
     $updatedAt: new Date().toISOString()
-  }));
+  })) as unknown as TripType[];
 }
 
 function generateMockCustomers(count: number): CustomerType[] {

@@ -7,7 +7,7 @@ import { redirect, useParams } from 'next/navigation'
 import type { Customer } from '@/types/apps/ecommerceTypes'
 
 // Component Imports
-import CustomerDetails from '@/views/mineralwater/customers/details'
+import CustomerDetails from '@/views/edms/customers/details'
 import { Grid } from '@mui/material'
 import { getCustomerDetailsById } from '@/libs/actions/customer.action'
 import LoaderDark from '@/components/layout/shared/LoaderDark'

@@ -1,5 +1,5 @@
 // Component Imports
-import UserList from '@views/mineralwater/user/list'
+import UserList from '@views/edms/user/list'
 
 // Data Imports
 import { getUserData } from '@/app/server/actions'

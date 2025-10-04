@@ -29,7 +29,7 @@ export async function getPermissionsList() {
     const permissions = await databases.listDocuments(
       appwriteConfig.database,
       appwriteConfig.permissions,
-      [Query.orderAsc('module'), Query.orderAsc('displayName')]
+      [Query.orderAsc('module'), Query.orderAsc('displayName'), Query.limit(200)]
     );
 
     return permissions;

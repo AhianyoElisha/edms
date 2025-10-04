@@ -87,9 +87,9 @@ const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
 const userRoleObj: UserRoleType = new Proxy(
   {
     admin: { icon: 'ri-vip-crown-line', color: 'error' },
-    sachetrep: { icon: 'ri-computer-line', color: 'warning' },
-    marketingrep: { icon: 'ri-truck-line', color: 'warning' },
-    warehouserep: { icon: 'ri-edit-box-line', color: 'info' },
+    operations: { icon: 'ri-computer-line', color: 'warning' },
+    driver: { icon: 'ri-truck-line', color: 'warning' },
+    pickupagent: { icon: 'ri-edit-box-line', color: 'info' },
     productionrep: { icon: 'ri-pie-chart-2-line', color: 'success' },
     storesrep: { icon: 'ri-user-3-line', color: 'primary' }
   } as UserRoleType,

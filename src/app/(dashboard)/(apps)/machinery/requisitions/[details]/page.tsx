@@ -4,7 +4,7 @@
 import Grid from '@mui/material/Grid'
 
 // Component Imports
-import ProductionSidebar from '@/views/mineralwater/requisition-details/stores/StoresProductionRequisitionSidebar'
+import ProductionSidebar from '@/views/edms/requisition-details/stores/StoresProductionRequisitionSidebar'
 
 // Data Imports
 import LoaderDark from '@/components/layout/shared/LoaderDark'
@@ -12,7 +12,7 @@ import { Suspense } from 'react'
 import { getInventoryCategoryItemById } from '@/libs/actions/stores.actions'
 
 import { useParams } from 'next/navigation'
-import ProductionDetails from '@/views/mineralwater/requisition-details/production/ProductionStoreRequisitionDetails'
+import ProductionDetails from '@/views/edms/requisition-details/production/ProductionStoreRequisitionDetails'
 /* const getAcademyData = async () => {
   // Vars
   const res = await fetch(`${process.env.API_URL}/apps/academy`)

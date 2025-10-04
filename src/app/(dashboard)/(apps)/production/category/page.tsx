@@ -1,6 +1,6 @@
 'use client'
 
-import ProductCategoryTable from '@/views/mineralwater/production/category/ProductCategoryTable'
+import ProductCategoryTable from '@/views/edms/production/category/ProductCategoryTable'
 
 
 const ProductionCategoryListContent = () => {

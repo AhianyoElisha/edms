@@ -2,8 +2,8 @@
 
 import { Suspense } from 'react'
 import Grid from '@mui/material/Grid'
-import ProductListTable from '@/views/mineralwater/inventory/list/ProductListTable'
-import ProductCard from '@/views/mineralwater/inventory/list/ProductCard'
+import ProductListTable from '@/views/edms/inventory/list/ProductListTable'
+import ProductCard from '@/views/edms/inventory/list/ProductCard'
 
 
 const InventoryListContent = () => {

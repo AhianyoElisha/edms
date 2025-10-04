@@ -69,20 +69,21 @@ export type DriverStatusType = 'active' | 'offline' | 'on-trip'
 export interface PackageTrackingType {
   $id: string
   trackingNumber: string
-  sender: string
-  senderPhone: string
+  // Simplified - no sender info required for driver entry
   recipient: string
   recipientPhone: string
-  origin: string
-  destination: string
+  origin: string // pickup location
+  destination: string // dropoff location
   status: PackageStatusType
   estimatedDelivery: string
   currentLocation?: string
   driverName?: string
   driverPhone?: string
-  packageType: string
-  weight: string
-  value: number
+  // Updated package fields
+  packageSize: 'big' | 'medium' | 'small' | 'bin' // Driver-friendly size categories
+  isBin?: boolean // Is this a bin containing multiple small items?
+  itemCount?: number // Headcount of items in bin (for tracking)
+  notes?: string // Optional special instructions
   timeline: DeliveryHistory[]
   $createdAt: string
   $updatedAt: string
@@ -138,24 +139,35 @@ export interface DriverType {
 export interface TripType {
   $id: string
   tripNumber: string
-  driverId: string
-  driverName: string
-  vehicleId: string
-  vehicleLicense: string
-  route: string
-  origin: string
-  destination: string
-  status: TripStatusType
+  vehicle: string // vehicle ID
+  driver: string // driver ID
+  route: string // route ID
+  tripDate: string
   startTime: string
-  estimatedArrival: string
-  actualArrival?: string
-  packages: string[] // Array of package IDs
-  packagesCount: number
-  completedDeliveries: number
-  revenue: number
-  distance: string
-  fuelCost: number
-  tolls: number
+  endTime?: string
+  clientRate?: number
+  driverRate?: number
+  profit?: number
+  manifests: string[] // array of manifest IDs
+  status: 'planned' | 'in_progress' | 'at_pickup' | 'on_route' | 'completed' | 'cancelled'
+  notes?: string
+  creator: string
+  
+  // Trip Checkpoint Tracking
+  checkpoints?: string // JSON string of checkpoint array
+  currentLocation?: string // current GPS coordinates
+  currentCheckpoint?: number // index of current checkpoint
+  distanceTraveled?: number // in kilometers
+  
+  // GPS and Tracking
+  gpsTrackingData?: string // JSON GPS tracking points
+  
+  // Financial
+  expenses?: string[] // array of expense IDs
+  invoiceGenerated: boolean
+  invoiceAmount: number
+  paymentStatus: 'pending' | 'partial' | 'paid'
+  
   $createdAt: string
   $updatedAt: string
 }
@@ -261,15 +273,14 @@ export interface DeliveryDashboardData {
 // API Response Interfaces
 export interface CreatePackageRequest {
   trackingNumber: string
-  sender: string
-  senderPhone: string
   recipient: string
   recipientPhone: string
-  origin: string
-  destination: string
-  packageType: string
-  weight: string
-  value: number
+  origin: string // pickup location
+  destination: string // dropoff location
+  packageSize: 'big' | 'medium' | 'small' | 'bin'
+  isBin?: boolean // Is this a bin?
+  itemCount?: number // Headcount for bin
+  notes?: string // Optional notes
   estimatedDelivery: string
 }
 
@@ -379,4 +390,70 @@ export interface ManifestFilters {
   vehicleId?: string
   pickupLocationId?: string
   dropoffLocationId?: string
+}
+
+// Route Types
+export interface RouteStopType {
+  locationId: string
+  locationName: string
+  address: string
+  sequence: number // order in the route
+  estimatedArrival?: string
+  actualArrival?: string
+}
+
+export interface RouteType {
+  $id: string
+  routeName: string
+  routeCode: string
+  startLocation: string // pickup location ID
+  startLocationName?: string
+  endLocation: string // final dropoff location ID
+  endLocationName?: string
+  intermediateStops: RouteStopType[] // array of intermediate dropoff locations
+  distance?: number // in kilometers
+  estimatedDuration?: number // in minutes
+  baseRate: number
+  isActive: boolean
+  $createdAt: string
+  $updatedAt: string
+}
+
+export interface RouteFilters {
+  search?: string
+  isActive?: boolean
+  startLocation?: string
+  endLocation?: string
+}
+
+// Trip Types (Enhanced)
+export interface TripManifestType {
+  dropoffLocationId: string
+  dropoffLocationName: string
+  manifestId?: string
+  manifestNumber?: string
+  packages: string[] // package IDs
+  packageCount: number
+  status: ManifestStatusType
+}
+
+export interface TripDetailsType {
+  $id: string
+  tripNumber: string
+  driverId: string
+  driverName: string
+  vehicleId: string
+  vehicleNumber: string
+  routeId: string
+  routeName: string
+  status: TripStatusType
+  startTime: string
+  endTime?: string
+  manifests: TripManifestType[]
+  totalPackages: number
+  deliveredPackages: number
+  notes?: string
+  creator: string
+  $createdAt: string
+  $updatedAt: string
 }

@@ -3,7 +3,7 @@
 
 // Data Imports
 import { Grid } from '@mui/material'
-import WorkersListTable from '@/views/mineralwater/workers/list/WorkersListTable'
+import WorkersListTable from '@/views/edms/workers/list/WorkersListTable'
 
 
 const SupplierListContent = () => {

@@ -1,5 +1,5 @@
 // Component Imports
-import Roles from '@views/mineralwater/roles'
+import Roles from '@views/edms/roles'
 
 // Data Imports
 import { getUserData } from '@/app/server/actions'

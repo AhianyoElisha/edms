@@ -4,9 +4,9 @@
 import Grid from '@mui/material/Grid'
 
 // Component Imports
-import TotalRequisitions from '@/views/mineralwater/manage-requisitions/TotalRequisitions'
-import RequisitionStatistics from '@/views/mineralwater/manage-requisitions/ReviewsStatistics'
-import ProductionWarehouseRequisitionTable from '@/views/mineralwater/manage-requisitions/production/IssuedProductionWarehouseRequisitionTable'
+import TotalRequisitions from '@/views/edms/manage-requisitions/TotalRequisitions'
+import RequisitionStatistics from '@/views/edms/manage-requisitions/ReviewsStatistics'
+import ProductionWarehouseRequisitionTable from '@/views/edms/manage-requisitions/production/IssuedProductionWarehouseRequisitionTable'
 
 
 

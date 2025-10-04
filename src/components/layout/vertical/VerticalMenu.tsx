@@ -198,10 +198,10 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
   }
 
   // Debug: Log current user info and permissions
-  console.log('Current User:', user)
-  console.log('User Role:', user?.role?.name)
-  console.log('User Permissions:', userPermissions)
-  console.log('Is Admin:', isAdmin)
+  // console.log('Current User:', user)
+  // console.log('User Role:', user?.role?.name)
+  // console.log('User Permissions:', userPermissions)
+  // console.log('Is Admin:', isAdmin)
 
   return (
     <ScrollWrapper
@@ -232,35 +232,26 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
         {/* Package Management Section */}
         {(hasAnyPermission(['packages.view', 'packages.create', 'packages.manage']) || hasAnyPermission(['manifests.view', 'manifests.create', 'manifests.manage'])) && (
           <MenuSection label="Package Management">
-            {/* Packages SubMenu */}
-            {hasAnyPermission(['packages.view', 'packages.create', 'packages.manage']) && (
+            {/* Packages SubMenu - TODO: Create package pages */}
+            {/* {hasAnyPermission(['packages.view', 'packages.create', 'packages.manage']) && (
               <SubMenu label="Packages" icon={<i className='ri-package-line' />}>
-                {hasAnyPermission(['packages.create']) && (
-                  <MenuItem onClick={() => handleNavigation('/packages/add')}>Create Package</MenuItem>
-                )}
                 {hasAnyPermission(['packages.view', 'packages.manage']) && (
-                  <MenuItem onClick={() => handleNavigation('/packages/list')}>Package List</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/edms/packages')}>All Packages</MenuItem>
                 )}
                 {hasAnyPermission(['packages.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/packages/tracking')}>Package Tracking</MenuItem>
-                )}
-                {hasAnyPermission(['packages.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/packages/history')}>Package History</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/edms/packages/tracking')}>Package Tracking</MenuItem>
                 )}
               </SubMenu>
-            )}
+            )} */}
 
             {/* Manifests SubMenu */}
             {hasAnyPermission(['manifests.view', 'manifests.create', 'manifests.manage']) && (
               <SubMenu label="Manifests" icon={<i className='ri-file-list-3-line' />}>
-                {hasAnyPermission(['manifests.create']) && (
-                  <MenuItem onClick={() => handleNavigation('/manifests/create')}>Create Manifest</MenuItem>
-                )}
                 {hasAnyPermission(['manifests.view', 'manifests.manage']) && (
-                  <MenuItem onClick={() => handleNavigation('/manifests/list')}>Manifest List</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/delivery/manifests')}>All Manifests</MenuItem>
                 )}
                 {hasAnyPermission(['manifests.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/manifests/active')}>Active Manifests</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/delivery/manifests/active')}>Active Manifests</MenuItem>
                 )}
               </SubMenu>
             )}
@@ -286,13 +277,10 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
             {hasAnyPermission(['vehicles.view', 'vehicles.create']) && (
               <SubMenu label="Vehicles" icon={<i className='ri-truck-line' />}>
                 {hasAnyPermission(['vehicles.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/vehicles')}>Vehicle Overview</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/vehicles')}>All Vehicles</MenuItem>
                 )}
                 {hasAnyPermission(['vehicles.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/vehicles/vehicles')}>Vehicle List</MenuItem>
-                )}
-                {hasAnyPermission(['vehicles.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/vehicles/fleet')}>Fleet Management</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/vehicles/fleet')}>Fleet View</MenuItem>
                 )}
               </SubMenu>
             )}
@@ -302,14 +290,14 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
             {/* Routes SubMenu */}
             {hasAnyPermission(['routes.view', 'routes.create']) && (
               <SubMenu label="Routes" icon={<i className='ri-route-line' />}>
-                {hasAnyPermission(['routes.create']) && (
-                  <MenuItem onClick={() => handleNavigation('/routes/add')}>Add Route</MenuItem>
-                )}
                 {hasAnyPermission(['routes.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/routes/list')}>Route List</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/edms/routes')}>All Routes</MenuItem>
+                )}
+                {hasAnyPermission(['routes.create']) && (
+                  <MenuItem onClick={() => handleNavigation('/edms/routes/create')}>Create Route</MenuItem>
                 )}
                 {hasAnyPermission(['ratecards.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/routes/ratecards')}>Rate Cards</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/edms/routes/ratecards')}>Rate Cards</MenuItem>
                 )}
               </SubMenu>
             )}
@@ -317,14 +305,11 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
             {/* Trips SubMenu */}
             {hasAnyPermission(['trips.view', 'trips.create']) && (
               <SubMenu label="Trips" icon={<i className='ri-map-pin-range-line' />}>
+                {hasAnyPermission(['trips.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/edms/trips')}>All Trips</MenuItem>
+                )}
                 {hasAnyPermission(['trips.create']) && (
-                  <MenuItem onClick={() => handleNavigation('/trips/plan')}>Plan Trip</MenuItem>
-                )}
-                {hasAnyPermission(['trips.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/trips/list')}>Trip List</MenuItem>
-                )}
-                {hasAnyPermission(['trips.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/trips/active')}>Active Trips</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/edms/trips/create')}>Create Trip</MenuItem>
                 )}
               </SubMenu>
             )}
@@ -382,8 +367,6 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
             {(hasPermission('users.view') || isAdmin) && (
               <SubMenu label="Staff Management" icon={<i className='ri-user-settings-line' />}>
                 <MenuItem onClick={() => handleNavigation('/user/list')}>All Users</MenuItem>
-                <MenuItem onClick={() => handleNavigation('/user/drivers')}>Drivers</MenuItem>
-                <MenuItem onClick={() => handleNavigation('/user/add')}>Add User</MenuItem>
               </SubMenu>
             )}
             {/* Roles Management */}

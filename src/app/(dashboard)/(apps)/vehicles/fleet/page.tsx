@@ -1,5 +1,5 @@
 // Component Imports
-import Fleet from '@/views/delivery/vehicles/fleet'
+import Fleet from '@/views/edms/vehicles/fleet'
 
 const FleetPage = () => {
   return <Fleet />

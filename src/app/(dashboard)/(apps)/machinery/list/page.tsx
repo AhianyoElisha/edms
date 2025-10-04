@@ -1,8 +1,8 @@
 'use client'
 
 import Grid from '@mui/material/Grid'
-import MachineryListTable from '@/views/mineralwater/machinery/list/MachineryListTable'
-import MachineryCard from '@/views/mineralwater/machinery/list/MachineryCard'
+import MachineryListTable from '@/views/edms/machinery/list/MachineryListTable'
+import MachineryCard from '@/views/edms/machinery/list/MachineryCard'
 
 
 const MachineryListContent = () => {

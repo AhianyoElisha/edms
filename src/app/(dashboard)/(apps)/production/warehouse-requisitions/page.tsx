@@ -4,13 +4,13 @@
 import Grid from '@mui/material/Grid'
 
 // Component Imports
-import TotalRequisitions from '@/views/mineralwater/manage-requisitions/TotalRequisitions'
-import RequisitionStatistics from '@/views/mineralwater/manage-requisitions/ReviewsStatistics'
-import ProductionWarehouseRequisitionTable from '@/views/mineralwater/manage-requisitions/production/ProductionWarehouseRequisitionTable'
-import ProductionToWarehouseRequisitionDetails from '@/views/mineralwater/manage-requisitions/warehouse/production-warehouse/ProductionToWarehouseRequisitionDetails';
+import TotalRequisitions from '@/views/edms/manage-requisitions/TotalRequisitions'
+import RequisitionStatistics from '@/views/edms/manage-requisitions/ReviewsStatistics'
+import ProductionWarehouseRequisitionTable from '@/views/edms/manage-requisitions/production/ProductionWarehouseRequisitionTable'
+import ProductionToWarehouseRequisitionDetails from '@/views/edms/manage-requisitions/warehouse/production-warehouse/ProductionToWarehouseRequisitionDetails';
 import { useState } from 'react'
-import PushToWarehouseRequisitionDetails from '@/views/mineralwater/manage-requisitions/production/production-warehouse/PushToWarehouseRequisitionDetails copy'
-import WarehouseRequisitionTable from '@/views/mineralwater/manage-requisitions/production/production-warehouse/WarehouseRequisitionTable'
+import PushToWarehouseRequisitionDetails from '@/views/edms/manage-requisitions/production/production-warehouse/PushToWarehouseRequisitionDetails copy'
+import WarehouseRequisitionTable from '@/views/edms/manage-requisitions/production/production-warehouse/WarehouseRequisitionTable'
 
 
 

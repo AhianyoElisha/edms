@@ -11,13 +11,13 @@ import Grid from '@mui/material/Grid'
 import type { PricingPlanType } from '@/types/pages/pricingTypes'
 
 // Component Imports
-import UserLeftOverview from '@views/mineralwater/user/view/user-left-overview'
-import UserRight from '@views/mineralwater/user/view/user-right'
+import UserLeftOverview from '@views/edms/user/view/user-left-overview'
+import UserRight from '@views/edms/user/view/user-right'
 
 // Data Imports
 import { getPricingData } from '@/app/server/actions'
 
-const SecurityTab = dynamic(() => import('@views/mineralwater/user/view/user-right/security'))
+const SecurityTab = dynamic(() => import('@views/edms/user/view/user-right/security'))
 
 // Vars
 const tabContentList = (data?: PricingPlanType[]): { [key: string]: ReactElement } => ({

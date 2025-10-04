@@ -1,8 +1,8 @@
 'use client'
 
 import Grid from '@mui/material/Grid'
-import ProductListTable from '@/views/mineralwater/warehouse/list/ProductListTable'
-import ProductCard from '@/views/mineralwater/inventory/list/ProductCard'
+import ProductListTable from '@/views/edms/warehouse/list/ProductListTable'
+import ProductCard from '@/views/edms/inventory/list/ProductCard'
 
 const ProductionListContent = () => {
   return (

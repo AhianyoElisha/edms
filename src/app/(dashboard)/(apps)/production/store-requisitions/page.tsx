@@ -3,10 +3,10 @@
 // MUI Imports
 import Grid from '@mui/material/Grid'
 
-import ProductionStoreRequisitionTable from '@/views/mineralwater/manage-requisitions/production/ProductionStoreRequisitionTable'
+import ProductionStoreRequisitionTable from '@/views/edms/manage-requisitions/production/ProductionStoreRequisitionTable'
 
 // Component Imports
-import StoreToProductionRequisitionDetails from "@/views/mineralwater/manage-requisitions/production/store-production/StoreToProductionRequisitionDetails"
+import StoreToProductionRequisitionDetails from "@/views/edms/manage-requisitions/production/store-production/StoreToProductionRequisitionDetails"
 import { useState } from 'react';
 
 const StoreToProductionRequisition = () => {

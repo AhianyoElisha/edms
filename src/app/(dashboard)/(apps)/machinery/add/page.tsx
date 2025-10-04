@@ -1,5 +1,5 @@
 // Component Imports
-import ProductDetails from '@/views/mineralwater/machinery/add/ProductDetails'
+import ProductDetails from '@/views/edms/machinery/add/ProductDetails'
 
 const eCommerceProductsAdd = () => {
   return (

@@ -7,7 +7,7 @@ import Grid from '@mui/material/Grid'
 import LoaderDark from '@/components/layout/shared/LoaderDark'
 import { getUserById } from '@/libs/actions/customer.action'
 import { useParams } from 'next/navigation'
-import UserView from '@/views/mineralwater/user/view'
+import UserView from '@/views/edms/user/view'
 import { Users } from '@/types/apps/ecommerceTypes'
 import { toast } from 'react-toastify'
 import { useEffect, useState } from 'react'
@@ -18,26 +18,26 @@ export default function UserViewPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        setIsLoading(true)
-        setError(null)
-        const userContent = await getUserById(params.id as string)
-        if (!userContent) {
-          setError('User not found')
-          return
-        }
-        setUserData(userContent as unknown as Users)
-      } catch (error) {
-        console.error('Error fetching user data:', error)
-        setError('Failed to load user data')
-        toast.error('Failed to load user data')
-      } finally {
-        setIsLoading(false)
+  const fetchUserData = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const userContent = await getUserById(params.id as string)
+      if (!userContent) {
+        setError('User not found')
+        return
       }
+      setUserData(userContent as unknown as Users)
+    } catch (error) {
+      console.error('Error fetching user data:', error)
+      setError('Failed to load user data')
+      toast.error('Failed to load user data')
+    } finally {
+      setIsLoading(false)
     }
+  }
 
+  useEffect(() => {
     if (params.id) {
       fetchUserData()
     }
@@ -65,7 +65,7 @@ export default function UserViewPage() {
   return (
     <Grid container spacing={6}>
       <Grid item xs={12}>
-        <UserView userData={userData} userId={params.id as string} />
+        <UserView userData={userData} userId={params.id as string} onUpdate={fetchUserData} />
       </Grid>
     </Grid>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import SalesCategoryTable from '@/views/mineralwater/sales/category/ProductCategoryTable'
+import SalesCategoryTable from '@/views/edms/sales/category/ProductCategoryTable'
 
 
 const SalesCategoryListContent = () => {

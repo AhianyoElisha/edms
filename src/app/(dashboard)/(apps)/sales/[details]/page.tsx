@@ -9,7 +9,7 @@ import { Suspense } from 'react'
 
 import { useParams } from 'next/navigation'
 import { getSalesItemById } from '@/libs/actions/warehouse.actions'
-import SalesDetails from '@/views/mineralwater/requisition-details/sales/SalesDetails'
+import SalesDetails from '@/views/edms/requisition-details/sales/SalesDetails'
 
 
 async function SalesContent() {

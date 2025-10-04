@@ -8,7 +8,7 @@ import LoaderDark from '@/components/layout/shared/LoaderDark'
 import { Suspense } from 'react'
 
 import { useParams } from 'next/navigation'
-import ProductionDetails from '@/views/mineralwater/requisition-details/production/ProductionWarehouseRequisitionDetails'
+import ProductionDetails from '@/views/edms/requisition-details/production/ProductionWarehouseRequisitionDetails'
 import { getProductionCategoryItemById } from '@/libs/actions/production.actions'
 
 
