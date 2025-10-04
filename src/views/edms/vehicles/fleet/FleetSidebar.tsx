@@ -160,7 +160,6 @@ const VehicleTracking = ({
               <Typography variant='caption' className='uppercase !text-success'>
                 Starting Location
               </Typography>
-              <Typography className='font-medium !text-textPrimary'>{`${vehicleTrackingData.starttown}, ${vehicleTrackingData.startcity}, ${vehicleTrackingData.startcountry}`}</Typography>
             </TimelineContent>
           </TimelineItem>
         </Timeline>
@@ -175,7 +174,6 @@ const VehicleTracking = ({
               <Typography variant='caption' className='uppercase !text-primary'>
                 Final Destination
               </Typography>
-              <Typography className='font-medium !text-textPrimary'>{`${vehicleTrackingData.endtown}, ${vehicleTrackingData.endcity}, ${vehicleTrackingData.endcountry}`}</Typography>
             </TimelineContent>
           </TimelineItem>
         </Timeline>

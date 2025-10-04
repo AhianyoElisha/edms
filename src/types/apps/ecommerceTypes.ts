@@ -44,11 +44,11 @@ export type Users = {
 export type Vehicle = {
   $id: string
   vehicleNumber: string
-  vehicleType: 'truck' | 'van' | 'bike' | 'car'
+  vehicleType: 'truck' | 'van' | 'bike' | 'car' | 'tricycle'
   brand?: string
   model?: string
   year?: number
-  status: 'active' | 'maintenance' | 'retired'
+  status: 'active' | 'maintenance' | 'retired'| 'inactive'
   ownership: 'owned' | 'rented'
   monthlyRentalCost?: number
   driver?: string // Relationship to user with driver role

@@ -10,7 +10,6 @@ import { Typography, Box, FormControl, InputLabel, Select, MenuItem } from '@mui
 import MaintenanceBanner from '../../../MaintenanceBanner';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { getDeliveryDashboardData } from '@/libs/actions/dashboard.actions';
 import { DeliveryHistory, DeliveryDashboardData } from '@/types/apps/deliveryTypes';
 import DeliveryOverviewCards from '@/views/dashboards/DeliveryOverviewCards';
 import PackageTrackingWidget from '@/views/dashboards/PackageTrackingWidget';
@@ -34,25 +33,8 @@ export default function DashboardContent() {
 
   const years = Array.from({length: 5}, (_, i) => new Date().getFullYear() - i)
 
-    const fetchDashboardData = useCallback(async () => {
-      try {
-        setIsLoading(true)
-        const response = await getDeliveryDashboardData(selectedMonth, selectedYear)
-        if (response) {
-          setDashboardData(response)
-        }
-        console.log('Delivery dashboard data fetched successfully:', response)
-      } catch (error) {
-        console.error('Error fetching delivery dashboard data:', error)
-        toast.error('Failed to fetch dashboard data')
-      } finally {
-        setIsLoading(false)
-      }
-    }, [selectedMonth, selectedYear])
-  
-    useEffect(() => {
-      fetchDashboardData()
-    }, [fetchDashboardData])
+
+
 
   // Get top 2 drivers for the performance cards
   const topDrivers = dashboardData?.driverStats?.drivers

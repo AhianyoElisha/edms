@@ -89,8 +89,9 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         dropoffSequence: manifests.indexOf(manifestData) + 1,
         manifestDate: new Date(tripDetails.startTime).toISOString(),
         totalPackages: packages.filter(pkg => pkg.manifestTempId === manifestData.tempId).length,
-        packageTypes: JSON.stringify(
-          getPackageTypeCountsForManifest(packages, manifestData.tempId)
+        totalItems: getTotalItemCountForManifest(packages, manifestData.tempId), // Including bin contents
+        packageSizes: JSON.stringify(
+          getPackageSizeCountsForManifest(packages, manifestData.tempId)
         ),
         packages: [], // Will be populated with package IDs
         status: 'pending',
@@ -135,7 +136,9 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
       const packageDoc = {
         packageId: packageData.trackingNumber,
         trackingNumber: packageData.trackingNumber,
-        packageType: packageData.packageType,
+        packageSize: packageData.packageSize, // Updated: big, medium, small, bin
+        isBin: packageData.isBin || false, // Is this a bin?
+        itemCount: packageData.itemCount || null, // Headcount for bins
         pickupLocation: '', // TODO: Get from route
         dropoffLocation: manifest.dropoffLocationId,
         route: tripDetails.routeId,
@@ -146,14 +149,10 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         expectedDeliveryDate: new Date(tripDetails.startTime).toISOString(),
         creator: tripDetails.driverId,
         
-        // Package details
-        senderName: packageData.senderName || null,
-        senderPhone: packageData.senderPhone || null,
+        // Recipient details (simplified - no sender info needed)
         recipientName: packageData.recipientName,
         recipientPhone: packageData.recipientPhone,
-        weight: packageData.weight || null,
-        value: packageData.value || null,
-        description: packageData.description || null,
+        notes: packageData.notes || null, // Optional notes for special instructions
         
         // Delivery tracking
         deliveryConfirmed: false,
@@ -262,14 +261,27 @@ async function generateTripNumber(): Promise<string> {
 }
 
 /**
- * Helper to get package type counts for a manifest
+ * Helper to get package size counts for a manifest
  */
-function getPackageTypeCountsForManifest(packages: any[], manifestTempId: string) {
+function getPackageSizeCountsForManifest(packages: any[], manifestTempId: string) {
   const manifestPackages = packages.filter(pkg => pkg.manifestTempId === manifestTempId)
   return manifestPackages.reduce((acc, pkg) => {
-    acc[pkg.packageType] = (acc[pkg.packageType] || 0) + 1
+    acc[pkg.packageSize] = (acc[pkg.packageSize] || 0) + 1
     return acc
   }, {} as Record<string, number>)
+}
+
+/**
+ * Helper to get total item count for a manifest (including bin contents)
+ */
+function getTotalItemCountForManifest(packages: any[], manifestTempId: string) {
+  const manifestPackages = packages.filter(pkg => pkg.manifestTempId === manifestTempId)
+  return manifestPackages.reduce((total, pkg) => {
+    if (pkg.isBin && pkg.itemCount) {
+      return total + pkg.itemCount
+    }
+    return total + 1
+  }, 0)
 }
 
 /**

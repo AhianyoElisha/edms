@@ -43,10 +43,7 @@ const LogisticsStatisticsCard = () => {
           const truckPercentage = totalVehicles > 0 ? Math.round((trucks / totalVehicles) * 100) : 0
           const maintenancePercentage = totalVehicles > 0 ? Math.round((maintenanceVehicles / totalVehicles) * 100) : 0
 
-          // Calculate route coverage (unique start-end combinations)
-          const uniqueRoutes = new Set(
-            vehicles.map(vehicle => `${vehicle.starttown}-${vehicle.endtown}`)
-          ).size
+
 
           const analyticsData: UserDataType[] = [
             {
@@ -78,7 +75,7 @@ const LogisticsStatisticsCard = () => {
             },
             {
               title: 'Route Coverage',
-              stats: uniqueRoutes.toString(),
+              stats: '',
               avatarIcon: 'ri-route-line',
               avatarColor: 'warning',
               trend: maintenanceVehicles > 0 ? 'negative' : 'positive',

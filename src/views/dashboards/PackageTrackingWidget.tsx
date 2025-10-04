@@ -88,7 +88,6 @@ const PackageTrackingWidget = ({
 
   const filteredPackages = packageData?.filter(pkg => 
     pkg.trackingNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    pkg.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
     pkg.recipient.toLowerCase().includes(searchTerm.toLowerCase())
   ) || []
 
@@ -158,9 +157,6 @@ const PackageTrackingWidget = ({
                   
                   <div className='flex items-center gap-4'>
                     <Typography variant='body2' color='text.secondary'>
-                      From: {pkg.sender}
-                    </Typography>
-                    <Typography variant='body2' color='text.secondary'>
                       To: {pkg.recipient}
                     </Typography>
                   </div>
@@ -178,12 +174,6 @@ const PackageTrackingWidget = ({
                 </div>
                 
                 <div className='flex flex-col gap-1 text-right'>
-                  <Typography variant='body2' className='font-medium'>
-                    {pkg.packageType}
-                  </Typography>
-                  <Typography variant='caption' color='text.secondary'>
-                    {pkg.weight}
-                  </Typography>
                   <Typography variant='caption' color='text.secondary'>
                     ETA: {new Date(pkg.estimatedDelivery).toLocaleDateString()}
                   </Typography>

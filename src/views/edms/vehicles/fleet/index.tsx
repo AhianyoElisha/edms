@@ -17,8 +17,8 @@ import { getAllMonthsLogisticsToExpenseEstimate } from '@/libs/actions/dashboard
 import { toast } from 'react-toastify'
 
 export type viewStateType = {
-  staff: LogisticsType['staff'] | null
-  distribution: LogisticsType['distribution'] | null
+  driver: LogisticsType['driver'] | null
+  // distribution: LogisticsType['distribution'] | null
 }
 
 // Type for the analytics data returned from getAllMonthsLogisticsToExpenseEstimate
@@ -76,8 +76,8 @@ const Fleet = () => {
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false)
 
   const [viewState, setViewState] = useState<viewStateType>({
-    staff: null,
-    distribution: null,
+    driver: null,
+    // distribution: null,
   })
 
   const fetchLogisticsData = useCallback(async () => {
@@ -131,12 +131,12 @@ const Fleet = () => {
       setSelectedLogistics(selectedVehicle)
       
       // Update viewState based on selected logistics data
-      if (selectedVehicle.customers && selectedVehicle.distribution) {
-        setViewState({
-          staff: selectedVehicle.staff as unknown as LogisticsType['staff'],
-          distribution: selectedVehicle.distribution as unknown as LogisticsType['distribution'],
-        })
-      }
+      // if (selectedVehicle.customers && selectedVehicle.distribution) {
+      //   setViewState({
+      //     staff: selectedVehicle.staff as unknown as LogisticsType['staff'],
+      //     distribution: selectedVehicle.distribution as unknown as LogisticsType['distribution'],
+      //   })
+      // }
 
       // Fetch analytics data for the selected vehicle
       // Assuming the vehicle has an ID field - adjust based on your data structure

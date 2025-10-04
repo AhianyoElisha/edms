@@ -206,23 +206,23 @@ const TopReferralSources = ({ selectedLogistics, onStaffUpdate }: Props) => {
         </TabList>
 
         <TabPanel sx={{ p: 0 }} value='vehicle staff'>
-          {selectedLogistics?.staff ? (
+          {selectedLogistics?.driver ? (
           <RenderVehicleStaffTable 
-            data={selectedLogistics.staff as unknown as Users[]} 
+            data={selectedLogistics.driver as unknown as Users[]} 
               logisticsId={selectedLogistics.$id} 
               onStaffUpdate={onStaffUpdate}
             />
           ) : (
-            <Typography className='p-4 text-center text-textSecondary'>No staff data available</Typography>
+            <Typography className='p-4 text-center text-textSecondary'>No driver data available</Typography>
           )}
         </TabPanel>
-        <TabPanel sx={{ p: 0 }} value='distribution'>
+        {/* <TabPanel sx={{ p: 0 }} value='distribution'>
           {selectedLogistics?.distribution ? (
             <RenderDistributionTable data={selectedLogistics.distribution as unknown as DistributedDetail[]} vehicleNumber={selectedLogistics.vehicleNumber} />
           ) : (
             <Typography className='p-4 text-center text-textSecondary'>No distribution data available</Typography>
           )}
-        </TabPanel>
+        </TabPanel> */}
       </TabContext>
     </Card>
   )
