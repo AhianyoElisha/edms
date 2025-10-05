@@ -68,7 +68,6 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
       currentLocation: null
     }
 
-    console.log('🚀 Creating trip with payload:', JSON.stringify(tripData, null, 2))
 
     const trip = await databases.createDocument(
       appwriteConfig.database,
@@ -77,7 +76,6 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
       tripData
     )
 
-    console.log('✅ Trip created successfully:', trip.$id)
 
     const manifestIds: string[] = []
     const manifestMap = new Map<string, string>() // tempId -> real ID
@@ -118,7 +116,6 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         recipientPhone: null
       }
 
-      console.log(`📦 Creating manifest ${manifests.indexOf(manifestData) + 1} with payload:`, JSON.stringify(manifestDoc, null, 2))
 
       const manifest = await databases.createDocument(
         appwriteConfig.database,
@@ -127,7 +124,6 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         manifestDoc
       )
 
-      console.log(`✅ Manifest created successfully:`, manifest.$id)
 
       manifestIds.push(manifest.$id)
       manifestMap.set(manifestData.tempId, manifest.$id)
@@ -164,7 +160,6 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         deliveryDate: null
       }
 
-      console.log(`📫 Creating package ${packageData.trackingNumber} with payload:`, JSON.stringify(packageDoc, null, 2))
 
       const pkg = await databases.createDocument(
         appwriteConfig.database,
@@ -173,7 +168,6 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         packageDoc
       )
 
-      console.log(`✅ Package created successfully:`, pkg.$id)
 
       packageIds.push(pkg.$id)
 

@@ -355,7 +355,7 @@ export interface ManifestType {
   dropoffSequence: number // order in route
   manifestDate: string
   totalPackages: number
-  packageTypes: string // JSON string of package size counts
+  packageTypes: string // JSON string: {small: number, medium: number, big: number, bin: number}
   packages: string[] // array of package IDs
   status: ManifestStatusType
   manifestImage?: string | null // uploaded manifest photo
@@ -372,6 +372,7 @@ export interface ManifestType {
   missingPackages: string // JSON string of missing package IDs
   recipientName?: string | null
   recipientPhone?: string | null
+  creator: string 
   $createdAt: string
   $updatedAt: string
 }

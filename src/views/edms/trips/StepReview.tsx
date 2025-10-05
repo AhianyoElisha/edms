@@ -27,6 +27,9 @@ import type { WizardStepProps } from './types'
 // Actions
 import { createTripWithManifestsAndPackages } from '@/libs/actions/trip.actions'
 
+// Third-party Imports
+import { toast } from 'react-toastify'
+
 const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
@@ -71,7 +74,10 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
       const result = await createTripWithManifestsAndPackages(wizardData)
 
       if (result.success) {
-        alert(`Trip created successfully!\nTrip Number: ${result.tripNumber}`)
+        toast.success(`Trip created successfully! Trip Number: ${result.tripNumber}`, {
+          position: 'top-right',
+          autoClose: 5000,
+        })
         router.push(`/edms/trips/${result.tripId}`)
       } else {
         throw new Error(result.error || 'Failed to create trip')
