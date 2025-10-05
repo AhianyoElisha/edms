@@ -1,4 +1,3 @@
-'use server'
 
 // Appwrite Imports
 import { databases } from '@/libs/appwrite.config'
@@ -58,14 +57,18 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         }))
       ),
       
-      manifests: [], // Will be populated with manifest IDs
-      expenses: [],
+      // Note: manifests array not initialized here - Appwrite's two-way relationship
+      // automatically populates it when we set 'trip' field on each manifest
       invoiceGenerated: false,
       invoiceAmount: 0,
       paymentStatus: 'pending',
       currentCheckpoint: 0,
-      distanceTraveled: 0
+      distanceTraveled: 0,
+      gpsTrackingData: null,
+      currentLocation: null
     }
+
+    console.log('🚀 Creating trip with payload:', JSON.stringify(tripData, null, 2))
 
     const trip = await databases.createDocument(
       appwriteConfig.database,
@@ -73,6 +76,8 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
       ID.unique(),
       tripData
     )
+
+    console.log('✅ Trip created successfully:', trip.$id)
 
     const manifestIds: string[] = []
     const manifestMap = new Map<string, string>() // tempId -> real ID
@@ -84,21 +89,23 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         trip: trip.$id,
         vehicle: tripDetails.vehicleId,
         driver: tripDetails.driverId,
-        pickupLocation: '', // TODO: Get from route
-        dropoffLocation: manifestData.dropoffLocationId,
+        pickuplocation: '', // TODO: Set from route start location
+        dropofflocation: manifestData.dropoffLocationId, // Lowercase 'l' to match DB
         dropoffSequence: manifests.indexOf(manifestData) + 1,
         manifestDate: new Date(tripDetails.startTime).toISOString(),
         totalPackages: packages.filter(pkg => pkg.manifestTempId === manifestData.tempId).length,
-        totalItems: getTotalItemCountForManifest(packages, manifestData.tempId), // Including bin contents
-        packageSizes: JSON.stringify(
+        packageTypes: JSON.stringify(
           getPackageSizeCountsForManifest(packages, manifestData.tempId)
-        ),
-        packages: [], // Will be populated with package IDs
+        ), // DB field is 'packageTypes', not 'packageSizes'
+        // Note: packages array not initialized - two-way relationship handles this
         status: 'pending',
         notes: manifestData.notes || '',
-        creator: tripDetails.driverId,
-        estimatedArrival: manifestData.estimatedArrival || null,
         departureTime: manifestData.departureTime || null,
+        
+        // Delivery tracking fields (initialized as null)
+        arrivalTime: null,
+        deliveryTime: null,
+        manifestImage: null,
         
         // Proof of delivery fields (to be filled during delivery)
         proofOfDeliveryImage: null,
@@ -107,10 +114,11 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         gpsVerificationDistance: null,
         deliveredPackages: JSON.stringify([]),
         missingPackages: JSON.stringify([]),
-        deliveryNotes: null,
         recipientName: null,
         recipientPhone: null
       }
+
+      console.log(`📦 Creating manifest ${manifests.indexOf(manifestData) + 1} with payload:`, JSON.stringify(manifestDoc, null, 2))
 
       const manifest = await databases.createDocument(
         appwriteConfig.database,
@@ -118,6 +126,8 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         ID.unique(),
         manifestDoc
       )
+
+      console.log(`✅ Manifest created successfully:`, manifest.$id)
 
       manifestIds.push(manifest.$id)
       manifestMap.set(manifestData.tempId, manifest.$id)
@@ -134,30 +144,27 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
       if (!manifest) continue
 
       const packageDoc = {
-        packageId: packageData.trackingNumber,
         trackingNumber: packageData.trackingNumber,
-        packageSize: packageData.packageSize, // Updated: big, medium, small, bin
+        packageSize: packageData.packageSize, // big, medium, small, bin
         isBin: packageData.isBin || false, // Is this a bin?
         itemCount: packageData.itemCount || null, // Headcount for bins
-        pickupLocation: '', // TODO: Get from route
-        dropoffLocation: manifest.dropoffLocationId,
-        route: tripDetails.routeId,
+        pickuplocation: '', // Will be set from route start location
+        dropofflocation: manifest.dropoffLocationId, // Lowercase 'l' to match DB
         manifest: manifestId,
-        trip: trip.$id,
+        // Note: Removed trip relationship - package -> manifest -> trip is sufficient
         status: 'pending',
-        createdAt: new Date().toISOString(),
         expectedDeliveryDate: new Date(tripDetails.startTime).toISOString(),
-        creator: tripDetails.driverId,
         
         // Recipient details (simplified - no sender info needed)
-        recipientName: packageData.recipientName,
+        recipient: packageData.recipientName, // DB field is 'recipient', not 'recipientName'
         recipientPhone: packageData.recipientPhone,
         notes: packageData.notes || null, // Optional notes for special instructions
         
-        // Delivery tracking
-        deliveryConfirmed: false,
-        notDeliveredReason: null
+        // Delivery tracking fields (set to null initially)
+        deliveryDate: null
       }
+
+      console.log(`📫 Creating package ${packageData.trackingNumber} with payload:`, JSON.stringify(packageDoc, null, 2))
 
       const pkg = await databases.createDocument(
         appwriteConfig.database,
@@ -166,53 +173,15 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         packageDoc
       )
 
+      console.log(`✅ Package created successfully:`, pkg.$id)
+
       packageIds.push(pkg.$id)
 
-      // Update manifest with package ID
-      const manifestToUpdate = manifestIds[manifests.findIndex(m => m.tempId === packageData.manifestTempId)]
-      if (manifestToUpdate) {
-        const currentManifest = await databases.getDocument(
-          appwriteConfig.database,
-          appwriteConfig.manifests,
-          manifestToUpdate
-        )
-        
-        const currentPackages = currentManifest.packages || []
-        await databases.updateDocument(
-          appwriteConfig.database,
-          appwriteConfig.manifests,
-          manifestToUpdate,
-          {
-            packages: [...currentPackages, pkg.$id]
-          }
-        )
-      }
+      // Note: We don't manually update manifest.packages here because
+      // Appwrite's two-way relationship automatically adds package ID to
+      // manifest.packages when we set package.manifest above
     }
 
-    // Step 4: Update trip with manifest IDs and update checkpoints
-    const checkpointsWithManifestIds = manifests.map((manifest, index) => ({
-      dropoffLocationId: manifest.dropoffLocationId,
-      dropoffLocationName: manifest.dropoffLocationName,
-      manifestId: manifestMap.get(manifest.tempId) || '',
-      sequence: index + 1,
-      status: 'pending',
-      arrivalTime: null,
-      completionTime: null,
-      gpsCoordinates: null,
-      gpsVerified: false,
-      packagesDelivered: 0,
-      packagesMissing: 0
-    }))
-
-    await databases.updateDocument(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      trip.$id,
-      {
-        manifests: manifestIds,
-        checkpoints: JSON.stringify(checkpointsWithManifestIds)
-      }
-    )
 
     return {
       success: true,
@@ -220,7 +189,12 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
       tripNumber: trip.tripNumber as string
     }
   } catch (error) {
-    console.error('Error creating trip with manifests and packages:', error)
+    console.error('❌ Error creating trip with manifests and packages:', error)
+    console.error('Error details:', JSON.stringify(error, null, 2))
+    if (error instanceof Error) {
+      console.error('Error message:', error.message)
+      console.error('Error stack:', error.stack)
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to create trip'

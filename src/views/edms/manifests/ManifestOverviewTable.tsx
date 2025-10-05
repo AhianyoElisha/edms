@@ -52,6 +52,21 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [manifestToDelete, setManifestToDelete] = useState<ManifestType | null>(null)
   
+  // Helper function to parse packageTypes JSON string
+  const parsePackageTypes = (packageTypesString: string) => {
+    try {
+      const parsed = JSON.parse(packageTypesString)
+      return {
+        small: parsed.small || 0,
+        medium: parsed.medium || 0,
+        big: parsed.big || 0,
+        bin: parsed.bin || 0
+      }
+    } catch (error) {
+      return { small: 0, medium: 0, big: 0, bin: 0 }
+    }
+  }
+  
   // Pagination
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
@@ -284,10 +299,10 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
                 <TableCell>
                   <Box>
                     <Typography variant="body2">
-                      From: {manifest.pickupLocation}
+                      From: {manifest.pickuplocation}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      To: {manifest.dropoffLocation}
+                      To: {manifest.dropofflocation}
                     </Typography>
                   </Box>
                 </TableCell>
@@ -297,7 +312,10 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
                       {manifest.totalPackages} packages
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      S:{manifest.packageTypes.small} M:{manifest.packageTypes.medium} L:{manifest.packageTypes.large} B:{manifest.packageTypes.bins}
+                      {(() => {
+                        const types = parsePackageTypes(manifest.packageTypes)
+                        return `S:${types.small} M:${types.medium} L:${types.big} B:${types.bin}`
+                      })()}
                     </Typography>
                   </Box>
                 </TableCell>
@@ -378,11 +396,11 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
                 </Typography>
                 <Box mb={2}>
                   <Typography variant="body2" color="text.secondary">Pickup Location</Typography>
-                  <Typography variant="body1">{selectedManifest.pickupLocation}</Typography>
+                  <Typography variant="body1">{selectedManifest.pickuplocation}</Typography>
                 </Box>
                 <Box mb={2}>
                   <Typography variant="body2" color="text.secondary">Dropoff Location</Typography>
-                  <Typography variant="body1">{selectedManifest.dropoffLocation}</Typography>
+                  <Typography variant="body1">{selectedManifest.dropofflocation}</Typography>
                 </Box>
               </Grid>
 
@@ -411,10 +429,10 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
                 <Box mb={2}>
                   <Typography variant="body2" color="text.secondary">Package Breakdown</Typography>
                   <Typography variant="body1">
-                    Small: {selectedManifest.packageTypes.small}, 
-                    Medium: {selectedManifest.packageTypes.medium}, 
-                    Large: {selectedManifest.packageTypes.large}, 
-                    Bins: {selectedManifest.packageTypes.bins}
+                    {(() => {
+                      const types = parsePackageTypes(selectedManifest.packageTypes)
+                      return `Small: ${types.small}, Medium: ${types.medium}, Big: ${types.big}, Bins: ${types.bin}`
+                    })()}
                   </Typography>
                 </Box>
               </Grid>

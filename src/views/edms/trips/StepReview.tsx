@@ -61,6 +61,13 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
       setSubmitting(true)
       setError(null)
 
+      console.log('📤 Submitting wizard data to backend:', JSON.stringify(wizardData, null, 2))
+      console.log('📊 Summary:', {
+        manifests: wizardData.manifests.length,
+        packages: wizardData.packages.length,
+        tripDate: wizardData.tripDetails.startTime
+      })
+
       const result = await createTripWithManifestsAndPackages(wizardData)
 
       if (result.success) {

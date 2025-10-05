@@ -10,13 +10,10 @@ import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
 import Box from '@mui/material/Box'
+import Grid from '@mui/material/Grid'
 import TextField from '@mui/material/TextField'
 import InputAdornment from '@mui/material/InputAdornment'
 import IconButton from '@mui/material/IconButton'
-import Stepper from '@mui/material/Stepper'
-import Step from '@mui/material/Step'
-import StepLabel from '@mui/material/StepLabel'
-import StepContent from '@mui/material/StepContent'
 import { styled } from '@mui/material/styles'
 
 // Third-party Imports
@@ -163,19 +160,14 @@ const PackageTrackingWidget = ({
                   
                   <div className='flex items-center gap-4'>
                     <Typography variant='caption' color='text.secondary'>
-                      📍 {pkg.origin} → {pkg.destination}
+                      📍 Pickup: {pkg.pickuplocation} → Dropoff: {pkg.dropofflocation}
                     </Typography>
-                    {pkg.currentLocation && (
-                      <Typography variant='caption' color='text.secondary'>
-                        Current: {pkg.currentLocation}
-                      </Typography>
-                    )}
                   </div>
                 </div>
                 
                 <div className='flex flex-col gap-1 text-right'>
                   <Typography variant='caption' color='text.secondary'>
-                    ETA: {new Date(pkg.estimatedDelivery).toLocaleDateString()}
+                    Expected: {new Date(pkg.expectedDeliveryDate).toLocaleDateString()}
                   </Typography>
                 </div>
                 
@@ -185,63 +177,64 @@ const PackageTrackingWidget = ({
                 )} />
               </div>
 
-              {/* Package Timeline */}
+              {/* Package Details */}
               {selectedPackage?.$id === pkg.$id && (
                 <Box className='p-4 border-t border-divider bg-backgroundPaper'>
-                  <Typography variant='h6' className='mbe-4'>Tracking Timeline</Typography>
+                  <Typography variant='h6' className='mbe-4'>Package Details</Typography>
                   
-                  <Stepper orientation="vertical" nonLinear>
-                    {pkg.timeline.map((step, index) => (
-                      <Step key={index} completed={step.completed} active={!step.completed && index === pkg.timeline.findIndex(s => !s.completed)}>
-                        <StepLabel
-                          StepIconComponent={() => (
-                            <CustomAvatar
-                              color={step.completed ? 'success' : 'secondary'}
-                              size={32}
-                              className='bs-8 is-8'
-                            >
-                              <i className={classnames(
-                                step.completed ? 'ri-checkbox-circle-fill' : getStatusIcon(step.status),
-                                'text-sm'
-                              )} />
-                            </CustomAvatar>
-                          )}
-                        >
-                          <div className='flex flex-col gap-1'>
-                            <Typography variant='body2' className='font-medium'>
-                              {formatStatus(step.status)}
-                            </Typography>
-                            <Typography variant='caption' color='text.secondary'>
-                              {step.location} • {new Date(step.timestamp).toLocaleString()}
-                            </Typography>
-                          </div>
-                        </StepLabel>
-                        <StepContent>
-                          <Typography variant='body2' color='text.secondary' className='mbs-2'>
-                            {step.description}
-                          </Typography>
-                        </StepContent>
-                      </Step>
-                    ))}
-                  </Stepper>
-
-                  {/* Driver Info */}
-                  {pkg.driverName && (
-                    <Box className='mbs-4 p-3 rounded-lg bg-actionSelected'>
-                      <Typography variant='subtitle2' className='mbe-2'>Driver Information</Typography>
-                      <div className='flex items-center gap-2'>
-                        <CustomAvatar size={32}>
-                          <i className='ri-user-line' />
-                        </CustomAvatar>
-                        <div>
-                          <Typography variant='body2'>{pkg.driverName}</Typography>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <Box className='p-3 rounded-lg bg-actionSelected'>
+                        <Typography variant='caption' color='text.secondary'>Tracking Number</Typography>
+                        <Typography variant='body2' className='font-medium'>{pkg.trackingNumber}</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Box className='p-3 rounded-lg bg-actionSelected'>
+                        <Typography variant='caption' color='text.secondary'>Status</Typography>
+                        <Typography variant='body2' className='font-medium'>{formatStatus(pkg.status)}</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Box className='p-3 rounded-lg bg-actionSelected'>
+                        <Typography variant='caption' color='text.secondary'>Recipient</Typography>
+                        <Typography variant='body2' className='font-medium'>{pkg.recipient}</Typography>
+                        <Typography variant='caption' color='text.secondary'>{pkg.recipientPhone}</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Box className='p-3 rounded-lg bg-actionSelected'>
+                        <Typography variant='caption' color='text.secondary'>Package Size</Typography>
+                        <Typography variant='body2' className='font-medium text-capitalize'>{pkg.packageSize}</Typography>
+                        {pkg.isBin && pkg.itemCount && (
                           <Typography variant='caption' color='text.secondary'>
-                            {pkg.driverPhone}
+                            Bin contains {pkg.itemCount} items
                           </Typography>
-                        </div>
-                      </div>
-                    </Box>
-                  )}
+                        )}
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Box className='p-3 rounded-lg bg-actionSelected'>
+                        <Typography variant='caption' color='text.secondary'>Delivery Information</Typography>
+                        <Typography variant='body2' className='font-medium'>
+                          Expected: {new Date(pkg.expectedDeliveryDate).toLocaleString()}
+                        </Typography>
+                        {pkg.deliveryDate && (
+                          <Typography variant='body2' color='success.main'>
+                            Delivered: {new Date(pkg.deliveryDate).toLocaleString()}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Grid>
+                    {pkg.notes && (
+                      <Grid item xs={12}>
+                        <Box className='p-3 rounded-lg bg-actionSelected'>
+                          <Typography variant='caption' color='text.secondary'>Notes</Typography>
+                          <Typography variant='body2'>{pkg.notes}</Typography>
+                        </Box>
+                      </Grid>
+                    )}
+                  </Grid>
                 </Box>
               )}
             </Box>

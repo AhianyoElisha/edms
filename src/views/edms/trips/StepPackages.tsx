@@ -22,10 +22,10 @@ import AccordionDetails from '@mui/material/AccordionDetails'
 import type { WizardStepProps, PackageData } from './types'
 
 const packageSizes = [
-  { value: 'small', label: 'Small', icon: 'ri-archive-line', description: 'Individual small package' },
+  { value: 'small', label: 'Small', icon: 'ri-inbox-line', description: 'Individual small package' },
   { value: 'medium', label: 'Medium', icon: 'ri-inbox-line', description: 'Medium-sized package' },
   { value: 'big', label: 'Big', icon: 'ri-box-3-line', description: 'Large package' },
-  { value: 'bin', label: 'Bin', icon: 'ri-container-line', description: 'Bin with multiple small items' }
+  { value: 'bin', label: 'Bin', icon: 'ri-inbox-line', description: 'Bin with multiple small items' }
 ]
 
 const StepPackages = ({ handleNext, handlePrev, wizardData, updateWizardData }: WizardStepProps) => {
@@ -64,9 +64,22 @@ const StepPackages = ({ handleNext, handlePrev, wizardData, updateWizardData }: 
   }
 
   const updatePackage = (packageTempId: string, field: keyof PackageData, value: any) => {
-    setPackages(packages.map(pkg =>
-      pkg.tempId === packageTempId ? { ...pkg, [field]: value } : pkg
-    ))
+    setPackages(prevPackages =>
+      prevPackages.map(pkg =>
+        pkg.tempId === packageTempId ? { ...pkg, [field]: value } : pkg
+      )
+    )
+  }
+
+  const updatePackageMultiple = (packageTempId: string, updates: Partial<PackageData>) => {
+    console.log('updatePackageMultiple called with:', packageTempId, updates)
+    setPackages(prevPackages => {
+      const newPackages = prevPackages.map(pkg =>
+        pkg.tempId === packageTempId ? { ...pkg, ...updates } : pkg
+      )
+      console.log('Updated packages:', newPackages.find(p => p.tempId === packageTempId))
+      return newPackages
+    })
   }
 
   const getPackagesByManifest = (manifestTempId: string) => {
@@ -309,15 +322,25 @@ const StepPackages = ({ handleNext, handlePrev, wizardData, updateWizardData }: 
                                   value={pkg.packageSize}
                                   onChange={(e) => {
                                     const newSize = e.target.value as PackageData['packageSize']
-                                    updatePackage(pkg.tempId, 'packageSize', newSize)
-                                    updatePackage(pkg.tempId, 'isBin', newSize === 'bin')
-                                    if (newSize !== 'bin') {
-                                      updatePackage(pkg.tempId, 'itemCount', undefined)
-                                    }
+                                    console.log('Changing package size from', pkg.packageSize, 'to', newSize)
+                                    // Update all related fields in a single state update
+                                    updatePackageMultiple(pkg.tempId, {
+                                      packageSize: newSize,
+                                      isBin: newSize === 'bin',
+                                      itemCount: newSize === 'bin' ? pkg.itemCount : undefined
+                                    })
                                   }}
                                   required
                                   size='small'
                                   helperText={packageSizes.find(s => s.value === pkg.packageSize)?.description}
+                                  SelectProps={{
+                                    native: false,
+                                    MenuProps: {
+                                      PaperProps: {
+                                        style: { maxHeight: 300 }
+                                      }
+                                    }
+                                  }}
                                 >
                                   {packageSizes.map(size => (
                                     <MenuItem key={size.value} value={size.value}>
@@ -368,7 +391,7 @@ const StepPackages = ({ handleNext, handlePrev, wizardData, updateWizardData }: 
                                 </Typography>
                               </Grid>
 
-                              <Grid item xs={12} sm={6}>
+                              <Grid item xs={12} md={6}>
                                 <TextField
                                   fullWidth
                                   label='Recipient Name'
@@ -379,7 +402,7 @@ const StepPackages = ({ handleNext, handlePrev, wizardData, updateWizardData }: 
                                 />
                               </Grid>
 
-                              <Grid item xs={12} sm={6}>
+                              <Grid item xs={12} md={6}>
                                 <TextField
                                   fullWidth
                                   label='Recipient Phone'
@@ -387,6 +410,7 @@ const StepPackages = ({ handleNext, handlePrev, wizardData, updateWizardData }: 
                                   onChange={(e) => updatePackage(pkg.tempId, 'recipientPhone', e.target.value)}
                                   required
                                   size='small'
+                                  type='tel'
                                 />
                               </Grid>
 
@@ -416,14 +440,16 @@ const StepPackages = ({ handleNext, handlePrev, wizardData, updateWizardData }: 
       </Grid>
 
       <Grid item xs={12}>
-        <div className='flex items-center justify-between'>
-          <Button variant='outlined' onClick={handlePrev}>
+        <div className='flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3'>
+          <Button variant='outlined' onClick={handlePrev} fullWidth className='sm:w-auto'>
             Previous: Manifests
           </Button>
           <Button 
             variant='contained' 
             onClick={handleSubmit}
             disabled={packages.length === 0}
+            fullWidth 
+            className='sm:w-auto'
           >
             Next: Review & Submit
           </Button>

@@ -70,21 +70,20 @@ export interface PackageTrackingType {
   $id: string
   trackingNumber: string
   // Simplified - no sender info required for driver entry
-  recipient: string
+  recipient: string // Recipient name
   recipientPhone: string
-  origin: string // pickup location
-  destination: string // dropoff location
+  pickuplocation: string // pickup location ID (lowercase 'l')
+  dropofflocation: string // dropoff location ID (lowercase 'l')
+  manifest: string // manifest ID (package -> manifest -> trip relationship)
+  // Note: trip relationship removed - access trip via manifest
   status: PackageStatusType
-  estimatedDelivery: string
-  currentLocation?: string
-  driverName?: string
-  driverPhone?: string
+  expectedDeliveryDate: string
+  deliveryDate?: string | null
   // Updated package fields
   packageSize: 'big' | 'medium' | 'small' | 'bin' // Driver-friendly size categories
   isBin?: boolean // Is this a bin containing multiple small items?
   itemCount?: number // Headcount of items in bin (for tracking)
   notes?: string // Optional special instructions
-  timeline: DeliveryHistory[]
   $createdAt: string
   $updatedAt: string
 }
@@ -139,31 +138,30 @@ export interface DriverType {
 export interface TripType {
   $id: string
   tripNumber: string
-  vehicle: string // vehicle ID
-  driver: string // driver ID
-  route: string // route ID
+  vehicle: string // vehicle ID (Many-to-one)
+  driver: string // driver ID (Many-to-one)
+  route: string // route ID (Many-to-one)
   tripDate: string
   startTime: string
-  endTime?: string
   clientRate?: number
   driverRate?: number
   profit?: number
-  manifests: string[] // array of manifest IDs
+  manifests: string[] // array of manifest IDs (One-to-many)
   status: 'planned' | 'in_progress' | 'at_pickup' | 'on_route' | 'completed' | 'cancelled'
   notes?: string
-  creator: string
+  creator: string // creator ID (Many-to-one)
   
   // Trip Checkpoint Tracking
-  checkpoints?: string // JSON string of checkpoint array
-  currentLocation?: string // current GPS coordinates
+  checkpoints?: string | null // JSON string of checkpoint array
+  currentLocation?: string | null // current GPS coordinates
   currentCheckpoint?: number // index of current checkpoint
   distanceTraveled?: number // in kilometers
   
   // GPS and Tracking
-  gpsTrackingData?: string // JSON GPS tracking points
+  gpsTrackingData?: string | null // JSON GPS tracking points
   
   // Financial
-  expenses?: string[] // array of expense IDs
+  tripexpenses?: string // trip expense ID (Many-to-one, not array)
   invoiceGenerated: boolean
   invoiceAmount: number
   paymentStatus: 'pending' | 'partial' | 'paid'
@@ -275,13 +273,16 @@ export interface CreatePackageRequest {
   trackingNumber: string
   recipient: string
   recipientPhone: string
-  origin: string // pickup location
-  destination: string // dropoff location
+  pickuplocation: string // pickup location ID (lowercase 'l')
+  dropofflocation: string // dropoff location ID (lowercase 'l')
+  manifest: string // manifest ID
+  trip: string // trip ID
   packageSize: 'big' | 'medium' | 'small' | 'bin'
   isBin?: boolean // Is this a bin?
   itemCount?: number // Headcount for bin
   notes?: string // Optional notes
-  estimatedDelivery: string
+  expectedDeliveryDate: string
+  status: PackageStatusType
 }
 
 export interface CreateTripRequest {
@@ -346,26 +347,31 @@ export type ManifestStatusType = 'pending' | 'loaded' | 'in_transit' | 'delivere
 export interface ManifestType {
   $id: string
   manifestNumber: string
+  trip: string // relationship to trip
   vehicle: string // relationship to vehicle
   driver: string // relationship to user with role as driver
-  pickupLocation: string // relationship to pickup location
-  dropoffLocation: string // relationship to dropoff location
+  pickuplocation: string // relationship to pickup location (lowercase 'l')
+  dropofflocation: string // relationship to dropoff location (lowercase 'l')
+  dropoffSequence: number // order in route
   manifestDate: string
   totalPackages: number
-  packageTypes: {
-    small: number
-    medium: number
-    large: number
-    bins: number
-  }
+  packageTypes: string // JSON string of package size counts
   packages: string[] // array of package IDs
   status: ManifestStatusType
-  manifestImage?: string // uploaded manifest photo
-  departureTime?: string
-  arrivalTime?: string
-  deliveryTime?: string
+  manifestImage?: string | null // uploaded manifest photo
+  departureTime?: string | null
+  arrivalTime?: string | null
+  deliveryTime?: string | null
   notes?: string
-  creator: string // relationship to user
+  // Proof of delivery fields
+  proofOfDeliveryImage?: string | null
+  deliveryGpsCoordinates?: string | null
+  deliveryGpsVerified: boolean
+  gpsVerificationDistance?: number | null
+  deliveredPackages: string // JSON string of delivered package IDs
+  missingPackages: string // JSON string of missing package IDs
+  recipientName?: string | null
+  recipientPhone?: string | null
   $createdAt: string
   $updatedAt: string
 }

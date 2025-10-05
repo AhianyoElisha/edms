@@ -237,8 +237,8 @@ const TripSummary = ({
                     <div className='flex items-center gap-2'>
                       <i className='ri-time-line text-sm' />
                       <Typography variant='caption' color='text.secondary'>
-                        {trip.status === 'completed' && trip.endTime
-                          ? `Completed: ${new Date(trip.endTime).toLocaleTimeString()}`
+                        {trip.status === 'completed'
+                          ? `Completed on ${new Date(trip.tripDate).toLocaleDateString()}`
                           : `Started: ${new Date(trip.startTime).toLocaleTimeString()}`
                         }
                       </Typography>
