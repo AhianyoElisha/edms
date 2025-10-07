@@ -299,9 +299,42 @@ export async function getAllTrips(filters?: {
 }
 
 /**
- * Get trip by ID
+ * Get trip by ID with all related data (vehicle, driver, route, manifests, packages)
  */
-export async function getTripById(tripId: string): Promise<TripType> {
+export async function getTripById(tripId: string): Promise<any> {
+  try {
+    const { tablesDB } = await import('@/libs/appwrite.config')
+    
+    // Fetch trip with related data using TablesDB Query.select
+    const trip = await tablesDB.getRow(
+      appwriteConfig.database,
+      appwriteConfig.trips,
+      tripId,
+      [
+        Query.select([
+          '*',
+          'vehicle.*', // Fetch complete vehicle details
+          'driver.*', // Fetch complete driver details  
+          'route.*', // Fetch complete route details
+          'manifests.*', // Fetch all manifests
+          'manifests.packages.*', // Fetch packages in each manifest
+          'manifests.pickuplocation.*', // Fetch pickup location details
+          'manifests.dropofflocation.*' // Fetch dropoff location details
+        ])
+      ]
+    )
+
+    return trip
+  } catch (error) {
+    console.error('Error fetching trip with related data:', error)
+    throw new Error('Failed to fetch trip')
+  }
+}
+
+/**
+ * Get trip by ID (basic version without relationships)
+ */
+export async function getTripByIdBasic(tripId: string): Promise<TripType> {
   try {
     const trip = await databases.getDocument(
       appwriteConfig.database,

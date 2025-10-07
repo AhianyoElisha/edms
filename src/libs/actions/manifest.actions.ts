@@ -1,7 +1,5 @@
-'use server'
-
 import { ID, Query } from 'appwrite'
-import { databases, appwriteConfig } from '@/libs/appwrite.config'
+import { databases, appwriteConfig, tablesDB } from '@/libs/appwrite.config'
 import type { ManifestType, ManifestFilters, ManifestStats } from '@/types/apps/deliveryTypes'
 
 // Database and Collection IDs
@@ -78,6 +76,33 @@ export const getManifestById = async (manifestId: string): Promise<ManifestType>
   } catch (error) {
     console.error('Error fetching manifest:', error)
     throw new Error('Failed to fetch manifest')
+  }
+}
+
+/**
+ * Get manifest by ID with all related data (packages, locations, trip)
+ */
+export const getManifestByIdWithRelations = async (manifestId: string) => {
+  try {
+    const manifest = await tablesDB.getRow(
+      DATABASE_ID,
+      MANIFESTS_COLLECTION_ID,
+      manifestId,
+      [
+        Query.select([
+          '*',
+          'packages.*',
+          'pickuplocation.*',
+          'dropofflocation.*',
+          'trip.*'
+        ])
+      ]
+    )
+
+    return manifest
+  } catch (error) {
+    console.error('Error fetching manifest with relations:', error)
+    throw new Error('Failed to fetch manifest details')
   }
 }
 
