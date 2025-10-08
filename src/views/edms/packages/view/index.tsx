@@ -17,7 +17,6 @@ import Button from '@mui/material/Button'
 import Avatar from '@mui/material/Avatar'
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
-import Box from '@mui/material/Box'
 
 // Timeline Imports
 import TimelineDot from '@mui/lab/TimelineDot'
@@ -143,486 +142,370 @@ const PackageView = ({ packageData }: { packageData: any }) => {
   const status = packageData.status || 'pending'
 
   return (
-    <Grid container spacing={6}>
-      {/* Header */}
-      <Grid item xs={12}>
-        <Card>
-          <CardContent>
-            <div className='flex flex-wrap items-start justify-between gap-4'>
-              <div>
-                <Typography variant='h4' className='mb-2'>
-                  Package {packageData.trackingNumber}
-                </Typography>
-                <div className='flex flex-wrap items-center gap-2 mb-3'>
-                  <Chip
-                    label={status}
-                    color={getStatusColor(status)}
-                    size='small'
-                  />
-                  <Chip
-                    label={`Size: ${getSizeLabel(packageData.packageSize)}`}
-                    size='small'
-                    color='info'
-                    icon={<i className='ri-archive-line' />}
-                  />
-                  {isBin && (
-                    <Chip
-                      label={`Bin • ${packageData.itemCount || 0} items`}
-                      size='small'
-                      color='secondary'
-                      icon={<i className='ri-stack-line' />}
-                    />
-                  )}
-                </div>
-                <Typography variant='body2' color='text.secondary'>
-                  Last updated: {formatDateTime(packageData.$updatedAt)}
-                </Typography>
-              </div>
-              <div className='flex flex-wrap gap-2'>
-                {manifest?.$id && (
-                  <Link href={`/edms/manifests/${manifest.$id}`} passHref>
-                    <Button variant='outlined' startIcon={<i className='ri-file-list-3-line' />}>
-                      View Manifest
-                    </Button>
-                  </Link>
-                )}
-                {trip?.$id && (
-                  <Link href={`/edms/trips/${trip.$id}`} passHref>
-                    <Button variant='contained' startIcon={<i className='ri-route-line' />}>
-                      View Trip
-                    </Button>
-                  </Link>
-                )}
-              </div>
+    <>
+      <Typography className='mt-4' variant='h4'>Package Details - {packageData.trackingNumber}</Typography>
+      <Divider className='my-8' />
+
+      {/* Header Info */}
+      <Card className='mb-6'>
+        <CardContent>
+          <div className='flex flex-wrap items-start justify-between gap-4'>
+            <div className='flex flex-wrap items-center gap-2'>
+              <Typography variant='body2' color='text.secondary'>
+                Status:
+              </Typography>
+              <Chip
+                label={status?.charAt(0).toUpperCase() + status?.slice(1)}
+                color={getStatusColor(status)}
+                variant='tonal'
+                size='small'
+              />
+              <Chip
+                label={`Size: ${getSizeLabel(packageData.packageSize)}`}
+                size='small'
+                color='info'
+                variant='tonal'
+              />
+              {isBin && (
+                <Chip
+                  label={`Bin • ${packageData.itemCount || 0} items`}
+                  size='small'
+                  color='secondary'
+                  variant='tonal'
+                />
+              )}
             </div>
-          </CardContent>
-        </Card>
-      </Grid>
+            <div className='flex flex-wrap gap-2'>
+              {manifest?.$id && (
+                <Link href={`/edms/manifests/${manifest.$id}`} passHref>
+                  <Button variant='outlined' size='small' startIcon={<i className='ri-file-list-line' />}>
+                    View Manifest
+                  </Button>
+                </Link>
+              )}
+              {trip?.$id && (
+                <Link href={`/edms/trips/${trip.$id}`} passHref>
+                  <Button variant='outlined' size='small' startIcon={<i className='ri-truck-line' />}>
+                    View Trip
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Tabs */}
-      <Grid item xs={12}>
-        <Card>
-          <Tabs
-            value={activeTab}
-            onChange={(_, newValue) => setActiveTab(newValue)}
-            aria-label='package details tabs'
-          >
-            <Tab
-              label='Overview'
-              value='overview'
-              icon={<i className='ri-dashboard-line' />}
-              iconPosition='start'
-            />
-            <Tab
-              label={`Activity ${deliveryHistory.length ? `(${deliveryHistory.length})` : ''}`}
-              value='activity'
-              icon={<i className='ri-timeline-view' />}
-              iconPosition='start'
-            />
-          </Tabs>
+      <Card>
+        <Tabs
+          value={activeTab}
+          onChange={(_, newValue) => setActiveTab(newValue)}
+          aria-label='package details tabs'
+        >
+          <Tab
+            label='Overview'
+            value='overview'
+            icon={<i className='ri-dashboard-line' />}
+            iconPosition='start'
+          />
+          <Tab
+            label={`Activity ${deliveryHistory.length ? `(${deliveryHistory.length})` : ''}`}
+            value='activity'
+            icon={<i className='ri-timeline-view' />}
+            iconPosition='start'
+          />
+        </Tabs>
 
-          <CardContent>
-            {activeTab === 'overview' && (
-              <Grid container spacing={4}>
-                <Grid item xs={12} lg={4}>
-                  <Card variant='outlined' className='h-full'>
-                    <CardContent>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <Avatar className='bg-primary' sx={{ width: 48, height: 48 }}>
-                          <i className='ri-archive-2-line text-2xl' />
-                        </Avatar>
-                        <div>
-                          <Typography variant='h6' className='font-bold'>
-                            Package Summary
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary'>
-                            Core package information
-                          </Typography>
-                        </div>
-                      </div>
-
-                      <div className='space-y-3'>
-                        <div>
-                          <Typography variant='body2' color='text.secondary'>
-                            Tracking Number
-                          </Typography>
-                          <Typography variant='body1' className='font-semibold'>
-                            {packageData.trackingNumber}
-                          </Typography>
-                        </div>
-
-                        <div>
-                          <Typography variant='body2' color='text.secondary'>
-                            Status
-                          </Typography>
-                          <Chip
-                            label={status}
-                            color={getStatusColor(status)}
-                            size='small'
-                          />
-                        </div>
-
-                        <div>
-                          <Typography variant='body2' color='text.secondary'>
-                            Expected Delivery
-                          </Typography>
-                          <Typography variant='body1' className='font-semibold'>
-                            {formatDateTime(packageData.expectedDeliveryDate)}
-                          </Typography>
-                        </div>
-
-                        <div>
-                          <Typography variant='body2' color='text.secondary'>
-                            Delivered On
-                          </Typography>
-                          <Typography variant='body1' className='font-semibold'>
-                            {formatDateTime(packageData.deliveryDate)}
-                          </Typography>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} lg={4}>
-                  <Card variant='outlined' className='h-full'>
-                    <CardContent>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <Avatar className='bg-success' sx={{ width: 48, height: 48 }}>
-                          <i className='ri-user-smile-line text-2xl' />
-                        </Avatar>
-                        <div>
-                          <Typography variant='h6' className='font-bold'>
-                            Recipient Details
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary'>
-                            Who receives this package
-                          </Typography>
-                        </div>
-                      </div>
-
-                      <div className='space-y-3'>
-                        <div>
-                          <Typography variant='body2' color='text.secondary'>
-                            Recipient Name
-                          </Typography>
-                          <Typography variant='body1' className='font-semibold text-capitalize'>
-                            {packageData.recipient || '—'}
-                          </Typography>
-                        </div>
-
-                        <div>
-                          <Typography variant='body2' color='text.secondary'>
-                            Phone
-                          </Typography>
-                          <Typography variant='body1' className='font-semibold'>
-                            {packageData.recipientPhone || '—'}
-                          </Typography>
-                        </div>
-
-                        <div>
-                          <Typography variant='body2' color='text.secondary'>
-                            Notes
-                          </Typography>
-                          <Typography variant='body2'>
-                            {packageData.notes || 'No special delivery notes provided.'}
-                          </Typography>
-                        </div>
-
-                        {isBin && (
-                          <Divider className='my-2' />
-                        )}
-
-                        {isBin && (
-                          <div className='space-y-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Bin Information
-                            </Typography>
-                            <Typography variant='body1' className='font-semibold'>
-                              Contains {packageData.itemCount || 0} items
-                            </Typography>
-                            <Typography variant='caption' color='text.secondary'>
-                              Ensure all items are accounted for at dropoff.
-                            </Typography>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} lg={4}>
-                  <Card variant='outlined' className='h-full'>
-                    <CardContent>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <Avatar className='bg-info' sx={{ width: 48, height: 48 }}>
-                          <i className='ri-file-list-3-line text-2xl' />
-                        </Avatar>
-                        <div>
-                          <Typography variant='h6' className='font-bold'>
-                            Manifest & Trip
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary'>
-                            Linked fulfillment records
-                          </Typography>
-                        </div>
-                      </div>
-
-                      {manifest ? (
-                        <div className='space-y-3'>
-                          <div>
-                            <Typography variant='body2' color='text.secondary'>
-                              Manifest Number
-                            </Typography>
-                            <Typography variant='body1' className='font-semibold'>
-                              {manifest.manifestNumber || manifest.$id}
-                            </Typography>
-                          </div>
-
-                          <div className='flex flex-wrap items-center gap-2'>
-                            <Chip
-                              label={manifest.status || 'unknown'}
-                              size='small'
-                              color={getStatusColor(manifest.status || '')}
-                            />
-                            <Chip
-                              label={`${manifest.totalPackages || manifest.packages?.length || 0} packages`}
-                              size='small'
-                              icon={<i className='ri-inbox-line' />}
-                            />
-                          </div>
-
-                          <Divider className='my-2' />
-
-                          {trip ? (
-                            <div className='space-y-2'>
-                              <Typography variant='body2' color='text.secondary'>
-                                Trip
-                              </Typography>
-                              <Typography variant='body1' className='font-semibold'>
-                                {trip.tripNumber || trip.$id}
-                              </Typography>
-                              <Chip
-                                label={trip.status || '—'}
-                                size='small'
-                                color={getStatusColor(trip.status || '')}
-                              />
-                            </div>
-                          ) : (
-                            <Typography variant='body2' color='text.secondary'>
-                              Trip information not available.
-                            </Typography>
-                          )}
-                        </div>
-                      ) : (
-                        <Typography variant='body2' color='text.secondary'>
-                          This package is not linked to a manifest yet.
-                        </Typography>
-                      )}
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} lg={6}>
-                  <Card variant='outlined' className='h-full'>
-                    <CardContent>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <Avatar className='bg-warning' sx={{ width: 48, height: 48 }}>
-                          <i className='ri-map-pin-line text-2xl' />
-                        </Avatar>
-                        <div>
-                          <Typography variant='h6' className='font-bold'>
-                            Pickup Location
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary'>
-                            Where the journey starts
-                          </Typography>
-                        </div>
-                      </div>
-
-                      {/* {pickupLocation ? (
-                        <Box className='space-y-2'>
-                          <Typography variant='body1' className='font-semibold'>
-                            {pickupLocation.locationName || pickupLocation.name || pickupLocation.$id || pickupLocation}
-                          </Typography>
-                          <Typography variant='body2' color='text.secondary'>
-                            {pickupLocation.address || pickupLocation.locationCode || 'No address provided.'}
-                          </Typography>
-                          {pickupLocation.contactPerson && (
-                            <Typography variant='caption' color='text.secondary' display='block'>
-                              Contact: {pickupLocation.contactPerson}
-                            </Typography>
-                          )}
-                        </Box>
-                      ) : ( */}
-                        <Typography variant='body2' color='text.secondary'>
-                          Pickup location information not available.
-                        </Typography>
-                      {/* )} */}
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} lg={6}>
-                  <Card variant='outlined' className='h-full'>
-                    <CardContent>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <Avatar className='bg-error' sx={{ width: 48, height: 48 }}>
-                          <i className='ri-map-pin-2-line text-2xl' />
-                        </Avatar>
-                        <div>
-                          <Typography variant='h6' className='font-bold'>
-                            Dropoff Location
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary'>
-                            Final destination
-                          </Typography>
-                        </div>
-                      </div>
-
-                      {dropoffLocation ? (
-                        <Box className='space-y-2'>
-                          <Typography variant='body1' className='font-semibold'>
-                            {dropoffLocation.locationName || dropoffLocation.name || dropoffLocation.$id || dropoffLocation}
-                          </Typography>
-                          <Typography variant='body2' color='text.secondary'>
-                            {dropoffLocation.address || dropoffLocation.locationCode || 'No address provided.'}
-                          </Typography>
-                          {dropoffLocation.contactPerson && (
-                            <Typography variant='caption' color='text.secondary' display='block'>
-                              Contact: {dropoffLocation.contactPerson}
-                            </Typography>
-                          )}
-                        </Box>
-                      ) : (
-                        <Typography variant='body2' color='text.secondary'>
-                          Dropoff location information not available.
-                        </Typography>
-                      )}
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12}>
-                  <Card variant='outlined'>
-                    <CardContent>
-                      <div className='flex flex-wrap items-center justify-between gap-4 mb-3'>
-                        <div className='flex items-center gap-3'>
-                          <Avatar className='bg-secondary' sx={{ width: 40, height: 40 }}>
-                            <i className='ri-information-line text-xl' />
-                          </Avatar>
-                          <div>
-                            <Typography variant='h6' className='font-bold'>
-                              Additional Information
-                            </Typography>
-                            <Typography variant='caption' color='text.secondary'>
-                              Creation metadata & identifiers
-                            </Typography>
-                          </div>
-                        </div>
-                        <Chip
-                          label={`Created ${formatDateTime(packageData.$createdAt)}`}
-                          size='small'
-                          variant='outlined'
-                          icon={<i className='ri-time-line' />}
-                        />
-                      </div>
-
-                      <Grid container spacing={3}>
-                        <Grid item xs={12} md={4}>
-                          <Typography variant='caption' color='text.secondary' className='uppercase tracking-wide'>
-                            Package ID
-                          </Typography>
-                          <Typography variant='body2' className='font-semibold break-all'>
-                            {packageData.trackingNumber}
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                          <Typography variant='caption' color='text.secondary' className='uppercase tracking-wide'>
-                            Manifest ID
-                          </Typography>
-                          <Typography variant='body2' className='font-semibold break-all'>
-                            {manifest?.manifestNumber || '—'}
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                          <Typography variant='caption' color='text.secondary' className='uppercase tracking-wide'>
-                            Trip ID
-                          </Typography>
-                          <Typography variant='body2' className='font-semibold break-all'>
-                            {trip?.tripNumber || '—'}
-                          </Typography>
-                        </Grid>
-                      </Grid>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
-            )}
-
-            {activeTab === 'activity' && (
-              <div>
-                {deliveryHistory && deliveryHistory.length > 0 ? (
-                  <Timeline position='right'>
-                    {deliveryHistory.map((event: any, index: number) => {
-                      const statusLabel = toDisplayText(event?.status ?? event?.title, 'Update')
-                      const timestamp = event?.timestamp ?? event?.date ?? event?.time
-                      const descriptionText = toDisplayText(event?.description ?? event?.details, 'Status updated.')
-                      const locationText = toDisplayText(event?.location, '')
-
-                      return (
-                        <TimelineItem key={`${statusLabel}-${index}`}>
-                          <TimelineSeparator>
-                            <TimelineDot color={getTimelineDotColor(statusLabel)}>
-                              <i className='ri-checkbox-circle-line' />
-                            </TimelineDot>
-                            {index < deliveryHistory.length - 1 && <TimelineConnector />}
-                          </TimelineSeparator>
-                          <TimelineContent>
-                            <Card variant='outlined' className='mb-4'>
-                              <CardContent>
-                                <div className='flex flex-wrap items-center justify-between gap-3 mb-1'>
-                                  <Typography variant='h6' className='font-semibold text-capitalize'>
-                                    {statusLabel.replaceAll('-', ' ')}
-                                  </Typography>
-                                  <Typography variant='caption' color='text.secondary'>
-                                    {formatDateTime(timestamp)}
-                                  </Typography>
-                                </div>
-                                <Typography variant='body2'>
-                                  {descriptionText}
-                                </Typography>
-                                {locationText !== '—' && locationText !== '' && (
-                                  <Typography variant='caption' color='text.secondary' display='block' className='mt-2'>
-                                    Location: {locationText}
-                                  </Typography>
-                                )}
-                              </CardContent>
-                            </Card>
-                          </TimelineContent>
-                        </TimelineItem>
-                      )
-                    })}
-                  </Timeline>
-                ) : (
-                  <div className='text-center py-12'>
-                    <Avatar className='bg-grey-200 mx-auto mb-4' sx={{ width: 80, height: 80 }}>
-                      <i className='ri-timeline-view text-4xl text-textSecondary' />
-                    </Avatar>
-                    <Typography variant='h6' color='text.secondary' className='mb-1'>
-                      No delivery activity yet
-                    </Typography>
-                    <Typography variant='body2' color='text.secondary'>
-                      Updates will appear here as this package moves through checkpoints.
-                    </Typography>
+        <CardContent>
+          {activeTab === 'overview' && (
+            <Grid container spacing={6}>
+              {/* Package Summary */}
+              <Grid item xs={12} sm={6} lg={3}>
+                <div className='flex items-center gap-4 overflow-hidden'>
+                  <Avatar variant='rounded' className='bg-primary'>
+                    <i className='ri-archive-line' />
+                  </Avatar>
+                  <div className='overflow-hidden'>
+                    <Typography variant='h5' className='truncate'>{packageData.trackingNumber}</Typography>
+                    <Typography variant='body2'>Tracking Number</Typography>
                   </div>
+                </div>
+              </Grid>
+              <Grid item xs={12} sm={6} lg={3}>
+                <div className='flex items-center gap-4 overflow-hidden'>
+                  <Avatar variant='rounded' className='bg-info'>
+                    <i className='ri-box-3-line' />
+                  </Avatar>
+                  <div className='overflow-hidden'>
+                    <Typography variant='h5'>{getSizeLabel(packageData.packageSize)}</Typography>
+                    <Typography variant='body2'>Package Size</Typography>
+                  </div>
+                </div>
+              </Grid>
+              <Grid item xs={12} sm={6} lg={3}>
+                <div className='flex items-center gap-4 overflow-hidden'>
+                  <Avatar variant='rounded' className='bg-warning'>
+                    <i className='ri-weight-line' />
+                  </Avatar>
+                  <div className='overflow-hidden'>
+                    <Typography variant='h5'>{packageData.weight ? `${packageData.weight} kg` : 'N/A'}</Typography>
+                    <Typography variant='body2'>Weight</Typography>
+                  </div>
+                </div>
+              </Grid>
+              <Grid item xs={12} sm={6} lg={3}>
+                <div className='flex items-center gap-4 overflow-hidden'>
+                  <Avatar variant='rounded' className='bg-success'>
+                    <i className='ri-money-dollar-circle-line' />
+                  </Avatar>
+                  <div className='overflow-hidden'>
+                    <Typography variant='h5'>${Number(packageData.declaredValue || 0).toFixed(2)}</Typography>
+                    <Typography variant='body2'>Declared Value</Typography>
+                  </div>
+                </div>
+              </Grid>
+
+              {/* Package Details */}
+              <Grid item xs={12}>
+                <Divider />
+              </Grid>
+
+              <Grid item xs={12} sm={6} lg={3}>
+                <Typography variant='body2' color='text.secondary'>Package Type</Typography>
+                <Typography className='font-medium'>{packageData.packageType || 'Standard'}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6} lg={3}>
+                <Typography variant='body2' color='text.secondary'>Expected Delivery</Typography>
+                <Typography className='font-medium'>
+                  {packageData.expectedDeliveryDate ? new Date(packageData.expectedDeliveryDate).toLocaleDateString() : 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6} lg={3}>
+                <Typography variant='body2' color='text.secondary'>Actual Delivery</Typography>
+                <Typography className='font-medium'>
+                  {packageData.deliveryDate ? new Date(packageData.deliveryDate).toLocaleDateString() : 'Not delivered'}
+                </Typography>
+              </Grid>
+              {isBin && packageData.itemCount && (
+                <Grid item xs={12} sm={6} lg={3}>
+                  <Typography variant='body2' color='text.secondary'>Item Count (Bin)</Typography>
+                  <Typography className='font-medium'>{packageData.itemCount} items</Typography>
+                </Grid>
+              )}
+
+              {/* Divider */}
+              <Grid item xs={12}>
+                <Divider />
+              </Grid>
+
+              {/* Recipient Information */}
+              <Grid item xs={12} md={6}>
+                <Typography variant='h6' className='mb-4'>Recipient Information</Typography>
+                <Typography color='text.secondary' className='mb-1'>
+                  <strong>Name:</strong> {packageData.recipient || packageData.recipientName || 'N/A'}
+                </Typography>
+                <Typography color='text.secondary' className='mb-1'>
+                  <strong>Phone:</strong> {packageData.recipientPhone || 'N/A'}
+                </Typography>
+                {packageData.recipientEmail && (
+                  <Typography color='text.secondary' className='mb-1'>
+                    <strong>Email:</strong> {packageData.recipientEmail}
+                  </Typography>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
+              </Grid>
+
+              {/* Sender Information (if available) */}
+              {(packageData.senderName || packageData.senderEmail || packageData.senderPhone) && (
+                <Grid item xs={12} md={6}>
+                  <Typography variant='h6' className='mb-4'>Sender Information</Typography>
+                  <Typography color='text.secondary' className='mb-1'>
+                    <strong>Name:</strong> {packageData.senderName || 'N/A'}
+                  </Typography>
+                  {packageData.senderPhone && (
+                    <Typography color='text.secondary' className='mb-1'>
+                      <strong>Phone:</strong> {packageData.senderPhone}
+                    </Typography>
+                  )}
+                  {packageData.senderEmail && (
+                    <Typography color='text.secondary' className='mb-1'>
+                      <strong>Email:</strong> {packageData.senderEmail}
+                    </Typography>
+                  )}
+                </Grid>
+              )}
+
+              {/* Divider */}
+              <Grid item xs={12}>
+                <Divider />
+              </Grid>
+
+              {/* Pickup Location */}
+              <Grid item xs={12} md={6}>
+                <Typography variant='h6' className='mb-4'>Pickup Location</Typography>
+                {pickupLocation && typeof pickupLocation === 'object' ? (
+                  <>
+                    <Typography color='text.secondary' className='mb-1'>
+                      <strong>Location:</strong> {pickupLocation.locationName || 'N/A'}
+                    </Typography>
+                    {pickupLocation.address && (
+                      <Typography color='text.secondary' className='mb-1'>
+                        <strong>Address:</strong> {pickupLocation.address}
+                      </Typography>
+                    )}
+                    {pickupLocation.city && (
+                      <Typography color='text.secondary' className='mb-1'>
+                        <strong>City:</strong> {pickupLocation.city}, {pickupLocation.region}
+                      </Typography>
+                    )}
+                    {pickupLocation.contactPerson && (
+                      <Typography color='text.secondary' className='mb-1'>
+                        <strong>Contact:</strong> {pickupLocation.contactPerson} {pickupLocation.contactPhone && `(${pickupLocation.contactPhone})`}
+                      </Typography>
+                    )}
+                  </>
+                ) : (
+                  <Typography color='text.secondary'>{pickupLocation || 'N/A'}</Typography>
+                )}
+              </Grid>
+
+              {/* Dropoff Location */}
+              <Grid item xs={12} md={6}>
+                <Typography variant='h6' className='mb-4'>Dropoff Location</Typography>
+                {dropoffLocation && typeof dropoffLocation === 'object' ? (
+                  <>
+                    <Typography color='text.secondary' className='mb-1'>
+                      <strong>Location:</strong> {dropoffLocation.locationName || 'N/A'}
+                    </Typography>
+                    {dropoffLocation.address && (
+                      <Typography color='text.secondary' className='mb-1'>
+                        <strong>Address:</strong> {dropoffLocation.address}
+                      </Typography>
+                    )}
+                    {dropoffLocation.city && (
+                      <Typography color='text.secondary' className='mb-1'>
+                        <strong>City:</strong> {dropoffLocation.city}, {dropoffLocation.region}
+                      </Typography>
+                    )}
+                    {dropoffLocation.contactPerson && (
+                      <Typography color='text.secondary' className='mb-1'>
+                        <strong>Contact:</strong> {dropoffLocation.contactPerson} {dropoffLocation.contactPhone && `(${dropoffLocation.contactPhone})`}
+                      </Typography>
+                    )}
+                  </>
+                ) : (
+                  <Typography color='text.secondary'>{dropoffLocation || 'N/A'}</Typography>
+                )}
+              </Grid>
+
+              {/* Additional Details */}
+              <Grid item xs={12}>
+                <Divider />
+              </Grid>
+
+              <Grid item xs={12} sm={6} lg={3}>
+                <Typography variant='body2' color='text.secondary'>Created Date</Typography>
+                <Typography className='font-medium'>
+                  {new Date(packageData.$createdAt).toLocaleDateString()}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6} lg={3}>
+                <Typography variant='body2' color='text.secondary'>Last Updated</Typography>
+                <Typography className='font-medium'>
+                  {new Date(packageData.$updatedAt).toLocaleDateString()}
+                </Typography>
+              </Grid>
+              {manifest && (
+                <>
+                  <Grid item xs={12} sm={6} lg={3}>
+                    <Typography variant='body2' color='text.secondary'>Manifest</Typography>
+                    <Typography className='font-medium'>{manifest.manifestNumber || manifest.$id}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6} lg={3}>
+                    <Typography variant='body2' color='text.secondary'>Dropoff Sequence</Typography>
+                    <Typography className='font-medium'>#{manifest.dropoffSequence || 'N/A'}</Typography>
+                  </Grid>
+                </>
+              )}
+
+              {(packageData.specialInstructions || packageData.notes) && (
+                <>
+                  <Grid item xs={12}>
+                    <Divider />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant='h6' className='mb-2'>Special Instructions / Notes</Typography>
+                    <Typography color='text.secondary'>{packageData.specialInstructions || packageData.notes}</Typography>
+                  </Grid>
+                </>
+              )}
+            </Grid>
+          )}
+
+          {activeTab === 'activity' && (
+            <div>
+              {deliveryHistory && deliveryHistory.length > 0 ? (
+                <Timeline position='right'>
+                  {deliveryHistory.map((event: any, index: number) => {
+                    const eventStatus = toDisplayText(event.status, 'pending')
+                    const statusLabel = eventStatus.charAt(0).toUpperCase() + eventStatus.slice(1)
+                    const timestamp = formatDateTime(event.timestamp || event.date)
+                    const description = toDisplayText(event.description || event.message, 'No description')
+                    const location = toDisplayText(event.location, '')
+
+                    return (
+                      <TimelineItem key={index}>
+                        <TimelineSeparator>
+                          <TimelineDot color={getTimelineDotColor(eventStatus)} sx={{ width: 40, height: 40 }}>
+                            <i className='ri-map-pin-line' />
+                          </TimelineDot>
+                          {index < deliveryHistory.length - 1 && <TimelineConnector />}
+                        </TimelineSeparator>
+                        <TimelineContent>
+                          <Card className='mb-4'>
+                            <CardContent>
+                              <div className='flex items-start justify-between flex-wrap gap-2 mb-2'>
+                                <Typography variant='h6'>{statusLabel}</Typography>
+                                <Chip
+                                  label={statusLabel}
+                                  variant='tonal'
+                                  color={getStatusColor(eventStatus)}
+                                  size='small'
+                                />
+                              </div>
+                              <Typography variant='body2' color='text.secondary' className='mb-1'>
+                                {description}
+                              </Typography>
+                              {location && (
+                                <Typography variant='body2' color='text.secondary' className='mb-1'>
+                                  <i className='ri-map-pin-line text-base' /> {location}
+                                </Typography>
+                              )}
+                              <Typography variant='caption' color='text.secondary'>
+                                {timestamp}
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        </TimelineContent>
+                      </TimelineItem>
+                    )
+                  })}
+                </Timeline>
+              ) : (
+                <div className='text-center py-12'>
+                  <i className='ri-timeline-view text-6xl text-textSecondary mb-2' />
+                  <Typography variant='h6' color='text.secondary'>
+                    No activity found
+                  </Typography>
+                  <Typography variant='body2' color='text.secondary'>
+                    No delivery history available for this package
+                  </Typography>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </>
   )
 }
 

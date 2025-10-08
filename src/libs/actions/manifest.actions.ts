@@ -94,7 +94,11 @@ export const getManifestByIdWithRelations = async (manifestId: string) => {
           'packages.*',
           'pickuplocation.*',
           'dropofflocation.*',
-          'trip.*'
+          'trip.*',
+          'vehicle.*',
+          'driver.*',
+          'trip.driver.*',
+          'trip.route.*',
         ])
       ]
     )

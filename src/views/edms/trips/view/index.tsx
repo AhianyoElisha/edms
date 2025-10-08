@@ -17,12 +17,15 @@ import Button from '@mui/material/Button'
 import Box from '@mui/material/Box'
 import LinearProgress from '@mui/material/LinearProgress'
 import Avatar from '@mui/material/Avatar'
-import IconButton from '@mui/material/IconButton'
-import Tooltip from '@mui/material/Tooltip'
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
-import { styled } from '@mui/material/styles'
-import { TripType } from '@/types/apps/deliveryTypes'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import Paper from '@mui/material/Paper'
 
 // Timeline Imports
 import TimelineDot from '@mui/lab/TimelineDot'
@@ -32,6 +35,7 @@ import TimelineSeparator from '@mui/lab/TimelineSeparator'
 import TimelineConnector from '@mui/lab/TimelineConnector'
 import MuiTimeline from '@mui/lab/Timeline'
 import type { TimelineProps } from '@mui/lab/Timeline'
+import { styled } from '@mui/material/styles'
 
 // Styled Timeline component
 const Timeline = styled(MuiTimeline)<TimelineProps>({
@@ -85,59 +89,60 @@ const TripView = ({ tripData }: { tripData: any }) => {
   const progressPercentage = checkpoints.length > 0 ? (completedCheckpoints / checkpoints.length) * 100 : 0
 
   return (
-    <Grid container spacing={6}>
-      {/* Header Card */}
-      <Grid item xs={12}>
-        <Card>
-          <CardContent>
-            <div className='flex items-start justify-between flex-wrap gap-4'>
-              <div>
-                <Typography variant='h4' className='mb-2'>
-                  Trip {tripData.tripNumber}
-                </Typography>
-                <div className='flex items-center gap-2 mb-2'>
-                  <Chip
-                    label={tripData.status}
-                    color={getStatusColor(tripData.status)}
-                    size='small'
-                  />
-                  {tripData.invoiceGenerated && (
-                    <Chip
-                      label='Invoice Generated'
-                      color='info'
-                      size='small'
-                      variant='outlined'
-                    />
-                  )}
-                </div>
-                <Typography variant='body2' color='text.secondary'>
-                  Created: {new Date(tripData.$createdAt).toLocaleString()}
-                </Typography>
-              </div>
-              <div className='flex gap-2'>
-                <Button
-                  variant='outlined'
-                  startIcon={<i className='ri-printer-line' />}
-                >
-                  Print
-                </Button>
-                <Button
-                  variant='contained'
-                  startIcon={<i className='ri-edit-line' />}
-                >
-                  Edit
-                </Button>
-              </div>
+    <>
+      <Typography className='mt-4' variant='h4'>Trip Details - {tripData.tripNumber}</Typography>
+      <Divider className='my-8' />
+      
+      {/* Header Info */}
+      <Card className='mb-6'>
+        <CardContent>
+          <div className='flex items-start justify-between flex-wrap gap-4'>
+            <div className='flex flex-wrap items-center gap-2'>
+              <Typography variant='body2' color='text.secondary'>
+                Status:
+              </Typography>
+              <Chip
+                label={tripData.status?.charAt(0).toUpperCase() + tripData.status?.slice(1)}
+                variant='tonal'
+                color={getStatusColor(tripData.status)}
+                size='small'
+              />
+              {tripData.invoiceGenerated && (
+                <Chip
+                  label='Invoice Generated'
+                  variant='tonal'
+                  color='info'
+                  size='small'
+                />
+              )}
             </div>
+            <div className='flex flex-wrap gap-2'>
+              <Button
+                variant='outlined'
+                size='small'
+                startIcon={<i className='ri-printer-line' />}
+              >
+                Print
+              </Button>
+              <Button
+                variant='contained'
+                size='small'
+                startIcon={<i className='ri-edit-line' />}
+              >
+                Edit
+              </Button>
+            </div>
+          </div>
 
-            {/* Progress Bar */}
-            <Box className='mt-4'>
+          {/* Progress Bar */}
+          {checkpoints.length > 0 && (
+            <Box className='mt-6'>
               <div className='flex items-center justify-between mb-2'>
-                <Typography variant='body2' className='font-semibold'>
+                <Typography variant='body2'>
                   Trip Progress
                 </Typography>
                 <Typography variant='body2' color='text.secondary'>
-                  {completedCheckpoints} of {checkpoints.length} checkpoints completed
+                  {completedCheckpoints} / {checkpoints.length} completed
                 </Typography>
               </div>
               <LinearProgress
@@ -146,657 +151,431 @@ const TripView = ({ tripData }: { tripData: any }) => {
                 className='h-2 rounded'
               />
             </Box>
-          </CardContent>
-        </Card>
-      </Grid>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Tabs */}
-      <Grid item xs={12}>
-        <Card>
-          <Tabs
-            value={activeTab}
-            onChange={(e, newValue) => setActiveTab(newValue)}
-            aria-label='trip details tabs'
-          >
-            <Tab 
-              label='Overview' 
-              value='overview'
-              icon={<i className='ri-dashboard-line' />}
-              iconPosition='start'
-            />
-            <Tab 
-              label={`Manifests ${tripData.manifests?.length ? `(${tripData.manifests.length})` : ''}`}
-              value='manifests'
-              icon={<i className='ri-file-list-3-line' />}
-              iconPosition='start'
-            />
-            <Tab 
-              label={`Checkpoints ${checkpoints.length ? `(${checkpoints.length})` : ''}`}
-              value='checkpoints'
-              icon={<i className='ri-map-pin-line' />}
-              iconPosition='start'
-            />
-          </Tabs>
+      <Card>
+        <Tabs
+          value={activeTab}
+          onChange={(e, newValue) => setActiveTab(newValue)}
+          aria-label='trip details tabs'
+        >
+          <Tab 
+            label='Overview' 
+            value='overview'
+            icon={<i className='ri-dashboard-line' />}
+            iconPosition='start'
+          />
+          <Tab 
+            label={`Manifests (${tripData.manifests?.length || 0})`}
+            value='manifests'
+            icon={<i className='ri-file-list-3-line' />}
+            iconPosition='start'
+          />
+          <Tab 
+            label={`Checkpoints (${checkpoints.length})`}
+            value='checkpoints'
+            icon={<i className='ri-map-pin-line' />}
+            iconPosition='start'
+          />
+        </Tabs>
 
-          <CardContent>
-            {/* Overview Tab */}
-            {activeTab === 'overview' && (
-              <Grid container spacing={4}>
-                {/* Vehicle Card */}
-                <Grid item xs={12} md={6}>
-                  <Card variant='outlined' className='h-full'>
-                    <CardContent>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <Avatar className='bg-primary' sx={{ width: 48, height: 48 }}>
-                          <i className='ri-truck-line text-2xl' />
-                        </Avatar>
-                        <div>
-                          <Typography variant='h6' className='font-bold'>
-                            Vehicle Information
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary'>
-                            Assigned vehicle details
-                          </Typography>
-                        </div>
-                      </div>
-                      <div className='space-y-3'>
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-hashtag text-textSecondary' />
-                          <div className='flex-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Vehicle Number
-                            </Typography>
-                            <Typography variant='body1' className='font-semibold'>
-                              {typeof tripData.vehicle === 'object' && tripData.vehicle !== null
-                                ? tripData.vehicle.vehicleNumber || tripData.vehicle.$id
-                                : tripData.vehicle || 'N/A'}
-                            </Typography>
-                          </div>
-                        </div>
-                        {typeof tripData.vehicle === 'object' && tripData.vehicle !== null && (
-                          <>
-                            <div className='flex items-center gap-2'>
-                              <i className='ri-car-line text-textSecondary' />
-                              <div className='flex-1'>
-                                <Typography variant='body2' color='text.secondary'>
-                                  Type & Model
-                                </Typography>
-                                <Typography variant='body1' className='font-semibold'>
-                                  {tripData.vehicle.vehicleType || 'N/A'}
-                                </Typography>
-                                <Typography variant='caption' color='text.secondary'>
-                                  {tripData.vehicle.brand} {tripData.vehicle.model}
-                                </Typography>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Grid>
+        <CardContent>
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <Grid container spacing={6}>
+              {/* Summary Cards */}
+              <Grid item xs={12} sm={6} lg={4}>
+                <div className='flex items-center gap-4'>
+                  <Avatar variant='rounded' className='bg-primary'>
+                    <i className='ri-truck-line' />
+                  </Avatar>
+                  <div className='overflow-hidden'>
+                    <Typography variant='h5' className='truncate'>
+                      {typeof tripData.vehicle === 'object' && tripData.vehicle !== null
+                        ? tripData.vehicle.vehicleNumber || tripData.vehicle.$id
+                        : tripData.vehicle || 'N/A'}
+                    </Typography>
+                    <Typography variant='body2'>Vehicle Number</Typography>
+                  </div>
+                </div>
+              </Grid>
+              <Grid item xs={12} sm={6} lg={4}>
+                <div className='flex items-center gap-4'>
+                  <Avatar variant='rounded' className='bg-success'>
+                    <i className='ri-user-line' />
+                  </Avatar>
+                  <div className='overflow-hidden'>
+                    <Typography variant='h5' className='truncate'>
+                      {typeof tripData.driver === 'object' && tripData.driver !== null
+                        ? tripData.driver.name || tripData.driver.email || tripData.driver.$id
+                        : tripData.driver || 'N/A'}
+                    </Typography>
+                    <Typography variant='body2'>Driver Name</Typography>
+                  </div>
+                </div>
+              </Grid>
+              <Grid item xs={12} sm={6} lg={4}>
+                <div className='flex items-center gap-4'>
+                  <Avatar variant='rounded' className='bg-info'>
+                    <i className='ri-route-line' />
+                  </Avatar>
+                  <div className='overflow-hidden'>
+                    <Typography variant='h5'>{tripData.distanceTraveled || tripData.totalDistance || 'N/A'} km</Typography>
+                    <Typography variant='body2'>Distance Traveled</Typography>
+                  </div>
+                </div>
+              </Grid>
 
-                {/* Driver Card */}
-                <Grid item xs={12} md={6}>
-                  <Card variant='outlined' className='h-full'>
-                    <CardContent>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <Avatar className='bg-success' sx={{ width: 48, height: 48 }}>
-                          <i className='ri-user-line text-2xl' />
-                        </Avatar>
-                        <div>
-                          <Typography variant='h6' className='font-bold'>
-                            Driver Information
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary'>
-                            Assigned driver details
-                          </Typography>
-                        </div>
-                      </div>
-                      <div className='space-y-3'>
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-user-3-line text-textSecondary' />
-                          <div className='flex-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Driver Name
-                            </Typography>
-                            <Typography variant='body1' className='font-semibold'>
-                              {typeof tripData.driver === 'object' && tripData.driver !== null
-                                ? tripData.driver.name || tripData.driver.email || tripData.driver.$id
-                                : tripData.driver || 'N/A'}
-                            </Typography>
-                          </div>
-                        </div>
-                        {typeof tripData.driver === 'object' && tripData.driver !== null && tripData.driver.phone && (
-                          <div className='flex items-center gap-2'>
-                            <i className='ri-phone-line text-textSecondary' />
-                            <div className='flex-1'>
-                              <Typography variant='body2' color='text.secondary'>
-                                Contact
-                              </Typography>
-                              <Typography variant='body1' className='font-semibold'>
-                                {tripData.driver.phone}
-                              </Typography>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Grid>
+              {/* Vehicle & Driver Details */}
+              <Grid item xs={12}>
+                <Divider />
+              </Grid>
 
-                {/* Route Card */}
-                <Grid item xs={12} md={6}>
-                  <Card variant='outlined' className='h-full'>
-                    <CardContent>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <Avatar className='bg-info' sx={{ width: 48, height: 48 }}>
-                          <i className='ri-route-line text-2xl' />
-                        </Avatar>
-                        <div>
-                          <Typography variant='h6' className='font-bold'>
-                            Route Information
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary'>
-                            Assigned route details
-                          </Typography>
-                        </div>
-                      </div>
-                      <div className='space-y-3'>
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-map-pin-line text-textSecondary' />
-                          <div className='flex-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Route Name
-                            </Typography>
-                            <Typography variant='body1' className='font-semibold'>
-                              {typeof tripData.route === 'object' && tripData.route !== null
-                                ? tripData.route.routeName || tripData.route.$id
-                                : tripData.route || 'N/A'}
-                            </Typography>
-                          </div>
-                        </div>
-                        {typeof tripData.route === 'object' && tripData.route !== null && tripData.route.routeCode && (
-                          <div className='flex items-center gap-2'>
-                            <i className='ri-barcode-line text-textSecondary' />
-                            <div className='flex-1'>
-                              <Typography variant='body2' color='text.secondary'>
-                                Route Code
-                              </Typography>
-                              <Typography variant='body1' className='font-semibold'>
-                                {tripData.route.routeCode}
-                              </Typography>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* Trip Statistics Card */}
-                <Grid item xs={12} md={6}>
-                  <Card variant='outlined' className='h-full'>
-                    <CardContent>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <Avatar className='bg-warning' sx={{ width: 48, height: 48 }}>
-                          <i className='ri-dashboard-line text-2xl' />
-                        </Avatar>
-                        <div>
-                          <Typography variant='h6' className='font-bold'>
-                            Trip Statistics
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary'>
-                            Real-time trip metrics
-                          </Typography>
-                        </div>
-                      </div>
-                      <div className='space-y-3'>
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-flag-line text-textSecondary' />
-                          <div className='flex-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Current Status
-                            </Typography>
-                            <Chip
-                              label={tripData.status}
-                              color={getStatusColor(tripData.status)}
-                              size='small'
-                            />
-                          </div>
-                        </div>
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-map-pin-range-line text-textSecondary' />
-                          <div className='flex-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Checkpoint Progress
-                            </Typography>
-                            <Chip
-                              label={`${tripData.currentCheckpoint} of ${checkpoints.length}`}
-                              color='secondary'
-                              size='small'
-                              icon={<i className='ri-map-pin-line' />}
-                            />
-                          </div>
-                        </div>
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-road-map-line text-textSecondary' />
-                          <div className='flex-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Distance Traveled
-                            </Typography>
-                            <Typography variant='body1' className='font-semibold'>
-                              {tripData.distanceTraveled || 0} km
-                            </Typography>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* Trip Details Card */}
-                <Grid item xs={12} md={6}>
-                  <Card variant='outlined' className='h-full'>
-                    <CardContent>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <Avatar className='bg-secondary' sx={{ width: 48, height: 48 }}>
-                          <i className='ri-calendar-line text-2xl' />
-                        </Avatar>
-                        <div>
-                          <Typography variant='h6' className='font-bold'>
-                            Trip Details
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary'>
-                            Schedule and timing
-                          </Typography>
-                        </div>
-                      </div>
-                      <div className='space-y-3'>
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-hashtag text-textSecondary' />
-                          <div className='flex-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Trip Number
-                            </Typography>
-                            <Typography variant='body1' className='font-semibold'>
-                              {tripData.tripNumber}
-                            </Typography>
-                          </div>
-                        </div>
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-calendar-check-line text-textSecondary' />
-                          <div className='flex-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Trip Date
-                            </Typography>
-                            <Typography variant='body1' className='font-semibold'>
-                              {new Date(tripData.tripDate).toLocaleDateString()}
-                            </Typography>
-                          </div>
-                        </div>
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-time-line text-textSecondary' />
-                          <div className='flex-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Start Time
-                            </Typography>
-                            <Typography variant='body1' className='font-semibold'>
-                              {new Date(tripData.startTime).toLocaleTimeString()}
-                            </Typography>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* Financial Information Card */}
-                <Grid item xs={12} md={6}>
-                  <Card variant='outlined' className='h-full'>
-                    <CardContent>
-                      <div className='flex items-center gap-3 mb-4'>
-                        <Avatar className='bg-error' sx={{ width: 48, height: 48 }}>
-                          <i className='ri-money-dollar-circle-line text-2xl' />
-                        </Avatar>
-                        <div>
-                          <Typography variant='h6' className='font-bold'>
-                            Financial Information
-                          </Typography>
-                          <Typography variant='caption' color='text.secondary'>
-                            Invoice and payment status
-                          </Typography>
-                        </div>
-                      </div>
-                      <div className='space-y-3'>
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-file-text-line text-textSecondary' />
-                          <div className='flex-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Invoice Status
-                            </Typography>
-                            <Chip
-                              label={tripData.invoiceGenerated ? 'Generated' : 'Not Generated'}
-                              color={tripData.invoiceGenerated ? 'success' : 'default'}
-                              size='small'
-                            />
-                          </div>
-                        </div>
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-money-dollar-box-line text-textSecondary' />
-                          <div className='flex-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Invoice Amount
-                            </Typography>
-                            <Typography variant='body1' className='font-semibold'>
-                              ${tripData.invoiceAmount?.toFixed(2) || '0.00'}
-                            </Typography>
-                          </div>
-                        </div>
-                        <div className='flex items-center gap-2'>
-                          <i className='ri-secure-payment-line text-textSecondary' />
-                          <div className='flex-1'>
-                            <Typography variant='body2' color='text.secondary'>
-                              Payment Status
-                            </Typography>
-                            <Chip
-                              label={tripData.paymentStatus}
-                              color={tripData.paymentStatus === 'paid' ? 'success' : 'warning'}
-                              size='small'
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* Notes */}
-                {tripData.notes && (
-                  <Grid item xs={12}>
-                    <Card variant='outlined'>
-                      <CardContent>
-                        <div className='flex items-center gap-3 mb-3'>
-                          <Avatar className='bg-grey-500' sx={{ width: 40, height: 40 }}>
-                            <i className='ri-file-text-line text-xl' />
-                          </Avatar>
-                          <Typography variant='h6' className='font-bold'>
-                            Notes
-                          </Typography>
-                        </div>
-                        <Typography variant='body2'>{tripData.notes}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant='h6' className='mb-4'>Vehicle Information</Typography>
+                {typeof tripData.vehicle === 'object' && tripData.vehicle !== null ? (
+                  <>
+                    <Typography color='text.secondary' className='mb-1'>
+                      <strong>Vehicle Number:</strong> {tripData.vehicle.vehicleNumber || 'N/A'}
+                    </Typography>
+                    <Typography color='text.secondary' className='mb-1'>
+                      <strong>Type:</strong> {tripData.vehicle.vehicleType || tripData.vehicle.type || 'N/A'}
+                    </Typography>
+                    <Typography color='text.secondary' className='mb-1'>
+                      <strong>Brand & Model:</strong> {tripData.vehicle.brand} {tripData.vehicle.model || 'N/A'}
+                    </Typography>
+                    {tripData.vehicle.licensePlate && (
+                      <Typography color='text.secondary' className='mb-1'>
+                        <strong>License Plate:</strong> {tripData.vehicle.licensePlate}
+                      </Typography>
+                    )}
+                    {tripData.vehicle.capacity && (
+                      <Typography color='text.secondary' className='mb-1'>
+                        <strong>Capacity:</strong> {tripData.vehicle.capacity} units
+                      </Typography>
+                    )}
+                  </>
+                ) : (
+                  <Typography color='text.secondary'>Vehicle details not available</Typography>
                 )}
               </Grid>
-            )}
 
-            {/* Manifests Tab */}
-            {activeTab === 'manifests' && (
-              <div>
-                {tripData.manifests && tripData.manifests.length > 0 ? (
-                  <div className='space-y-4'>
-                    <Typography variant='body1' className='mb-4'>
-                      This trip has {tripData.manifests.length} manifest(s).
+              <Grid item xs={12} md={6}>
+                <Typography variant='h6' className='mb-4'>Driver Information</Typography>
+                {typeof tripData.driver === 'object' && tripData.driver !== null ? (
+                  <>
+                    <Typography color='text.secondary' className='mb-1'>
+                      <strong>Name:</strong> {tripData.driver.name || tripData.driver.email || 'N/A'}
                     </Typography>
-                    <div className='grid gap-3'>
-                      {tripData.manifests.map((manifest: any, index: number) => {
-                        // Handle both object and string manifest
-                        const isObject = typeof manifest === 'object' && manifest !== null
-                        const manifestId = isObject ? manifest.$id : manifest
-                        const manifestNumber = isObject ? manifest.manifestNumber : `Manifest ${index + 1}`
-                        const totalPackages = isObject ? manifest.totalPackages : 0
-                        const status = isObject ? manifest.status : 'unknown'
-                        const dropoffLocation = isObject && manifest.dropofflocation 
-                          ? (typeof manifest.dropofflocation === 'object' 
-                              ? manifest.dropofflocation.locationName 
-                              : manifest.dropofflocation)
-                          : 'N/A'
-                        
+                    {tripData.driver.phone && (
+                      <Typography color='text.secondary' className='mb-1'>
+                        <strong>Phone:</strong> {tripData.driver.phone}
+                      </Typography>
+                    )}
+                    {tripData.driver.email && (
+                      <Typography color='text.secondary' className='mb-1'>
+                        <strong>Email:</strong> {tripData.driver.email}
+                      </Typography>
+                    )}
+                    {tripData.driver.rating !== undefined && (
+                      <Typography color='text.secondary' className='mb-1'>
+                        <strong>Rating:</strong> {tripData.driver.rating} / 5.0
+                      </Typography>
+                    )}
+                    {tripData.driver.licenseNumber && (
+                      <Typography color='text.secondary' className='mb-1'>
+                        <strong>License:</strong> {tripData.driver.licenseNumber}
+                      </Typography>
+                    )}
+                  </>
+                ) : (
+                  <Typography color='text.secondary'>Driver details not available</Typography>
+                )}
+              </Grid>
+
+              {/* Trip Timeline */}
+              <Grid item xs={12}>
+                <Divider />
+              </Grid>
+
+              <Grid item xs={12} md={6} lg={3}>
+                <Typography color='text.secondary'>Trip Date</Typography>
+                <Typography className='font-medium'>
+                  {tripData.tripDate ? new Date(tripData.tripDate).toLocaleDateString() : 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={6} lg={3}>
+                <Typography color='text.secondary'>Start Time</Typography>
+                <Typography className='font-medium'>
+                  {tripData.startTime ? new Date(tripData.startTime).toLocaleString() : 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={6} lg={3}>
+                <Typography color='text.secondary'>Current Checkpoint</Typography>
+                <Typography className='font-medium'>
+                  {tripData.currentCheckpoint !== undefined ? `${tripData.currentCheckpoint + 1} of ${checkpoints.length}` : 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={6} lg={3}>
+                <Typography color='text.secondary'>Created</Typography>
+                <Typography className='font-medium'>
+                  {new Date(tripData.$createdAt).toLocaleDateString()}
+                </Typography>
+              </Grid>
+
+              {/* Financial Information */}
+              {(tripData.clientRate || tripData.driverRate || tripData.profit || tripData.invoiceAmount) && (
+                <>
+                  <Grid item xs={12}>
+                    <Divider />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant='h6' className='mb-4'>Financial Information</Typography>
+                  </Grid>
+                  {tripData.clientRate !== undefined && (
+                    <Grid item xs={12} md={6} lg={3}>
+                      <Typography color='text.secondary'>Client Rate</Typography>
+                      <Typography className='font-medium'>${Number(tripData.clientRate || 0).toFixed(2)}</Typography>
+                    </Grid>
+                  )}
+                  {tripData.driverRate !== undefined && (
+                    <Grid item xs={12} md={6} lg={3}>
+                      <Typography color='text.secondary'>Driver Rate</Typography>
+                      <Typography className='font-medium'>${Number(tripData.driverRate || 0).toFixed(2)}</Typography>
+                    </Grid>
+                  )}
+                  {tripData.profit !== undefined && (
+                    <Grid item xs={12} md={6} lg={3}>
+                      <Typography color='text.secondary'>Profit</Typography>
+                      <Typography className='font-medium'>${Number(tripData.profit || 0).toFixed(2)}</Typography>
+                    </Grid>
+                  )}
+                  {tripData.invoiceAmount !== undefined && (
+                    <Grid item xs={12} md={6} lg={3}>
+                      <Typography color='text.secondary'>Invoice Amount</Typography>
+                      <Typography className='font-medium'>${Number(tripData.invoiceAmount || 0).toFixed(2)}</Typography>
+                    </Grid>
+                  )}
+                  {tripData.paymentStatus && (
+                    <Grid item xs={12} md={6} lg={3}>
+                      <Typography color='text.secondary'>Payment Status</Typography>
+                      <Chip
+                        label={tripData.paymentStatus.charAt(0).toUpperCase() + tripData.paymentStatus.slice(1)}
+                        variant='tonal'
+                        color={tripData.paymentStatus === 'paid' ? 'success' : tripData.paymentStatus === 'partial' ? 'warning' : 'error'}
+                        size='small'
+                      />
+                    </Grid>
+                  )}
+                </>
+              )}
+
+              {tripData.notes && (
+                <>
+                  <Grid item xs={12}>
+                    <Divider />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant='h6' className='mb-2'>Notes</Typography>
+                    <Typography color='text.secondary'>{tripData.notes}</Typography>
+                  </Grid>
+                </>
+              )}
+            </Grid>
+          )}
+
+          {/* Manifests Tab */}
+          {activeTab === 'manifests' && (
+            <div className='overflow-x-auto'>
+              {tripData.manifests && tripData.manifests.length > 0 ? (
+                <TableContainer component={Paper} variant='outlined'>
+                  <Table sx={{ minWidth: 650 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Sequence</TableCell>
+                        <TableCell>Manifest Number</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Packages</TableCell>
+                        <TableCell>Dropoff Location</TableCell>
+                        <TableCell>Departure Time</TableCell>
+                        <TableCell>Arrival Time</TableCell>
+                        <TableCell align='right'>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {tripData.manifests.map((manifest: any) => {
+                        const manifestPackages = Array.isArray(manifest.packages) ? manifest.packages : []
+                        const manifestStatus = manifest.status || 'pending'
+                        const pickupLocation = manifest.pickupLocation || manifest.pickuplocation
+                        const dropoffLocation = manifest.dropoffLocation || manifest.dropofflocation
+
                         return (
-                          <Card key={manifestId} variant='outlined' className='border-l-4 border-l-primary'>
-                            <CardContent>
-                              <div className='flex items-center justify-between flex-wrap gap-4'>
-                                <div className='flex gap-3'>
-                                  <Avatar variant='rounded' className='bg-primary'>
-                                    <i className='ri-file-list-3-line' />
-                                  </Avatar>
-                                  <div>
-                                    <Typography variant='h6' className='font-bold'>
-                                      {manifestNumber}
-                                    </Typography>
-                                    <Typography variant='body2' color='text.secondary'>
-                                      {dropoffLocation}
-                                    </Typography>
-                                    <Typography variant='caption' color='text.secondary'>
-                                      ID: {manifestId.substring(0, 12)}...
-                                    </Typography>
-                                  </div>
-                                </div>
-                                <div className='flex gap-2 items-center flex-wrap'>
-                                  <Chip
-                                    label={`${totalPackages} packages`}
-                                    color='info'
-                                    size='small'
-                                    icon={<i className='ri-inbox-line' />}
-                                  />
-                                  <Chip
-                                    label={status}
-                                    color={getStatusColor(status)}
-                                    size='small'
-                                  />
-                                  <Link href={`/edms/manifests/${manifestId}`} passHref>
-                                    <Button 
-                                      size='small' 
-                                      variant='outlined'
-                                      startIcon={<i className='ri-eye-line' />}
-                                    >
-                                      View Details
-                                    </Button>
-                                  </Link>
-                                </div>
-                              </div>
-                              
-                              {/* Show packages if available */}
-                              {isObject && manifest.packages && Array.isArray(manifest.packages) && manifest.packages.length > 0 && (
-                                <div className='mt-4 pt-4 border-t'>
-                                  <div className='flex items-center gap-2 mb-3'>
-                                    <i className='ri-inbox-line text-textSecondary' />
-                                    <Chip
-                                      label={`${manifest.packages.length} Packages`}
-                                      color='primary'
-                                      size='small'
-                                      variant='outlined'
-                                    />
-                                  </div>
-                                  <div className='flex gap-2 flex-wrap'>
-                                    {manifest.packages.slice(0, 5).map((pkg: any) => {
-                                      const pkgObj = typeof pkg === 'object' ? pkg : null
-                                      return (
-                                        <Chip
-                                          key={pkgObj?.$id || pkg}
-                                          label={pkgObj?.trackingNumber || pkg}
-                                          size='small'
-                                          variant='outlined'
-                                        />
-                                      )
-                                    })}
-                                    {manifest.packages.length > 5 && (
-                                      <Chip
-                                        label={`+${manifest.packages.length - 5} more`}
-                                        size='small'
-                                        variant='outlined'
-                                        color='secondary'
-                                      />
-                                    )}
-                                  </div>
-                                </div>
+                          <TableRow key={manifest.$id} hover>
+                            <TableCell>
+                              <Typography className='font-medium'>
+                                #{manifest.dropoffSequence || 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography className='font-medium'>
+                                {manifest.manifestNumber}
+                              </Typography>
+                              {manifest.manifestDate && (
+                                <Typography variant='caption' color='text.secondary' className='block'>
+                                  {new Date(manifest.manifestDate).toLocaleDateString()}
+                                </Typography>
                               )}
-                            </CardContent>
-                          </Card>
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={manifestStatus.charAt(0).toUpperCase() + manifestStatus.slice(1)}
+                                variant='tonal'
+                                color={getStatusColor(manifestStatus)}
+                                size='small'
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography>{manifestPackages.length} packages</Typography>
+                              {manifest.packageTypes && (
+                                <Typography variant='caption' color='text.secondary' className='block'>
+                                  {(() => {
+                                    try {
+                                      const types = JSON.parse(manifest.packageTypes)
+                                      return Object.entries(types)
+                                        .filter(([_, count]) => (count as number) > 0)
+                                        .map(([type, count]) => `${count} ${type}`)
+                                        .join(', ')
+                                    } catch {
+                                      return 'Mixed'
+                                    }
+                                  })()}
+                                </Typography>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant='body2'>
+                                {dropoffLocation && typeof dropoffLocation === 'object'
+                                  ? dropoffLocation.locationName || dropoffLocation.address || dropoffLocation.city
+                                  : dropoffLocation || 'N/A'}
+                              </Typography>
+                              {dropoffLocation && typeof dropoffLocation === 'object' && dropoffLocation.city && (
+                                <Typography variant='caption' color='text.secondary' className='block'>
+                                  {dropoffLocation.city}
+                                </Typography>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant='body2'>
+                                {manifest.departureTime ? new Date(manifest.departureTime).toLocaleString() : 'Not departed'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant='body2'>
+                                {manifest.arrivalTime ? new Date(manifest.arrivalTime).toLocaleString() : 'Not arrived'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align='right'>
+                              <Link href={`/edms/manifests/${manifest.$id}`} passHref>
+                                <Button size='small' variant='outlined'>
+                                  View Details
+                                </Button>
+                              </Link>
+                            </TableCell>
+                          </TableRow>
                         )
                       })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className='text-center py-8'>
-                    <i className='ri-file-list-line text-6xl text-textSecondary mb-2' />
-                    <Typography variant='body1' color='text.secondary'>
-                      No manifests found for this trip
-                    </Typography>
-                  </div>
-                )}
-              </div>
-            )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <div className='text-center py-12'>
+                  <i className='ri-file-list-line text-6xl text-textSecondary mb-2' />
+                  <Typography variant='h6' color='text.secondary'>
+                    No manifests found
+                  </Typography>
+                  <Typography variant='body2' color='text.secondary'>
+                    This trip doesn't have any manifests yet
+                  </Typography>
+                </div>
+              )}
+            </div>
+          )}
 
-            {/* Checkpoints Tab */}
-            {activeTab === 'checkpoints' && (
-              <div>
-                {checkpoints.length > 0 ? (
-                  <Timeline>
-                    {checkpoints.map((checkpoint: any, index: number) => (
+          {/* Checkpoints Tab */}
+          {activeTab === 'checkpoints' && (
+            <div>
+              {checkpoints.length > 0 ? (
+                <Timeline>
+                  {checkpoints.map((checkpoint: any, index: number) => {
+                    const isCompleted = checkpoint.status === 'completed'
+                    const isPending = checkpoint.status === 'pending'
+
+                    return (
                       <TimelineItem key={index}>
                         <TimelineSeparator>
                           <TimelineDot
-                            color={
-                              checkpoint.status === 'completed'
-                                ? 'success'
-                                : checkpoint.status === 'in-progress'
-                                ? 'primary'
-                                : 'grey'
-                            }
+                            color={isCompleted ? 'success' : isPending ? 'grey' : 'primary'}
                             sx={{ width: 40, height: 40 }}
                           >
-                            {checkpoint.status === 'completed' ? (
-                              <i className='ri-check-line text-xl' />
-                            ) : checkpoint.status === 'in-progress' ? (
-                              <i className='ri-time-line text-xl' />
-                            ) : (
-                              <i className='ri-map-pin-line text-xl' />
-                            )}
+                            <i className={isCompleted ? 'ri-checkbox-circle-line' : 'ri-map-pin-line'} />
                           </TimelineDot>
                           {index < checkpoints.length - 1 && <TimelineConnector />}
                         </TimelineSeparator>
                         <TimelineContent>
-                          <Card variant='outlined' className='mb-4'>
+                          <Card className='mb-4'>
                             <CardContent>
-                              <div className='flex items-start justify-between flex-wrap gap-4 mb-3'>
-                                <div className='flex items-center gap-3'>
-                                  <Avatar className='bg-primary' sx={{ width: 48, height: 48 }}>
-                                    <i className='ri-map-pin-2-line text-2xl' />
-                                  </Avatar>
-                                  <div>
-                                    <Typography variant='h6' className='font-bold mb-1'>
-                                      {checkpoint.dropoffLocationName || `Checkpoint ${checkpoint.sequence}`}
-                                    </Typography>
-                                    <div className='flex items-center gap-2 flex-wrap'>
-                                      <Chip
-                                        label={checkpoint.status}
-                                        color={getStatusColor(checkpoint.status)}
-                                        size='small'
-                                      />
-                                      {checkpoint.gpsVerified && (
-                                        <Chip
-                                          label='GPS Verified'
-                                          color='success'
-                                          size='small'
-                                          icon={<i className='ri-map-pin-user-line' />}
-                                        />
-                                      )}
-                                      <Chip
-                                        label={`Sequence #${checkpoint.sequence}`}
-                                        variant='outlined'
-                                        size='small'
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className='text-right'>
-                                  {checkpoint.arrivalTime && (
-                                    <div className='flex items-center gap-1 justify-end mb-1'>
-                                      <i className='ri-login-circle-line text-info' />
-                                      <Typography variant='caption' color='text.secondary'>
-                                        Arrived: {new Date(checkpoint.arrivalTime).toLocaleString()}
-                                      </Typography>
-                                    </div>
-                                  )}
-                                  {checkpoint.completionTime && (
-                                    <div className='flex items-center gap-1 justify-end'>
-                                      <i className='ri-checkbox-circle-line text-success' />
-                                      <Typography variant='caption' color='text.secondary'>
-                                        Completed: {new Date(checkpoint.completionTime).toLocaleString()}
-                                      </Typography>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              <Divider className='my-3' />
-                              
-                              {/* Delivery Stats */}
-                              <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
-                                <div className='text-center'>
-                                  <div className='flex items-center justify-center gap-1 mb-1'>
-                                    <i className='ri-inbox-line text-primary' />
-                                    <Typography variant='caption' color='text.secondary'>
-                                      Delivered
-                                    </Typography>
-                                  </div>
-                                  <Typography variant='h6' className='font-bold text-success'>
-                                    {checkpoint.packagesDelivered || 0}
+                              <div className='flex items-start justify-between flex-wrap gap-2 mb-3'>
+                                <div>
+                                  <Typography variant='h6' className='mb-1'>
+                                    {checkpoint.locationName || `Checkpoint ${index + 1}`}
+                                  </Typography>
+                                  <Typography variant='body2' color='text.secondary'>
+                                    {checkpoint.address}
                                   </Typography>
                                 </div>
-                                <div className='text-center'>
-                                  <div className='flex items-center justify-center gap-1 mb-1'>
-                                    <i className='ri-error-warning-line text-error' />
-                                    <Typography variant='caption' color='text.secondary'>
-                                      Missing
-                                    </Typography>
-                                  </div>
-                                  <Typography variant='h6' className='font-bold text-error'>
-                                    {checkpoint.packagesMissing || 0}
-                                  </Typography>
-                                </div>
-                                {checkpoint.manifestId && (
-                                  <div className='text-center col-span-2'>
-                                    <div className='flex items-center justify-center gap-1 mb-1'>
-                                      <i className='ri-file-list-3-line text-info' />
-                                      <Typography variant='caption' color='text.secondary'>
-                                        Manifest ID
-                                      </Typography>
-                                    </div>
-                                    <Typography variant='body2' className='font-semibold'>
-                                      {checkpoint.manifestId.substring(0, 12)}...
-                                    </Typography>
-                                  </div>
-                                )}
+                                <Chip
+                                  label={checkpoint.status?.charAt(0).toUpperCase() + checkpoint.status?.slice(1)}
+                                  variant='tonal'
+                                  color={getStatusColor(checkpoint.status)}
+                                  size='small'
+                                />
                               </div>
+                              {checkpoint.notes && (
+                                <Typography variant='body2' color='text.secondary' className='mt-2'>
+                                  {checkpoint.notes}
+                                </Typography>
+                              )}
+                              {checkpoint.timestamp && (
+                                <Typography variant='caption' color='text.secondary' className='mt-2 block'>
+                                  {new Date(checkpoint.timestamp).toLocaleString()}
+                                </Typography>
+                              )}
                             </CardContent>
                           </Card>
                         </TimelineContent>
                       </TimelineItem>
-                    ))}
-                  </Timeline>
-                ) : (
-                  <div className='text-center py-12'>
-                    <Avatar className='bg-grey-200 mx-auto mb-4' sx={{ width: 80, height: 80 }}>
-                      <i className='ri-map-pin-line text-5xl text-textSecondary' />
-                    </Avatar>
-                    <Typography variant='h6' color='text.secondary' className='mb-1'>
-                      No checkpoints found
-                    </Typography>
-                    <Typography variant='body2' color='text.secondary'>
-                      This trip doesn't have any checkpoints yet
-                    </Typography>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
+                    )
+                  })}
+                </Timeline>
+              ) : (
+                <div className='text-center py-12'>
+                  <i className='ri-map-pin-line text-6xl text-textSecondary mb-2' />
+                  <Typography variant='h6' color='text.secondary'>
+                    No checkpoints found
+                  </Typography>
+                  <Typography variant='body2' color='text.secondary'>
+                    This trip doesn't have any checkpoints yet
+                  </Typography>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </>
   )
 }
 
