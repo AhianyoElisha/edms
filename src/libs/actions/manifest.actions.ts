@@ -366,3 +366,91 @@ export const removePackagesFromManifest = async (
     throw new Error('Failed to remove packages from manifest')
   }
 }
+
+/**
+ * Update manifest with proof of delivery image
+ */
+export const updateManifestWithProofImage = async (
+  manifestId: string,
+  imageUrl: string,
+  gpsCoordinates?: string,
+  gpsVerified?: boolean
+): Promise<ManifestType> => {
+  try {
+    const updateData: any = {
+      proofOfDeliveryImage: imageUrl,
+      deliveryTime: new Date().toISOString()
+    }
+    
+    if (gpsCoordinates) {
+      updateData.deliveryGpsCoordinates = gpsCoordinates
+    }
+    
+    if (gpsVerified !== undefined) {
+      updateData.deliveryGpsVerified = gpsVerified
+    }
+    
+    const manifest = await databases.updateDocument(
+      DATABASE_ID,
+      MANIFESTS_COLLECTION_ID,
+      manifestId,
+      updateData
+    )
+    
+    return manifest as unknown as ManifestType
+  } catch (error) {
+    console.error('Error updating manifest with proof image:', error)
+    throw new Error('Failed to update manifest with proof image')
+  }
+}
+
+/**
+ * Mark manifest as delivered/completed
+ */
+export const markManifestAsDelivered = async (
+  manifestId: string
+): Promise<ManifestType> => {
+  try {
+    const manifest = await databases.updateDocument(
+      DATABASE_ID,
+      MANIFESTS_COLLECTION_ID,
+      manifestId,
+      {
+        status: 'delivered',
+        deliveryTime: new Date().toISOString()
+      }
+    )
+    
+    return manifest as unknown as ManifestType
+  } catch (error) {
+    console.error('Error marking manifest as delivered:', error)
+    throw new Error('Failed to mark manifest as delivered')
+  }
+}
+
+/**
+ * Get manifest package statistics
+ */
+export const getManifestPackageStats = async (manifestId: string): Promise<{
+  total: number
+  delivered: number
+  pending: number
+  missing: number
+}> => {
+  try {
+    const manifest = await getManifestByIdWithRelations(manifestId)
+    const packages = Array.isArray(manifest.packages) ? manifest.packages : []
+    
+    const stats = {
+      total: packages.length,
+      delivered: packages.filter((pkg: any) => pkg.status === 'delivered').length,
+      pending: packages.filter((pkg: any) => pkg.status === 'pending' || pkg.status === 'in_transit').length,
+      missing: packages.filter((pkg: any) => pkg.status === 'missing' || pkg.status === 'failed').length
+    }
+    
+    return stats
+  } catch (error) {
+    console.error('Error fetching manifest package stats:', error)
+    throw new Error('Failed to fetch manifest package statistics')
+  }
+}

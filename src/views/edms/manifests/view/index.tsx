@@ -24,6 +24,12 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Paper from '@mui/material/Paper'
+import Checkbox from '@mui/material/Checkbox'
+import CircularProgress from '@mui/material/CircularProgress'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
 
 // Helper function to parse JSON fields safely
 const parseJSON = (jsonString: string | null | undefined) => {
@@ -60,6 +66,10 @@ const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | '
 
 const ManifestView = ({ manifestData }: { manifestData: any }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'packages'>('overview')
+  const [selectedPackages, setSelectedPackages] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; action: 'delivered' | 'submit' | null }>({ open: false, action: null })
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Parse packages and their related data
   const packages = Array.isArray(manifestData.packages) ? manifestData.packages : []
@@ -69,6 +79,31 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
   const pickupLocation = manifestData.pickupLocation || manifestData.pickuplocation
   const dropoffLocation = manifestData.dropoffLocation || manifestData.dropofflocation
   const trip = manifestData.trip
+  
+  // Check if manifest can be submitted (has proof image and is not already delivered)
+  const canSubmit = manifestData.proofOfDeliveryImage && manifestData.status !== 'delivered' && manifestData.status !== 'completed'
+  const isDelivered = manifestData.status === 'delivered' || manifestData.status === 'completed'
+  
+  // Handle select all packages
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      const allPackageIds = packages.filter((pkg: any) => pkg.status !== 'delivered').map((pkg: any) => pkg.$id)
+      setSelectedPackages(allPackageIds)
+    } else {
+      setSelectedPackages([])
+    }
+  }
+  
+  // Handle individual package selection
+  const handleSelectPackage = (packageId: string) => {
+    setSelectedPackages(prev => {
+      if (prev.includes(packageId)) {
+        return prev.filter(id => id !== packageId)
+      } else {
+        return [...prev, packageId]
+      }
+    })
+  }
 
   return (
     <>
@@ -517,12 +552,38 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
           {activeTab === 'packages' && (
             <div className='overflow-x-auto'>
               {packages.length > 0 ? (
-                <TableContainer component={Paper} variant='outlined'>
-                  <Table sx={{ minWidth: 800 }}>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Tracking Number</TableCell>
-                        <TableCell>Recipient</TableCell>
+                <>
+                  {!isDelivered && selectedPackages.length > 0 && (
+                    <div className='mb-4 p-4 bg-primary/10 rounded flex items-center justify-between flex-wrap gap-2'>
+                      <Typography variant='body2' color='primary'>
+                        {selectedPackages.length} package{selectedPackages.length > 1 ? 's' : ''} selected
+                      </Typography>
+                      <Button
+                        variant='contained'
+                        size='small'
+                        color='success'
+                        onClick={() => setConfirmDialog({ open: true, action: 'delivered' })}
+                        startIcon={<i className='ri-check-line' />}
+                      >
+                        Mark as Delivered
+                      </Button>
+                    </div>
+                  )}
+                  <TableContainer component={Paper} variant='outlined'>
+                    <Table sx={{ minWidth: 800 }}>
+                      <TableHead>
+                        <TableRow>
+                          {!isDelivered && (
+                            <TableCell padding='checkbox'>
+                              <Checkbox
+                                checked={selectedPackages.length > 0 && selectedPackages.length === packages.filter((pkg: any) => pkg.status !== 'delivered').length}
+                                indeterminate={selectedPackages.length > 0 && selectedPackages.length < packages.filter((pkg: any) => pkg.status !== 'delivered').length}
+                                onChange={handleSelectAll}
+                              />
+                            </TableCell>
+                          )}
+                          <TableCell>Tracking Number</TableCell>
+                          <TableCell>Recipient</TableCell>
                         <TableCell>Size/Type</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Expected Delivery</TableCell>
@@ -533,6 +594,15 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                     <TableBody>
                       {packages.map((pkg: any) => (
                         <TableRow key={pkg.$id} hover>
+                          {!isDelivered && (
+                            <TableCell padding='checkbox'>
+                              <Checkbox
+                                checked={selectedPackages.includes(pkg.$id)}
+                                onChange={() => handleSelectPackage(pkg.$id)}
+                                disabled={pkg.status === 'delivered'}
+                              />
+                            </TableCell>
+                          )}
                           <TableCell>
                             <Typography className='font-medium'>
                               {pkg.trackingNumber}

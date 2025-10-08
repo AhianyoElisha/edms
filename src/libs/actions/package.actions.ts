@@ -45,3 +45,64 @@ export const getPackageByIdWithRelations = async (packageId: string) => {
     throw new Error('Failed to fetch package details')
   }
 }
+
+/**
+ * Bulk update package statuses
+ */
+export const bulkUpdatePackageStatus = async (
+  packageIds: string[],
+  status: string,
+  deliveryDate?: string
+): Promise<void> => {
+  try {
+    const updateData: any = { status }
+    
+    if (status === 'delivered' && deliveryDate) {
+      updateData.deliveryDate = deliveryDate
+    }
+    
+    // Update all packages
+    await Promise.all(
+      packageIds.map(packageId =>
+        databases.updateDocument(
+          DATABASE_ID,
+          PACKAGES_COLLECTION_ID,
+          packageId,
+          updateData
+        )
+      )
+    )
+  } catch (error) {
+    console.error('Error bulk updating package status:', error)
+    throw new Error('Failed to update package statuses')
+  }
+}
+
+/**
+ * Update single package status
+ */
+export const updatePackageStatus = async (
+  packageId: string,
+  status: string,
+  deliveryDate?: string
+): Promise<PackageTrackingType> => {
+  try {
+    const updateData: any = { status }
+    
+    if (status === 'delivered' && deliveryDate) {
+      updateData.deliveryDate = deliveryDate
+    }
+    
+    const pkg = await databases.updateDocument(
+      DATABASE_ID,
+      PACKAGES_COLLECTION_ID,
+      packageId,
+      updateData
+    )
+    
+    return pkg as unknown as PackageTrackingType
+  } catch (error) {
+    console.error('Error updating package status:', error)
+    throw new Error('Failed to update package status')
+  }
+}

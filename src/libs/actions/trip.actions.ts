@@ -367,3 +367,32 @@ export async function updateTripStatus(tripId: string, status: string): Promise<
     throw new Error('Failed to update trip status')
   }
 }
+
+/**
+ * Check if all manifests in a trip are delivered and auto-complete the trip
+ */
+export async function checkAndCompleteTrip(tripId: string): Promise<boolean> {
+  try {
+    // Get trip with all manifests
+    const trip = await getTripById(tripId)
+    
+    if (!trip || !trip.manifests || trip.manifests.length === 0) {
+      return false
+    }
+    
+    // Check if all manifests are delivered
+    const allManifestsDelivered = trip.manifests.every(
+      (manifest: any) => manifest.status === 'delivered' || manifest.status === 'completed'
+    )
+    
+    if (allManifestsDelivered && trip.status !== 'completed') {
+      await updateTripStatus(tripId, 'completed')
+      return true
+    }
+    
+    return false
+  } catch (error) {
+    console.error('Error checking and completing trip:', error)
+    return false
+  }
+}
