@@ -178,10 +178,10 @@ export async function getCustomerList() {
 
 export async function getLogisticsList() {
   try {
-    const inventoryList = await databases.listDocuments(
+    const inventoryList = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.vehicles,
-      [Query.orderDesc('$createdAt')]
+      [Query.orderDesc('$createdAt'), Query.select(['*', 'driver.*', 'assignedRoutes.*'])]
     );
     if (!inventoryList) throw Error;
     return inventoryList;
@@ -221,7 +221,7 @@ export async function getVehicleDetailById(itemId: string) {
       itemId,
       [
         // Select all fields including relationships
-        Query.select(['*', 'staff.*', 'distributedproducts.*', 'soldproducts.*', 'distributedproducts.category.*', 'soldproducts.category.*']),
+        Query.select(['*', 'driver.*', 'assignedRoutes.*']),
       ]
     );
 

@@ -46,6 +46,7 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
           dropoffLocationId: manifest.dropoffLocationId,
           dropoffLocationName: manifest.dropoffLocationName,
           manifestId: '', // Will be updated after manifest creation
+          manifestNumber: '', // Will be updated after manifest creation
           sequence: index + 1,
           status: 'pending',
           arrivalTime: null,
@@ -146,14 +147,17 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
       manifestMap.set(manifestData.tempId, manifest.$id)
     }
 
-    // Step 2.5: Update trip checkpoints with actual manifest IDs
+    // Step 2.5: Update trip checkpoints with manifest numbers and IDs
     const checkpointsData = JSON.parse(trip.checkpoints)
     const updatedCheckpoints = checkpointsData.map((checkpoint: any, index: number) => {
       const manifestData = manifests[index]
-      const manifestId = manifestMap.get(manifestData.manifestNumber)
+      // Find the created manifest by matching the temp ID
+      const createdManifestId = manifestMap.get(manifestData.tempId)
+      
       return {
         ...checkpoint,
-        manifestId: manifestId || '' // Update with actual manifest ID
+        manifestId: createdManifestId || '', // Store manifest ID
+        manifestNumber: manifestData.manifestNumber // Store manifest number
       }
     })
     

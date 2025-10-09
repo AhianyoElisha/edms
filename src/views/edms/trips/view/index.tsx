@@ -5,9 +5,11 @@ import { useState } from 'react'
 
 // Next Imports
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 // MUI Imports
 import Grid from '@mui/material/Grid'
+import { Breadcrumbs } from '@mui/material'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
@@ -26,6 +28,9 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Paper from '@mui/material/Paper'
+
+// Component Imports
+import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
 
 // Timeline Imports
 import TimelineDot from '@mui/lab/TimelineDot'
@@ -80,10 +85,11 @@ const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | '
 
 const TripView = ({ tripData }: { tripData: any }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'manifests' | 'checkpoints'>('overview')
+  
+  const router = useRouter()
 
   // Parse checkpoints
   const checkpoints = parseJSON(tripData.checkpoints)
-  console.log(tripData)
   // Calculate progress
   const completedCheckpoints = checkpoints.filter((cp: any) => cp.status === 'completed').length
   const progressPercentage = checkpoints.length > 0 ? (completedCheckpoints / checkpoints.length) * 100 : 0
@@ -92,6 +98,21 @@ const TripView = ({ tripData }: { tripData: any }) => {
     <>
       <Typography className='mt-4' variant='h4'>Trip Details - {tripData.tripNumber}</Typography>
       <Divider className='my-8' />
+      <Breadcrumbs aria-label="breadcrumb" className='mt-10 ml-5 mb-5'>
+        <StyledBreadcrumb 
+          component="a"
+          onClick={() => router.back()}
+          icon={<i className='ri-menu-4-line' />}
+          className='cursor-pointer'
+          label="Back" 
+        />
+        <StyledBreadcrumb
+          label="Details"
+          icon={<i className='ri-stack-line' />}
+          className='cursor-pointer'
+          disabled
+        />
+      </Breadcrumbs>
       
       {/* Header Info */}
       <Card className='mb-6'>
@@ -542,7 +563,7 @@ const TripView = ({ tripData }: { tripData: any }) => {
                                     />
                                   </div>
                                   <Typography variant='body2' color='text.secondary'>
-                                    Manifest: {checkpoint.manifestId || 'Not assigned'}
+                                    Manifest: {checkpoint.manifestNumber || 'Not assigned'}
                                   </Typography>
                                 </div>
                               </div>

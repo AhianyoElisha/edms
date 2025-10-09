@@ -143,7 +143,8 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
     try {
       setIsLoading(true)
       const response = await getLogisticsList()
-      setData(response?.documents as unknown as Logistics[])
+      setData(response?.rows as unknown as Logistics[])
+      console.log(response)
     } catch (error) {
       console.error('Error fetching vehicles  data:', error)
       toast.error('Failed to fetch vehicles data')
@@ -236,7 +237,7 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
         header: 'Driver',
         cell: ({ row }) => (
           <Typography color='text.primary'>
-            {row.original.driver ? (
+            {row.original.driver?.length ? (
               <Chip
                 variant='tonal'
                 label='Assigned'

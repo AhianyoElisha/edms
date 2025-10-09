@@ -36,7 +36,7 @@ export const getAllManifests = async (filters?: ManifestFilters): Promise<Manife
     const response = await databases.listDocuments(
       DATABASE_ID,
       MANIFESTS_COLLECTION_ID,
-      queries
+      [...queries, Query.select(['*', 'trip.*'])]
     )
     
     return response.documents as unknown as ManifestType[]
@@ -531,6 +531,13 @@ async function updateCheckpointPackageCount(
   packagesDelivered: number
 ): Promise<void> {
   try {
+    // Fetch manifest to get manifest number
+    const manifest = await databases.getDocument(
+      DATABASE_ID,
+      MANIFESTS_COLLECTION_ID,
+      manifestId
+    ) as any
+    
     // Fetch current trip to get checkpoints
     const trip = await databases.getDocument(
       DATABASE_ID,
@@ -543,8 +550,10 @@ async function updateCheckpointPackageCount(
     // Parse checkpoints
     const checkpoints = JSON.parse(trip.checkpoints)
     
-    // Find and update the checkpoint for this manifest
-    const checkpointIndex = checkpoints.findIndex((cp: any) => cp.manifestId === manifestId)
+    // Find and update the checkpoint for this manifest using manifestNumber
+    const checkpointIndex = checkpoints.findIndex((cp: any) => 
+      cp.manifestNumber === manifest.manifestNumber || cp.manifestId === manifestId
+    )
     
     if (checkpointIndex !== -1) {
       checkpoints[checkpointIndex] = {
@@ -599,6 +608,13 @@ export const markManifestAsDelivered = async (
       missingPackages: JSON.stringify(missingPackageIds)
     }
     
+    // First, fetch the manifest to get trip relationship
+    const existingManifest = await databases.getDocument(
+      DATABASE_ID,
+      MANIFESTS_COLLECTION_ID,
+      manifestId
+    ) as any
+    
     // Update manifest
     const manifest = await databases.updateDocument(
       DATABASE_ID,
@@ -607,15 +623,19 @@ export const markManifestAsDelivered = async (
       updateData
     ) as any
     
-    // Update trip checkpoints
-    if (manifest.trip) {
+    // Update trip checkpoints - use trip from existingManifest as updateDocument may not return relationships
+    const tripId = existingManifest.trip || manifest.trip
+    if (tripId) {
+      console.log('Updating trip checkpoint for trip:', tripId, 'manifest:', manifestId)
       await updateTripCheckpoint(
-        typeof manifest.trip === 'string' ? manifest.trip : manifest.trip.$id,
+        typeof tripId === 'string' ? tripId : tripId.$id,
         manifestId,
         deliveredPackageIds.length,
         missingPackageIds.length,
         now
       )
+    } else {
+      console.warn('No trip found for manifest:', manifestId)
     }
     
     return manifest as unknown as ManifestType
@@ -636,6 +656,17 @@ async function updateTripCheckpoint(
   completionTime: string
 ): Promise<void> {
   try {
+    console.log('🔄 updateTripCheckpoint called:', { tripId, manifestId, packagesDelivered, packagesMissing })
+    
+    // Fetch manifest to get manifest number
+    const manifest = await databases.getDocument(
+      DATABASE_ID,
+      MANIFESTS_COLLECTION_ID,
+      manifestId
+    ) as any
+    
+    console.log('📦 Manifest fetched:', { manifestNumber: manifest.manifestNumber, manifestId: manifest.$id })
+    
     // Fetch current trip to get checkpoints
     const trip = await databases.getDocument(
       DATABASE_ID,
@@ -643,15 +674,32 @@ async function updateTripCheckpoint(
       tripId
     ) as any
     
-    if (!trip.checkpoints) return
+    console.log('🚚 Trip fetched:', { tripId: trip.$id, hasCheckpoints: !!trip.checkpoints })
+    
+    if (!trip.checkpoints) {
+      console.error('❌ No checkpoints found in trip')
+      return
+    }
     
     // Parse checkpoints
     const checkpoints = JSON.parse(trip.checkpoints)
+    console.log('📋 Parsed checkpoints:', checkpoints.length, 'checkpoints')
     
-    // Find and update the checkpoint for this manifest
-    const checkpointIndex = checkpoints.findIndex((cp: any) => cp.manifestId === manifestId)
+    // Find and update the checkpoint for this manifest using manifestNumber
+    const checkpointIndex = checkpoints.findIndex((cp: any) => 
+      cp.manifestNumber === manifest.manifestNumber || cp.manifestId === manifestId
+    )
+    
+    console.log('🔍 Checkpoint search result:', {
+      checkpointIndex,
+      searchingFor: { manifestNumber: manifest.manifestNumber, manifestId },
+      availableCheckpoints: checkpoints.map((cp: any) => ({ manifestNumber: cp.manifestNumber, manifestId: cp.manifestId }))
+    })
     
     if (checkpointIndex !== -1) {
+      console.log('✏️ Updating checkpoint at index:', checkpointIndex)
+      console.log('Old checkpoint:', checkpoints[checkpointIndex])
+      
       checkpoints[checkpointIndex] = {
         ...checkpoints[checkpointIndex],
         status: 'completed',
@@ -661,8 +709,10 @@ async function updateTripCheckpoint(
         packagesMissing
       }
       
+      console.log('New checkpoint:', checkpoints[checkpointIndex])
+      
       // Update trip with new checkpoints
-      await databases.updateDocument(
+      const updateResult = await databases.updateDocument(
         DATABASE_ID,
         appwriteConfig.trips,
         tripId,
@@ -671,10 +721,14 @@ async function updateTripCheckpoint(
           currentCheckpoint: checkpointIndex + 1
         }
       )
+      
+      console.log('✅ Trip updated successfully:', updateResult.$id)
+    } else {
+      console.error('❌ Checkpoint not found for manifest:', manifest.manifestNumber)
     }
   } catch (error) {
-    console.error('Error updating trip checkpoint:', error)
-    // Don't throw - checkpoint update is supplementary
+    console.error('💥 Error updating trip checkpoint:', error)
+    throw error // Re-throw to see the error in the UI
   }
 }
 

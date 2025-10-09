@@ -17,6 +17,9 @@ import Button from '@mui/material/Button'
 import Avatar from '@mui/material/Avatar'
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
+import { Breadcrumbs } from '@mui/material'
+import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
+import { useRouter } from 'next/navigation'
 
 // Timeline Imports
 import TimelineDot from '@mui/lab/TimelineDot'
@@ -125,7 +128,7 @@ const getLocation = (packageData: any, key: 'pickup' | 'dropoff') => {
 const PackageView = ({ packageData }: { packageData: any }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'activity'>('overview')
 
-  console.log('Package Data:', packageData)
+  const router = useRouter()
 
   const deliveryHistory = useMemo(() => {
     if (Array.isArray(packageData.deliveryHistory)) return packageData.deliveryHistory
@@ -145,7 +148,21 @@ const PackageView = ({ packageData }: { packageData: any }) => {
     <>
       <Typography className='mt-4' variant='h4'>Package Details - {packageData.trackingNumber}</Typography>
       <Divider className='my-8' />
-
+      <Breadcrumbs aria-label="breadcrumb" className='mt-10 ml-5 mb-5'>
+        <StyledBreadcrumb 
+          component="a"
+          onClick={() => router.back()}
+          icon={<i className='ri-menu-4-line' />}
+          className='cursor-pointer'
+          label="Back" 
+        />
+        <StyledBreadcrumb
+          label="Details"
+          icon={<i className='ri-stack-line' />}
+          className='cursor-pointer'
+          disabled
+        />
+      </Breadcrumbs>
       {/* Header Info */}
       <Card className='mb-6'>
         <CardContent>

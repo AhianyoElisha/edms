@@ -5,9 +5,11 @@ import { useState } from 'react'
 
 // Next Imports
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 // MUI Imports
 import Grid from '@mui/material/Grid'
+import { Breadcrumbs } from '@mui/material'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
@@ -31,6 +33,9 @@ import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Tooltip from '@mui/material/Tooltip'
+
+// Component Imports
+import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
 
 // Toast Imports
 import { toast } from 'react-toastify'
@@ -73,6 +78,8 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
   const [selectedPackages, setSelectedPackages] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; action: 'delivered' | 'submit' | null }>({ open: false, action: null })
+  
+  const router = useRouter()
   const [refreshKey, setRefreshKey] = useState(0)
 
   // Parse packages and their related data
@@ -306,6 +313,21 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
     <>
       <Typography className='mt-4' variant='h4'>Manifest Details - {manifestData.manifestNumber}</Typography>
       <Divider className='my-8' />
+      <Breadcrumbs aria-label="breadcrumb" className='mt-10 ml-5 mb-5'>
+        <StyledBreadcrumb 
+          component="a"
+          onClick={() => router.back()}
+          icon={<i className='ri-menu-4-line' />}
+          className='cursor-pointer'
+          label="Back" 
+        />
+        <StyledBreadcrumb
+          label="Details"
+          icon={<i className='ri-stack-line' />}
+          className='cursor-pointer'
+          disabled
+        />
+      </Breadcrumbs>
       
       {/* Header Info */}
       <Card className='mb-6'>
