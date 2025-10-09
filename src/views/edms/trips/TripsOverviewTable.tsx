@@ -83,6 +83,7 @@ const TripsOverviewTable = () => {
     loadTrips()
   }, [statusFilter])
 
+
   const columns = useMemo<ColumnDef<TripType, any>[]>(
     () => [
       columnHelper.accessor('tripNumber', {
@@ -105,7 +106,7 @@ const TripsOverviewTable = () => {
         header: 'Driver',
         cell: ({ row }) => (
           <Typography color='text.primary'>
-            {row.original.driver || 'N/A'}
+            {row.original.driver.name || 'N/A'}
           </Typography>
         )
       }),
@@ -113,7 +114,7 @@ const TripsOverviewTable = () => {
         header: 'Vehicle',
         cell: ({ row }) => (
           <Typography color='text.primary'>
-            {row.original.vehicle || 'N/A'}
+            {row.original.vehicle.vehicleNumber || 'N/A'}
           </Typography>
         )
       }),

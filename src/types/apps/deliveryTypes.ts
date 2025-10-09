@@ -137,9 +137,9 @@ export interface DriverType {
 export interface TripType {
   $id: string
   tripNumber: string
-  vehicle: string // vehicle ID (Many-to-one)
-  driver: string // driver ID (Many-to-one)
-  route: string // route ID (Many-to-one)
+  vehicle: any // vehicle ID (Many-to-one)
+  driver: any // driver ID (Many-to-one)
+  route: any // route ID (Many-to-one)
   tripDate: string
   startTime: string
   clientRate?: number

@@ -1,6 +1,6 @@
 
 // Appwrite Imports
-import { databases } from '@/libs/appwrite.config'
+import { databases, tablesDB } from '@/libs/appwrite.config'
 import { appwriteConfig } from '@/libs/appwrite.config'
 import { ID, Query } from 'node-appwrite'
 
@@ -146,6 +146,27 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
       manifestMap.set(manifestData.tempId, manifest.$id)
     }
 
+    // Step 2.5: Update trip checkpoints with actual manifest IDs
+    const checkpointsData = JSON.parse(trip.checkpoints)
+    const updatedCheckpoints = checkpointsData.map((checkpoint: any, index: number) => {
+      const manifestData = manifests[index]
+      const manifestId = manifestMap.get(manifestData.manifestNumber)
+      return {
+        ...checkpoint,
+        manifestId: manifestId || '' // Update with actual manifest ID
+      }
+    })
+    
+    // Update trip with checkpoints containing manifest IDs
+    await databases.updateDocument(
+      appwriteConfig.database,
+      appwriteConfig.trips,
+      trip.$id,
+      {
+        checkpoints: JSON.stringify(updatedCheckpoints)
+      }
+    )
+
     const packageIds: string[] = []
 
     // Step 3: Create all package documents
@@ -283,10 +304,10 @@ export async function getAllTrips(filters?: {
 
     if (filters) {
       if (filters.status) {
-        queries.push(Query.equal('status', filters.status))
+        queries.push(Query.equal('status', filters.status))   
       }
       if (filters.driverId) {
-        queries.push(Query.equal('driver', filters.driverId))
+        queries.push(Query.equal('driver', filters.driverId)) 
       }
       if (filters.vehicleId) {
         queries.push(Query.equal('vehicle', filters.vehicleId))
@@ -301,13 +322,17 @@ export async function getAllTrips(filters?: {
 
     queries.push(Query.orderDesc('$createdAt'))
 
-    const response = await databases.listDocuments(
+    console.log('Trip query filters:', queries)
+
+    const response = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.trips,
-      queries
+      [...queries, Query.select(['*', 'driver.*', 'vehicle.*', 'manifests.length'])]
     )
 
-    return response.documents as unknown as TripType[]
+    console.log('Fetched trips:', response)
+
+    return response.rows as unknown as TripType[]
   } catch (error) {
     console.error('Error fetching trips:', error)
     throw new Error('Failed to fetch trips')
@@ -333,9 +358,50 @@ export async function getTripById(tripId: string): Promise<any> {
           'driver.*', // Fetch complete driver details  
           'route.*', // Fetch complete route details
           'manifests.*', // Fetch all manifests
+          'manifests.dropofflocation.*', // Fetch dropoff location for each manifest
         ])
       ]
     )
+
+    // Fetch packages for each manifest separately (one-way relationship: packages.manifest → manifests)
+    if (trip.manifests && Array.isArray(trip.manifests)) {
+      const PACKAGES_COLLECTION_ID = appwriteConfig.packages
+      
+      // Fetch packages for all manifests in parallel
+      const manifestPackages = await Promise.all(
+        trip.manifests.map(async (manifest: any) => {
+          try {
+            const packagesResponse = await databases.listDocuments(
+              appwriteConfig.database,
+              PACKAGES_COLLECTION_ID,
+              [
+                Query.equal('manifest', manifest.$id),
+                Query.limit(300)
+              ]
+            )
+            return {
+              manifestId: manifest.$id,
+              packages: packagesResponse.documents
+            }
+          } catch (error) {
+            console.warn(`Could not fetch packages for manifest ${manifest.$id}`)
+            return {
+              manifestId: manifest.$id,
+              packages: []
+            }
+          }
+        })
+      )
+      
+      // Attach packages to their respective manifests
+      trip.manifests = trip.manifests.map((manifest: any) => {
+        const manifestPackageData = manifestPackages.find(mp => mp.manifestId === manifest.$id)
+        return {
+          ...manifest,
+          packages: manifestPackageData?.packages || []
+        }
+      })
+    }
 
     return trip
   } catch (error) {

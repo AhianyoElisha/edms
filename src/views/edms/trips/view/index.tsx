@@ -83,7 +83,7 @@ const TripView = ({ tripData }: { tripData: any }) => {
 
   // Parse checkpoints
   const checkpoints = parseJSON(tripData.checkpoints)
-  
+  console.log(tripData)
   // Calculate progress
   const completedCheckpoints = checkpoints.filter((cp: any) => cp.status === 'completed').length
   const progressPercentage = checkpoints.length > 0 ? (completedCheckpoints / checkpoints.length) * 100 : 0

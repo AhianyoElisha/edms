@@ -82,7 +82,7 @@ export const getManifestByIdWithRelations = async (manifestId: string) => {
           'trip.vehicle.*',
           'trip.driver.*',
           'trip.route.*',
-          'dropofflocation.*', // fetch dropoff location directly from manifest
+          'dropofflocation.*',
         ])
       ]
     )
@@ -488,7 +488,7 @@ export const updateManifestWithProofImage = async (
 }
 
 /**
- * Update manifest deliveredPackages count
+ * Update manifest deliveredPackages count and trip checkpoint
  * Called when packages are marked as delivered
  */
 export const updateManifestDeliveredCount = async (
@@ -496,6 +496,7 @@ export const updateManifestDeliveredCount = async (
   deliveredCount: number
 ): Promise<ManifestType> => {
   try {
+    // Update manifest
     const manifest = await databases.updateDocument(
       DATABASE_ID,
       MANIFESTS_COLLECTION_ID,
@@ -503,12 +504,67 @@ export const updateManifestDeliveredCount = async (
       {
         deliveredPackages: deliveredCount
       }
-    )
+    ) as any
+    
+    // Update trip checkpoint with delivered package count
+    if (manifest.trip) {
+      await updateCheckpointPackageCount(
+        typeof manifest.trip === 'string' ? manifest.trip : manifest.trip.$id,
+        manifestId,
+        deliveredCount
+      )
+    }
     
     return manifest as unknown as ManifestType
   } catch (error) {
     console.error('Error updating manifest delivered count:', error)
     throw new Error('Failed to update manifest delivered count')
+  }
+}
+
+/**
+ * Update checkpoint with delivered package count (without completing it)
+ */
+async function updateCheckpointPackageCount(
+  tripId: string,
+  manifestId: string,
+  packagesDelivered: number
+): Promise<void> {
+  try {
+    // Fetch current trip to get checkpoints
+    const trip = await databases.getDocument(
+      DATABASE_ID,
+      appwriteConfig.trips,
+      tripId
+    ) as any
+    
+    if (!trip.checkpoints) return
+    
+    // Parse checkpoints
+    const checkpoints = JSON.parse(trip.checkpoints)
+    
+    // Find and update the checkpoint for this manifest
+    const checkpointIndex = checkpoints.findIndex((cp: any) => cp.manifestId === manifestId)
+    
+    if (checkpointIndex !== -1) {
+      checkpoints[checkpointIndex] = {
+        ...checkpoints[checkpointIndex],
+        packagesDelivered
+      }
+      
+      // Update trip with new checkpoints
+      await databases.updateDocument(
+        DATABASE_ID,
+        appwriteConfig.trips,
+        tripId,
+        {
+          checkpoints: JSON.stringify(checkpoints)
+        }
+      )
+    }
+  } catch (error) {
+    console.error('Error updating checkpoint package count:', error)
+    // Don't throw - checkpoint update is supplementary
   }
 }
 

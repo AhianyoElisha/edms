@@ -81,8 +81,9 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
   const packageStatuses = parseJSON(manifestData.packageStatuses)
 
   const trip = manifestData.trip
-  const dropoffLocation = manifestData?.trip?.route?.startLocation
-  const pickupLocation = manifestData?.trip?.route?.endLocation
+  const dropoffLocation = manifestData?.dropofflocation
+  const pickupLocation = manifestData?.pickuplocation
+
 
   // Check if manifest can be submitted (has proof image and is not already delivered)
   const hasProofImage = Boolean(manifestData.proofOfDeliveryImage)
@@ -475,14 +476,7 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                   </Avatar>
                   <div className='overflow-hidden'>
                     <Typography variant='h5'>
-                      {(() => {
-                        try {
-                          const delivered = JSON.parse(manifestData.deliveredPackages || '[]')
-                          return Array.isArray(delivered) ? delivered.length : 0
-                        } catch {
-                          return packages.filter((pkg: any) => pkg.status === 'delivered' || pkg.status === 'completed').length
-                        }
-                      })()}
+                      {manifestData.deliveredPackages || 0}
                     </Typography>
                     <Typography variant='body2'>Delivered</Typography>
                   </div>
@@ -576,20 +570,20 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
               <Grid item xs={12} md={6}>
                 <Typography variant='h6' className='mb-4'>Vehicle Information</Typography>
                 <Typography color='text.secondary' className='mb-1'>
-                  <strong>Vehicle ID:</strong> {typeof manifestData.vehicle === 'object' && manifestData.vehicle !== null
-                    ? manifestData.vehicle.vehicleNumber || manifestData.vehicle.$id
-                    : manifestData.vehicle || 'N/A'}
+                  <strong>Vehicle ID:</strong> {typeof trip.vehicle === 'object' && trip.vehicle !== null
+                    ? trip.vehicle.vehicleNumber || trip.vehicle.$id
+                    : trip.vehicle || 'N/A'}
                 </Typography>
-                {typeof manifestData.vehicle === 'object' && manifestData.vehicle !== null && (
+                {typeof trip.vehicle === 'object' && trip.vehicle !== null && (
                   <>
-                    {manifestData.vehicle.vehicleType && (
+                    {trip.vehicle.vehicleType && (
                       <Typography color='text.secondary' className='mb-1'>
-                        <strong>Type:</strong> {manifestData.vehicle.vehicleType}
+                        <strong>Type:</strong> {trip.vehicle.vehicleType}
                       </Typography>
                     )}
-                    {manifestData.vehicle.brand && (
+                    {trip.vehicle.brand && (
                       <Typography color='text.secondary' className='mb-1'>
-                        <strong>Brand & Model:</strong> {manifestData.vehicle.brand} {manifestData.vehicle.model}
+                        <strong>Brand & Model:</strong> {trip.vehicle.brand} {trip.vehicle.model}
                       </Typography>
                     )}
                   </>
