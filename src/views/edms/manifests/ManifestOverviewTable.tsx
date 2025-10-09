@@ -289,20 +289,19 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
                       {manifest.manifestNumber}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Driver: {manifest.driver}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Vehicle: {manifest.vehicle}
+                      Trip: {typeof manifest.trip === 'object' && manifest.trip !== null
+                        ? (manifest.trip as any).tripNumber || (manifest.trip as any).$id
+                        : manifest.trip || 'N/A'}
                     </Typography>
                   </Box>
                 </TableCell>
                 <TableCell>
                   <Box>
                     <Typography variant="body2">
-                      From: {manifest.pickuplocation}
+                      Sequence: {manifest.dropoffSequence}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      To: {manifest.dropofflocation}
+                      Packages: {manifest.totalPackages}
                     </Typography>
                   </Box>
                 </TableCell>
@@ -392,29 +391,33 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
 
               <Grid item xs={12} sm={6}>
                 <Typography variant="h6" gutterBottom>
-                  Route Details
+                  Trip Assignment
                 </Typography>
                 <Box mb={2}>
-                  <Typography variant="body2" color="text.secondary">Pickup Location</Typography>
-                  <Typography variant="body1">{selectedManifest.pickuplocation}</Typography>
+                  <Typography variant="body2" color="text.secondary">Trip Number</Typography>
+                  <Typography variant="body1">
+                    {typeof selectedManifest.trip === 'object' && selectedManifest.trip !== null
+                      ? (selectedManifest.trip as any).tripNumber || (selectedManifest.trip as any).$id
+                      : selectedManifest.trip || 'Not assigned'}
+                  </Typography>
                 </Box>
                 <Box mb={2}>
-                  <Typography variant="body2" color="text.secondary">Dropoff Location</Typography>
-                  <Typography variant="body1">{selectedManifest.dropofflocation}</Typography>
+                  <Typography variant="body2" color="text.secondary">Dropoff Sequence</Typography>
+                  <Typography variant="body1">{selectedManifest.dropoffSequence}</Typography>
                 </Box>
               </Grid>
 
               <Grid item xs={12} sm={6}>
                 <Typography variant="h6" gutterBottom>
-                  Assignment
+                  Recipient
                 </Typography>
                 <Box mb={2}>
-                  <Typography variant="body2" color="text.secondary">Driver</Typography>
-                  <Typography variant="body1">{selectedManifest.driver}</Typography>
+                  <Typography variant="body2" color="text.secondary">Name</Typography>
+                  <Typography variant="body1">{selectedManifest.recipientName || 'N/A'}</Typography>
                 </Box>
                 <Box mb={2}>
-                  <Typography variant="body2" color="text.secondary">Vehicle</Typography>
-                  <Typography variant="body1">{selectedManifest.vehicle}</Typography>
+                  <Typography variant="body2" color="text.secondary">Phone</Typography>
+                  <Typography variant="body1">{selectedManifest.recipientPhone || 'N/A'}</Typography>
                 </Box>
               </Grid>
 

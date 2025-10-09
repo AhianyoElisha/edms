@@ -512,15 +512,16 @@ const TripView = ({ tripData }: { tripData: any }) => {
                   {checkpoints.map((checkpoint: any, index: number) => {
                     const isCompleted = checkpoint.status === 'completed'
                     const isPending = checkpoint.status === 'pending'
+                    const isInProgress = checkpoint.status === 'in-progress' || checkpoint.status === 'in_progress'
 
                     return (
                       <TimelineItem key={index}>
                         <TimelineSeparator>
                           <TimelineDot
-                            color={isCompleted ? 'success' : isPending ? 'grey' : 'primary'}
+                            color={isCompleted ? 'success' : isInProgress ? 'primary' : 'grey'}
                             sx={{ width: 40, height: 40 }}
                           >
-                            <i className={isCompleted ? 'ri-checkbox-circle-line' : 'ri-map-pin-line'} />
+                            <i className={isCompleted ? 'ri-checkbox-circle-line' : isInProgress ? 'ri-truck-line' : 'ri-map-pin-line'} />
                           </TimelineDot>
                           {index < checkpoints.length - 1 && <TimelineConnector />}
                         </TimelineSeparator>
@@ -528,30 +529,71 @@ const TripView = ({ tripData }: { tripData: any }) => {
                           <Card className='mb-4'>
                             <CardContent>
                               <div className='flex items-start justify-between flex-wrap gap-2 mb-3'>
-                                <div>
-                                  <Typography variant='h6' className='mb-1'>
-                                    {checkpoint.locationName || `Checkpoint ${index + 1}`}
-                                  </Typography>
+                                <div className='flex-1'>
+                                  <div className='flex items-center gap-2 mb-1'>
+                                    <Typography variant='h6'>
+                                      {checkpoint.dropoffLocationName || `Checkpoint ${checkpoint.sequence || index + 1}`}
+                                    </Typography>
+                                    <Chip
+                                      label={checkpoint.status?.charAt(0).toUpperCase() + checkpoint.status?.slice(1).replace('_', ' ')}
+                                      variant='tonal'
+                                      color={getStatusColor(checkpoint.status)}
+                                      size='small'
+                                    />
+                                  </div>
                                   <Typography variant='body2' color='text.secondary'>
-                                    {checkpoint.address}
+                                    Manifest: {checkpoint.manifestId || 'Not assigned'}
                                   </Typography>
                                 </div>
-                                <Chip
-                                  label={checkpoint.status?.charAt(0).toUpperCase() + checkpoint.status?.slice(1)}
-                                  variant='tonal'
-                                  color={getStatusColor(checkpoint.status)}
-                                  size='small'
-                                />
                               </div>
-                              {checkpoint.notes && (
-                                <Typography variant='body2' color='text.secondary' className='mt-2'>
-                                  {checkpoint.notes}
-                                </Typography>
+
+                              {/* Package delivery stats */}
+                              {isCompleted && (
+                                <div className='flex gap-4 my-3'>
+                                  <div className='flex items-center gap-2'>
+                                    <i className='ri-checkbox-circle-line text-success' />
+                                    <Typography variant='body2'>
+                                      <strong>{checkpoint.packagesDelivered || 0}</strong> delivered
+                                    </Typography>
+                                  </div>
+                                  {checkpoint.packagesMissing > 0 && (
+                                    <div className='flex items-center gap-2'>
+                                      <i className='ri-error-warning-line text-error' />
+                                      <Typography variant='body2'>
+                                        <strong>{checkpoint.packagesMissing}</strong> missing
+                                      </Typography>
+                                    </div>
+                                  )}
+                                </div>
                               )}
-                              {checkpoint.timestamp && (
-                                <Typography variant='caption' color='text.secondary' className='mt-2 block'>
-                                  {new Date(checkpoint.timestamp).toLocaleString()}
-                                </Typography>
+
+                              {/* Timestamps */}
+                              <div className='mt-3 space-y-1'>
+                                {checkpoint.arrivalTime && (
+                                  <Typography variant='caption' color='text.secondary' className='block'>
+                                    <i className='ri-time-line mr-1' />
+                                    Arrived: {new Date(checkpoint.arrivalTime).toLocaleString()}
+                                  </Typography>
+                                )}
+                                {checkpoint.completionTime && (
+                                  <Typography variant='caption' color='text.secondary' className='block'>
+                                    <i className='ri-check-line mr-1' />
+                                    Completed: {new Date(checkpoint.completionTime).toLocaleString()}
+                                  </Typography>
+                                )}
+                              </div>
+
+                              {/* GPS verification */}
+                              {checkpoint.gpsVerified && (
+                                <div className='mt-2'>
+                                  <Chip
+                                    label='GPS Verified'
+                                    size='small'
+                                    color='success'
+                                    variant='outlined'
+                                    icon={<i className='ri-map-pin-line' />}
+                                  />
+                                </div>
                               )}
                             </CardContent>
                           </Card>

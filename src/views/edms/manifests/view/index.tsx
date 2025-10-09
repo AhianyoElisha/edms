@@ -30,6 +30,10 @@ import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
+import Tooltip from '@mui/material/Tooltip'
+
+// Toast Imports
+import { toast } from 'react-toastify'
 
 // Helper function to parse JSON fields safely
 const parseJSON = (jsonString: string | null | undefined) => {
@@ -76,13 +80,20 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
   const packageTypes = parseJSON(manifestData.packageTypes)
   const packageStatuses = parseJSON(manifestData.packageStatuses)
 
-  const pickupLocation = manifestData.pickupLocation || manifestData.pickuplocation
-  const dropoffLocation = manifestData.dropoffLocation || manifestData.dropofflocation
   const trip = manifestData.trip
-  
+  const dropoffLocation = manifestData?.trip?.route?.startLocation
+  const pickupLocation = manifestData?.trip?.route?.endLocation
+
   // Check if manifest can be submitted (has proof image and is not already delivered)
-  const canSubmit = manifestData.proofOfDeliveryImage && manifestData.status !== 'delivered' && manifestData.status !== 'completed'
+  const hasProofImage = Boolean(manifestData.proofOfDeliveryImage)
   const isDelivered = manifestData.status === 'delivered' || manifestData.status === 'completed'
+  
+  // Check if at least one package has been marked as delivered (to prevent premature submission)
+  const hasDeliveredPackages = packages.some((pkg: any) => pkg.status === 'delivered')
+  const hasUnprocessedPackages = packages.some((pkg: any) => pkg.status !== 'delivered' && pkg.status !== 'missing')
+  
+  // Can only submit if: has proof, has at least one delivered package, and not already delivered
+  const canSubmit = hasProofImage && hasDeliveredPackages && !isDelivered
   
   // Handle select all packages
   const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,6 +114,191 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
         return [...prev, packageId]
       }
     })
+  }
+  
+  // Handle proof of delivery image upload
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file')
+      return
+    }
+    
+    try {
+      setUploading(true)
+      toast.info('Compressing and uploading image...')
+      
+      // Import necessary functions
+      const { storage, appwriteConfig } = await import('@/libs/appwrite.config')
+      const { updateManifestWithProofImage } = await import('@/libs/actions/manifest.actions')
+      const { ID } = await import('appwrite')
+      const imageCompression = (await import('browser-image-compression')).default
+      
+      // Validate bucket ID
+      const bucketId = appwriteConfig.bucket || process.env.NEXT_PUBLIC_BUCKET_ID
+      if (!bucketId) {
+        throw new Error('Storage bucket ID is not configured')
+      }
+      
+      // Compress image options
+      const options = {
+        maxSizeMB: 1, // Maximum file size in MB
+        maxWidthOrHeight: 1920, // Maximum width or height
+        useWebWorker: true, // Use web worker for better performance
+        fileType: 'image/jpeg', // Convert to JPEG for better compression
+        initialQuality: 0.8 // Quality (0-1), 0.8 maintains good quality
+      }
+      
+      // Compress the image
+      const compressedFile = await imageCompression(file, options)
+      
+      // Create a new File object with the compressed blob
+      const compressedImageFile = new File(
+        [compressedFile], 
+        `proof_${Date.now()}.jpg`, 
+        { type: 'image/jpeg' }
+      )
+      
+      // Upload to Appwrite storage
+      const uploadedFile = await storage.createFile(
+        bucketId,
+        ID.unique(),
+        compressedImageFile
+      )
+      
+      // Get file URL
+      const fileUrl = `${appwriteConfig.endpoint}/storage/buckets/${bucketId}/files/${uploadedFile.$id}/view?project=${appwriteConfig.project}`
+      
+      // Update manifest with proof image
+      const updatedManifest = await updateManifestWithProofImage(manifestData.$id, fileUrl)
+      
+      toast.success('Proof of delivery uploaded successfully!')
+      
+      // Update local state instead of reloading
+      Object.assign(manifestData, {
+        proofOfDeliveryImage: fileUrl,
+        deliveryTime: updatedManifest.deliveryTime
+      })
+      
+      // Trigger re-render by updating refresh key
+      setRefreshKey(prev => prev + 1)
+    } catch (error: any) {
+      console.error('Error uploading proof image:', error)
+      toast.error(error?.message || 'Failed to upload image. Please try again.')
+    } finally {
+      setUploading(false)
+    }
+  }
+  
+  // Handle mark packages as delivered
+  const handleMarkAsDelivered = async () => {
+    try {
+      setUploading(true)
+      toast.info('Updating package statuses...')
+      
+      const { bulkUpdatePackageStatus } = await import('@/libs/actions/package.actions')
+      const { updateManifestDeliveredCount } = await import('@/libs/actions/manifest.actions')
+      
+      // Update selected packages to delivered
+      await bulkUpdatePackageStatus(selectedPackages, 'delivered', new Date().toISOString())
+      
+      // Update local package statuses
+      packages.forEach((pkg: any) => {
+        if (selectedPackages.includes(pkg.$id)) {
+          pkg.status = 'delivered'
+          pkg.deliveryDate = new Date().toISOString()
+        }
+      })
+      
+      // Count total delivered packages in this manifest
+      const deliveredCount = packages.filter((pkg: any) => pkg.status === 'delivered').length
+      
+      // Update manifest's deliveredPackages count
+      await updateManifestDeliveredCount(manifestData.$id, deliveredCount)
+      
+      // Update local manifest data
+      Object.assign(manifestData, {
+        deliveredPackages: deliveredCount
+      })
+      
+      toast.success(`${selectedPackages.length} package(s) marked as delivered!`)
+      
+      // Clear selection and close dialog
+      setSelectedPackages([])
+      setConfirmDialog({ open: false, action: null })
+      setUploading(false)
+      
+      // Trigger re-render
+      setRefreshKey(prev => prev + 1)
+    } catch (error: any) {
+      console.error('Error marking packages as delivered:', error)
+      toast.error(error?.message || 'Failed to update packages. Please try again.')
+      setUploading(false)
+      setConfirmDialog({ open: false, action: null })
+    }
+  }
+  
+  // Handle submit manifest
+  const handleSubmitManifest = async () => {
+    try {
+      setUploading(true)
+      toast.info('Submitting manifest...')
+      
+      const { markManifestAsDelivered } = await import('@/libs/actions/manifest.actions')
+      const { checkAndCompleteTrip } = await import('@/libs/actions/trip.actions')
+      
+      // Get delivered and missing package IDs
+      const deliveredPackageIds = packages
+        .filter((pkg: any) => pkg.status === 'delivered')
+        .map((pkg: any) => pkg.$id)
+      
+      const missingPackageIds = packages
+        .filter((pkg: any) => pkg.status !== 'delivered' && pkg.status !== 'pending')
+        .map((pkg: any) => pkg.$id)
+      
+      // Mark manifest as delivered with package tracking
+      const updatedManifest = await markManifestAsDelivered(
+        manifestData.$id,
+        deliveredPackageIds,
+        missingPackageIds
+      )
+      
+      // Update local manifest data
+      Object.assign(manifestData, {
+        status: 'delivered',
+        deliveryTime: updatedManifest.deliveryTime,
+        actualArrival: updatedManifest.actualArrival,
+        arrivalTime: updatedManifest.arrivalTime,
+        deliveredPackages: updatedManifest.deliveredPackages,
+        missingPackages: updatedManifest.missingPackages
+      })
+      
+      // Check if trip should be auto-completed
+      if (trip?.$id) {
+        const tripCompleted = await checkAndCompleteTrip(trip.$id)
+        if (tripCompleted) {
+          toast.success('Manifest submitted and trip completed!')
+          if (trip) trip.status = 'completed'
+        } else {
+          toast.success('Manifest submitted successfully!')
+        }
+      } else {
+        toast.success('Manifest submitted successfully!')
+      }
+      
+      // Close dialog and update UI
+      setConfirmDialog({ open: false, action: null })
+      setUploading(false)
+      setRefreshKey(prev => prev + 1)
+    } catch (error: any) {
+      console.error('Error submitting manifest:', error)
+      toast.error(error?.message || 'Failed to submit manifest. Please try again.')
+      setUploading(false)
+      setConfirmDialog({ open: false, action: null })
+    }
   }
 
   return (
@@ -132,6 +328,59 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
               />
             </div>
             <div className='flex flex-wrap gap-2'>
+              {!isDelivered && (
+                <>
+                  <Button
+                    variant='outlined'
+                    size='small'
+                    component='label'
+                    startIcon={uploading ? <CircularProgress size={16} /> : <i className='ri-image-add-line' />}
+                    disabled={uploading}
+                  >
+                    {manifestData.proofOfDeliveryImage ? 'Change' : 'Upload'} Proof
+                    <input
+                      type='file'
+                      hidden
+                      accept='image/*'
+                      onChange={handleImageUpload}
+                    />
+                  </Button>
+                  {!isDelivered && (
+                    <Tooltip 
+                      title={
+                        !hasProofImage 
+                          ? "Upload proof of delivery first" 
+                          : !hasDeliveredPackages 
+                          ? "Mark at least one package as delivered in the Packages tab" 
+                          : "Ready to submit"
+                      }
+                    >
+                      <span>
+                        <Button
+                          variant='contained'
+                          size='small'
+                          color='success'
+                          startIcon={<i className='ri-check-double-line' />}
+                          onClick={() => setConfirmDialog({ open: true, action: 'submit' })}
+                          disabled={!canSubmit}
+                        >
+                          Submit Manifest
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  )}
+                </>
+              )}
+              {manifestData.proofOfDeliveryImage && (
+                <Button
+                  variant='outlined'
+                  size='small'
+                  startIcon={<i className='ri-image-line' />}
+                  onClick={() => window.open(manifestData.proofOfDeliveryImage, '_blank')}
+                >
+                  View Proof
+                </Button>
+              )}
               <Button
                 variant='outlined'
                 size='small'
@@ -139,17 +388,37 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
               >
                 Print
               </Button>
-              <Button
-                variant='contained'
-                size='small'
-                startIcon={<i className='ri-edit-line' />}
-              >
-                Edit
-              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Proof of Delivery Image Preview */}
+      {hasProofImage && (
+        <Card className='mb-6'>
+          <CardContent>
+            <div className='flex items-center justify-between mb-4'>
+              <div className='flex items-center gap-2'>
+                <i className='ri-image-line text-2xl text-success' />
+                <Typography variant='h6'>Proof of Delivery</Typography>
+              </div>
+              <Chip label='Uploaded' color='success' size='small' variant='tonal' />
+            </div>
+            <div className='relative w-full max-w-2xl mx-auto'>
+              <img
+                src={manifestData.proofOfDeliveryImage}
+                alt='Proof of Delivery'
+                className='w-full h-auto rounded border-2 border-gray-200 cursor-pointer hover:border-primary transition-colors'
+                onClick={() => window.open(manifestData.proofOfDeliveryImage, '_blank')}
+                style={{ maxHeight: '400px', objectFit: 'contain' }}
+              />
+              <Typography variant='caption' color='text.secondary' className='block text-center mt-2'>
+                Click image to view full size
+              </Typography>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs */}
       <Card>
@@ -330,18 +599,18 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
               <Grid item xs={12} md={6}>
                 <Typography variant='h6' className='mb-4'>Driver Information</Typography>
                 <Typography color='text.secondary' className='mb-1'>
-                  <strong>Name:</strong> {manifestData.driver.name || 'N/A'}
+                  <strong>Name:</strong> {trip.driver.name || 'N/A'}
                 </Typography>
-                {typeof manifestData.driver === 'object' && manifestData.driver !== null && (
+                {typeof trip.driver === 'object' && trip.driver !== null && (
                   <>
-                    {manifestData.driver.phone && (
+                    {trip.driver.phone && (
                       <Typography color='text.secondary' className='mb-1'>
-                        <strong>Phone:</strong> {manifestData.driver.phone}
+                        <strong>Phone:</strong> {trip.driver.phone}
                       </Typography>
                     )}
-                    {manifestData.driver.email && (
+                    {trip.driver.email && (
                       <Typography color='text.secondary' className='mb-1'>
-                        <strong>Email:</strong> {manifestData.driver.email}
+                        <strong>Email:</strong> {trip.driver.email}
                       </Typography>
                     )}
                   </>
@@ -553,7 +822,21 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
             <div className='overflow-x-auto'>
               {packages.length > 0 ? (
                 <>
-                  {!isDelivered && selectedPackages.length > 0 && (
+                  {!hasProofImage && (
+                    <div className='mb-4 p-4 bg-warning/10 rounded'>
+                      <Typography variant='body2' color='warning'>
+                        <i className='ri-alert-line' /> Please upload proof of delivery image before marking packages as delivered
+                      </Typography>
+                    </div>
+                  )}
+                  {hasProofImage && !hasDeliveredPackages && (
+                    <div className='mb-4 p-4 bg-info/10 rounded'>
+                      <Typography variant='body2' color='info'>
+                        <i className='ri-information-line' /> Select and mark packages as delivered before submitting the manifest
+                      </Typography>
+                    </div>
+                  )}
+                  {hasProofImage && selectedPackages.length > 0 && (
                     <div className='mb-4 p-4 bg-primary/10 rounded flex items-center justify-between flex-wrap gap-2'>
                       <Typography variant='body2' color='primary'>
                         {selectedPackages.length} package{selectedPackages.length > 1 ? 's' : ''} selected
@@ -573,12 +856,13 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                     <Table sx={{ minWidth: 800 }}>
                       <TableHead>
                         <TableRow>
-                          {!isDelivered && (
+                          {(
                             <TableCell padding='checkbox'>
                               <Checkbox
                                 checked={selectedPackages.length > 0 && selectedPackages.length === packages.filter((pkg: any) => pkg.status !== 'delivered').length}
                                 indeterminate={selectedPackages.length > 0 && selectedPackages.length < packages.filter((pkg: any) => pkg.status !== 'delivered').length}
                                 onChange={handleSelectAll}
+                                disabled={!hasProofImage}
                               />
                             </TableCell>
                           )}
@@ -594,12 +878,12 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                     <TableBody>
                       {packages.map((pkg: any) => (
                         <TableRow key={pkg.$id} hover>
-                          {!isDelivered && (
+                          {(
                             <TableCell padding='checkbox'>
                               <Checkbox
                                 checked={selectedPackages.includes(pkg.$id)}
                                 onChange={() => handleSelectPackage(pkg.$id)}
-                                disabled={pkg.status === 'delivered'}
+                                disabled={!hasProofImage || pkg.status === 'delivered'}
                               />
                             </TableCell>
                           )}
@@ -668,6 +952,7 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                     </TableBody>
                   </Table>
                 </TableContainer>
+                </>
               ) : (
                 <div className='text-center py-12'>
                   <i className='ri-inbox-line text-6xl text-textSecondary mb-2' />
@@ -683,6 +968,56 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
           )}
         </CardContent>
       </Card>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmDialog.open} onClose={() => !uploading && setConfirmDialog({ open: false, action: null })}>
+        <DialogTitle>
+          {confirmDialog.action === 'delivered' ? 'Mark Packages as Delivered' : 'Submit Manifest'}
+        </DialogTitle>
+        <DialogContent>
+          {confirmDialog.action === 'delivered' ? (
+            <Typography>
+              Are you sure you want to mark {selectedPackages.length} package{selectedPackages.length > 1 ? 's' : ''} as delivered?
+            </Typography>
+          ) : (
+            <div>
+              <Typography gutterBottom>
+                Are you sure you want to submit this manifest as delivered?
+              </Typography>
+              <div className='mt-4 p-3 bg-gray-50 rounded'>
+                <Typography variant='body2' className='mb-2'>
+                  <strong>Summary:</strong>
+                </Typography>
+                <Typography variant='body2' color='success.main'>
+                  • Delivered: {packages.filter((pkg: any) => pkg.status === 'delivered').length} package(s)
+                </Typography>
+                {hasUnprocessedPackages && (
+                  <Typography variant='body2' color='warning.main'>
+                    • Remaining: {packages.filter((pkg: any) => pkg.status !== 'delivered' && pkg.status !== 'missing').length} package(s) (will be marked as missing)
+                  </Typography>
+                )}
+              </div>
+              <Typography variant='body2' color='text.secondary' className='mt-3'>
+                This action will finalize the manifest and update the trip checkpoint.
+              </Typography>
+            </div>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialog({ open: false, action: null })} disabled={uploading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDialog.action === 'delivered' ? handleMarkAsDelivered : handleSubmitManifest}
+            variant='contained'
+            color={confirmDialog.action === 'delivered' ? 'success' : 'primary'}
+            disabled={uploading}
+            startIcon={uploading ? <CircularProgress size={16} /> : <i className='ri-check-line' />}
+          >
+            {uploading ? 'Processing...' : 'Confirm'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   )
 }

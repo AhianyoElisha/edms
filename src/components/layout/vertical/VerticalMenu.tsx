@@ -250,9 +250,9 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
                 {hasAnyPermission(['manifests.view', 'manifests.manage']) && (
                   <MenuItem onClick={() => handleNavigation('/delivery/manifests')}>All Manifests</MenuItem>
                 )}
-                {hasAnyPermission(['manifests.view']) && (
+                {/* {hasAnyPermission(['manifests.view']) && (
                   <MenuItem onClick={() => handleNavigation('/delivery/manifests/active')}>Active Manifests</MenuItem>
-                )}
+                )} */}
               </SubMenu>
             )}
 

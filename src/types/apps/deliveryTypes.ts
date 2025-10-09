@@ -72,9 +72,8 @@ export interface PackageTrackingType {
   // Simplified - no sender info required for driver entry
   recipient: string // Recipient name
   recipientPhone: string
-  pickuplocation: string // pickup location ID (lowercase 'l')
-  dropofflocation: string // dropoff location ID (lowercase 'l')
   manifest: string // manifest ID (package -> manifest -> trip relationship)
+  // Note: Locations are accessed through manifest.dropofflocation and trip.route.startLocation
   // Note: trip relationship removed - access trip via manifest
   status: PackageStatusType
   expectedDeliveryDate: string
@@ -347,32 +346,29 @@ export type ManifestStatusType = 'pending' | 'loaded' | 'in_transit' | 'delivere
 export interface ManifestType {
   $id: string
   manifestNumber: string
-  trip: string // relationship to trip
-  vehicle: string // relationship to vehicle
-  driver: string // relationship to user with role as driver
-  pickuplocation: string // relationship to pickup location (lowercase 'l')
-  dropofflocation: string // relationship to dropoff location (lowercase 'l')
+  trip: string // relationship to trip (trip contains vehicle, driver, route relationships)
+  dropofflocation: string // direct relationship to dropoff location (manifest serves ONE dropoff location)
   dropoffSequence: number // order in route
   manifestDate: string
   totalPackages: number
   packageTypes: string // JSON string: {small: number, medium: number, big: number, bin: number}
-  packages: string[] // array of package IDs
   status: ManifestStatusType
   manifestImage?: string | null // uploaded manifest photo
   departureTime?: string | null
   arrivalTime?: string | null
+  actualArrival?: string | null // actual arrival time at dropoff location
   deliveryTime?: string | null
-  notes?: string
+  estimatedArrival?: string | null // estimated arrival time
+  notes?: string | null
   // Proof of delivery fields
   proofOfDeliveryImage?: string | null
   deliveryGpsCoordinates?: string | null
-  deliveryGpsVerified: boolean
+  deliveryGpsVerified?: boolean
   gpsVerificationDistance?: number | null
-  deliveredPackages: string // JSON string of delivered package IDs
-  missingPackages: string // JSON string of missing package IDs
-  recipientName?: string | null
-  recipientPhone?: string | null
-  creator: string 
+  deliveredPackages?: number | null // count of delivered packages (integer)
+  missingPackages?: string | null // JSON string of missing package IDs
+  recipientName?: string | null // auto-populated from dropofflocation.contactPerson
+  recipientPhone?: string | null // auto-populated from dropofflocation.contactPhone
   $createdAt: string
   $updatedAt: string
 }

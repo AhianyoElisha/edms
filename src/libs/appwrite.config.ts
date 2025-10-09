@@ -2,6 +2,7 @@ import { Client, Account, Databases, Storage, Avatars, TablesDB } from "appwrite
 
 export const appwriteConfig = {
   api: process.env.APPWRITE_API_KEY!,
+  bucket: process.env.NEXT_PUBLIC_BUCKET_ID || process.env.BUCKET || '68e6a9100001d5b0c070',
   project:'68c8989000381e194776',
   database:'68d5e82e00304125c0ae',
   roles:'68d5e8650013cd602cbd',
@@ -26,7 +27,6 @@ export const appwriteConfig = {
   warehouserequisition:'676e1222003df5e30ac0',
   salesrequisition:'676e123400360eba7c42',
   sales:'66c2460a00339fb96286',
-  bucket:'66c246e400356ab125ee',
   endpoint:'https://cloud.appwrite.io/v1',
   users: '68d5eb2a0035c2892e30',
   packages: '68d5f888003df624b455',
@@ -34,7 +34,7 @@ export const appwriteConfig = {
   dropofflocations: '68d5fb6700187a5d2ddd',
   drivers: '68d601d5002442e07af8',
   routes: '68d5fd6d001724b175fa',
-  manifests: '68d605dd001bd30c7ff4',
+  manifests: '68e79442002f72bd0769',
   deliveries: '68d60b47002c4d3883eb',
   tripexenses: '68d60fa6002c88a35f3f',
   trips: '68d60fed0006e92089b6',

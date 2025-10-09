@@ -82,27 +82,42 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
 
     // Step 2: Create all manifest documents
     for (const manifestData of manifests) {
+      // Fetch dropoff location to get contact person and phone
+      let recipientName = null
+      let recipientPhone = null
+      
+      try {
+        const dropoffLocation = await databases.getDocument(
+          appwriteConfig.database,
+          appwriteConfig.dropofflocations,
+          manifestData.dropoffLocationId
+        )
+        
+        recipientName = dropoffLocation.contactPerson || null
+        recipientPhone = dropoffLocation.contactPhone || null
+      } catch (error) {
+        console.warn(`Could not fetch dropoff location details for ${manifestData.dropoffLocationId}`)
+      }
+      
       const manifestDoc = {
         manifestNumber: manifestData.manifestNumber,
         trip: trip.$id,
-        vehicle: tripDetails.vehicleId,
-        driver: tripDetails.driverId,
-        pickuplocation: '', // TODO: Set from route start location
-        dropofflocation: manifestData.dropoffLocationId, // Lowercase 'l' to match DB
+        dropofflocation: manifestData.dropoffLocationId, // direct relationship to dropoff location
         dropoffSequence: manifests.indexOf(manifestData) + 1,
         manifestDate: new Date(tripDetails.startTime).toISOString(),
         totalPackages: packages.filter(pkg => pkg.manifestTempId === manifestData.tempId).length,
         packageTypes: JSON.stringify(
           getPackageSizeCountsForManifest(packages, manifestData.tempId)
-        ), // DB field is 'packageTypes', not 'packageSizes'
-        // Note: packages array not initialized - two-way relationship handles this
+        ),
         status: 'pending',
         notes: manifestData.notes || '',
         departureTime: manifestData.departureTime || null,
         
         // Delivery tracking fields (initialized as null)
         arrivalTime: null,
+        actualArrival: null,
         deliveryTime: null,
+        estimatedArrival: null,
         manifestImage: null,
         
         // Proof of delivery fields (to be filled during delivery)
@@ -110,10 +125,12 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         deliveryGpsCoordinates: null,
         deliveryGpsVerified: false,
         gpsVerificationDistance: null,
-        deliveredPackages: JSON.stringify([]),
+        deliveredPackages: 0, // count of delivered packages (integer)
         missingPackages: JSON.stringify([]),
-        recipientName: null,
-        recipientPhone: null
+        
+        // Auto-populate recipient details from dropoff location
+        recipientName,
+        recipientPhone
       }
 
 
@@ -144,9 +161,8 @@ export async function createTripWithManifestsAndPackages(wizardData: TripWizardD
         packageSize: packageData.packageSize, // big, medium, small, bin
         isBin: packageData.isBin || false, // Is this a bin?
         itemCount: packageData.itemCount || null, // Headcount for bins
-        pickuplocation: '', // Will be set from route start location
-        dropofflocation: manifest.dropoffLocationId, // Lowercase 'l' to match DB
         manifest: manifestId,
+        // Note: Locations accessed through manifest.dropofflocation and trip.route.startLocation
         // Note: Removed trip relationship - package -> manifest -> trip is sufficient
         status: 'pending',
         expectedDeliveryDate: new Date(tripDetails.startTime).toISOString(),
@@ -317,9 +333,6 @@ export async function getTripById(tripId: string): Promise<any> {
           'driver.*', // Fetch complete driver details  
           'route.*', // Fetch complete route details
           'manifests.*', // Fetch all manifests
-          'manifests.packages.*', // Fetch packages in each manifest
-          'manifests.pickuplocation.*', // Fetch pickup location details
-          'manifests.dropofflocation.*' // Fetch dropoff location details
         ])
       ]
     )

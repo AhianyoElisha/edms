@@ -160,7 +160,7 @@ const PackageTrackingWidget = ({
                   
                   <div className='flex items-center gap-4'>
                     <Typography variant='caption' color='text.secondary'>
-                      📍 Pickup: {pkg.pickuplocation} → Dropoff: {pkg.dropofflocation}
+                      � {pkg.recipientPhone || 'No phone'}
                     </Typography>
                   </div>
                 </div>

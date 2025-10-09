@@ -22,6 +22,7 @@ export const getPackageById = async (packageId: string): Promise<PackageTracking
 
 export const getPackageByIdWithRelations = async (packageId: string) => {
   try {
+    // Fetch package with manifest (including dropofflocation) and trip relationships
     const pkg = await tablesDB.getRow(
       DATABASE_ID,
       PACKAGES_COLLECTION_ID,
@@ -30,16 +31,38 @@ export const getPackageByIdWithRelations = async (packageId: string) => {
         Query.select([
           '*',
           'manifest.*',
+          'manifest.dropofflocation.*', // fetch dropoff location from manifest
           'manifest.trip.*',
-          'manifest.pickuplocation.*',
-          'manifest.dropofflocation.*',
-          'pickuplocation.*',
-          'dropofflocation.*'
+          'manifest.trip.vehicle.*',
+          'manifest.trip.driver.*',
+          'manifest.trip.route.*'
         ])
       ]
-    )
+    ) as any
 
-    return pkg
+    // Get locations from the manifest and trip relationships
+    let pickupLocation = null
+    let dropoffLocation = pkg.manifest?.dropofflocation || null // dropoff from manifest
+
+    // Get pickup location from trip's route (startLocation is the pickup point)
+    if (pkg.manifest?.trip?.route?.startLocation) {
+      try {
+        pickupLocation = await databases.getDocument(
+          DATABASE_ID,
+          appwriteConfig.pickuplocations,
+          pkg.manifest.trip.route.startLocation
+        )
+      } catch (error) {
+        console.warn('Could not fetch pickup location from trip route')
+      }
+    }
+
+    // Combine all data
+    return {
+      ...pkg,
+      pickupLocation,
+      dropoffLocation
+    }
   } catch (error) {
     console.error('Error fetching package with relations:', error)
     throw new Error('Failed to fetch package details')
