@@ -130,7 +130,7 @@ const TripsOverviewTable = () => {
         header: 'Status',
         cell: ({ row }) => (
           <Chip
-            label={row.original.status?.replace('_', ' ').toUpperCase()}
+            label={row.original.status?.replace('_', ' ')}
             color={statusColors[row.original.status || 'planned'] || 'default'}
             size='small'
             variant='tonal'
