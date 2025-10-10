@@ -25,7 +25,7 @@ const LogisticsStatisticsCard = () => {
       try {
         setLoading(true)
         const response = await getLogisticsList()
-        const vehicles = response?.documents as unknown as Logistics[]
+        const vehicles = response?.rows as unknown as Logistics[]
 
         if (vehicles) {
           // Calculate analytics

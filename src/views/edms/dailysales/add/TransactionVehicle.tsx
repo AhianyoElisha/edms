@@ -32,7 +32,7 @@ const TransactionVehicle = ({ control, index, name, error, onVehicleSelect }: Pr
     try {
       setIsLoading(true)
       const data = await getLogisticsList()
-      setVehicleData(data?.documents as unknown as Logistics[])
+      setVehicleData(data?.rows as unknown as Logistics[])
     } catch (error) {
       console.error('Error fetching inventory data:', error)
       setVehicleData(null)

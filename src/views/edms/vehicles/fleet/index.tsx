@@ -83,7 +83,7 @@ const Fleet = () => {
   const fetchLogisticsData = useCallback(async () => {
     try {
       const response = await getLogisticsList()
-      const logisticsData = response?.documents as unknown as Logistics[]
+      const logisticsData = response?.rows as unknown as Logistics[]
       setLogisticsData(logisticsData)
     } catch (error) {
       console.error('Error fetching logistics data:', error)
