@@ -129,3 +129,41 @@ export const updatePackageStatus = async (
     throw new Error('Failed to update package status')
   }
 }
+
+/**
+ * Get delivered packages by date range
+ * @param startDate - Start date in ISO format (optional)
+ * @param endDate - End date in ISO format (optional)
+ * @returns Array of delivered packages
+ */
+export const getDeliveredPackagesByDateRange = async (
+  startDate?: string,
+  endDate?: string
+): Promise<PackageTrackingType[]> => {
+  try {
+    // Build queries
+    const queries = [Query.equal('status', 'delivered')]
+    
+    if (startDate) {
+      queries.push(Query.greaterThanEqual('deliveryDate', startDate))
+    }
+    
+    if (endDate) {
+      queries.push(Query.lessThanEqual('deliveryDate', endDate))
+    }
+    
+    queries.push(Query.orderDesc('deliveryDate'))
+    queries.push(Query.limit(1000))
+    
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      PACKAGES_COLLECTION_ID,
+      queries
+    )
+    
+    return response.documents as unknown as PackageTrackingType[]
+  } catch (error) {
+    console.error('Error fetching delivered packages:', error)
+    throw new Error('Failed to fetch delivered packages')
+  }
+}
