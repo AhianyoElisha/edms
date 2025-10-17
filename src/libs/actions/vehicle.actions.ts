@@ -2,6 +2,7 @@ import { ID, Query } from 'appwrite'
 import { databases } from '@/libs/appwrite.config'
 import { appwriteConfig } from '@/libs/appwrite.config'
 import { VehicleType, VehicleStatusType } from '@/types/apps/deliveryTypes'
+import { addActivityHistory } from './activity-history.actions'
 
 // Type conversion helper
 const toVehicleType = (doc: any): VehicleType => doc as unknown as VehicleType
@@ -34,7 +35,7 @@ export interface VehicleFilters {
 }
 
 // Create a new vehicle
-export async function createVehicle(vehicleData: CreateVehicleData): Promise<VehicleType> {
+export async function createVehicle(vehicleData: CreateVehicleData, userId?: string, userName?: string): Promise<VehicleType> {
   try {
     const vehicle = await databases.createDocument(
       appwriteConfig.database,
@@ -46,6 +47,24 @@ export async function createVehicle(vehicleData: CreateVehicleData): Promise<Veh
         fuelLevel: vehicleData.fuelLevel || 100,
       }
     )
+
+    // Add to activity history
+    if (userId) {
+      await addActivityHistory({
+        entityType: 'vehicle',
+        entityId: vehicle.$id,
+        entityName: `${vehicleData.model} (${vehicleData.licensePlate})`,
+        action: 'created',
+        description: `Created vehicle ${vehicleData.model} with license plate ${vehicleData.licensePlate}`,
+        userId,
+        userName,
+        metadata: {
+          type: vehicleData.type,
+          capacity: vehicleData.capacity,
+          status: vehicleData.status
+        }
+      })
+    }
     
     return toVehicleType(vehicle)
   } catch (error) {
@@ -106,7 +125,7 @@ export async function getVehicleById(vehicleId: string): Promise<VehicleType> {
 }
 
 // Update a vehicle
-export async function updateVehicle(vehicleData: UpdateVehicleData): Promise<VehicleType> {
+export async function updateVehicle(vehicleData: UpdateVehicleData, userId?: string, userName?: string): Promise<VehicleType> {
   try {
     const { $id, ...updateData } = vehicleData
     
@@ -116,6 +135,21 @@ export async function updateVehicle(vehicleData: UpdateVehicleData): Promise<Veh
       $id,
       updateData
     )
+
+    // Add to activity history
+    if (userId) {
+      const updatedFields = Object.keys(updateData).join(', ')
+      await addActivityHistory({
+        entityType: 'vehicle',
+        entityId: $id,
+        entityName: `${vehicle.model} (${vehicle.licensePlate})`,
+        action: 'updated',
+        description: `Updated vehicle fields: ${updatedFields}`,
+        userId,
+        userName,
+        metadata: updateData
+      })
+    }
     
     return toVehicleType(vehicle)
   } catch (error) {
@@ -125,13 +159,32 @@ export async function updateVehicle(vehicleData: UpdateVehicleData): Promise<Veh
 }
 
 // Delete a vehicle
-export async function deleteVehicle(vehicleId: string): Promise<void> {
+export async function deleteVehicle(vehicleId: string, userId?: string, userName?: string): Promise<void> {
   try {
+    const vehicle = await getVehicleById(vehicleId)
+    
     await databases.deleteDocument(
       appwriteConfig.database,
       appwriteConfig.vehicles,
       vehicleId
     )
+
+    // Add to activity history
+    if (userId) {
+      await addActivityHistory({
+        entityType: 'vehicle',
+        entityId: vehicleId,
+        entityName: `${vehicle.model} (${vehicle.licensePlate})`,
+        action: 'deleted',
+        description: `Deleted vehicle ${vehicle.model} with license plate ${vehicle.licensePlate}`,
+        userId,
+        userName,
+        metadata: {
+          type: vehicle.type,
+          licensePlate: vehicle.licensePlate
+        }
+      })
+    }
   } catch (error) {
     console.error('Error deleting vehicle:', error)
     throw new Error('Failed to delete vehicle')

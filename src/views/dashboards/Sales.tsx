@@ -30,7 +30,7 @@ type SalesProps = {
 }
 
 
-const Sales = ({ totalCustomers, totalProfit, totalTransactions, totalSales, isLoading }: SalesProps) => {
+const Revenue = ({ totalCustomers, totalProfit, totalTransactions, totalSales, isLoading }: SalesProps) => {
   // Helper function to render stats content
   const renderStats = (stats: string | ReactNode) => {
     if (typeof stats === 'string') {
@@ -76,7 +76,7 @@ const Sales = ({ totalCustomers, totalProfit, totalTransactions, totalSales, isL
   return (
     <Card className='bs-full'>
       <CardHeader
-        title='Sales Overview'
+        title='Revenue Overview'
         action={<OptionMenu options={['Refresh', 'Share', 'Update']} />}
         subheader={
           <div className='flex items-center gap-2'>
@@ -103,4 +103,4 @@ const Sales = ({ totalCustomers, totalProfit, totalTransactions, totalSales, isL
   )
 }
 
-export default Sales
+export default Revenue

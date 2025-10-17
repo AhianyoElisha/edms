@@ -40,6 +40,7 @@ export const appwriteConfig = {
   trips: '68d60fed0006e92089b6',
   ratecards: '68d615200027173fa63e',
   notifications: '68d617c100052a1662ee',
+  activityhistory: '68f0b6ba003332bc6e3d', // Activity history collection
   machinery: '68d617c100052a1662ee', // Using same as notifications for now
   production: '68d617c100052a1662ee', // Using same as notifications for now
   salesestimate: '68d617c100052a1662ee', // Using same as notifications for now

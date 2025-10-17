@@ -3,38 +3,20 @@
 import { useAuth } from '@/contexts/AppwriteProvider';
 import Grid from '@mui/material/Grid';
 import Sales from '@/views/dashboards/Sales';
-import SalesMonth from '@/views/dashboards/SalesMonth';
-import TotalVisits from '@/views/dashboards/TotalVisits';
-import WeeklySalesBg from '@/views/dashboards/WeeklySalesBg';
-import OrdersImpressions from '@/views/dashboards/OrdersImpressions';
-import StoresAndProduction from '@/views/dashboards/StoresAndProduction';
-import WarehouseAndSales from '@/views/dashboards/WareHouseAndSales';
 import ActivityTimeline from '@/views/dashboards/ActivityTimeline';
 import UserTable from '@/views/dashboards/UserTable';
 import { Typography, Box, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
-import MaintenanceBanner from '../../../MaintenanceBanner';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { getDashboardData } from '@/libs/actions/dashboard.actions';
-import { RequisitionHistory, Users } from '@/types/apps/ecommerceTypes';
-import SalesStatistics from '@/views/dashboards/ReviewsStatistics'; // Updated import
-import UserListCards from '@/views/dashboards/UserListCards';
+import { getEDMSDashboardData } from '@/libs/actions/edms-dashboard.actions';
+import SalesStatistics from '@/views/dashboards/ReviewsStatistics';
 import CardStatWithImage from '@/components/card-statistics/Character';
 import Shimmer from '@/components/layout/shared/Shimmer';
 
-export default function DashboardContent() {
+export default function EDMSDashboardContent() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true)
-  const [supplierListData, setSupplierListData] = useState<any>()
-  const [activityTimelineData, setActivityTimelineData] = useState<RequisitionHistory[]>()
-  const [costEstimateListData, setCostEstimateListData] = useState<any>()
-  const [currentMonthEstimatesListData, setCurrentMonthEstimatesListData] = useState<any>()
-  const [userListData, setUserListData] = useState<User[]>()
-  const [customerListData, setCustomerListData] = useState<any>()
-  const [expenseAndReturnsData, setExpenseAndReturnsData] = useState<any>()
-  const [tripsTotal, setTripsTotal] = useState<number>(0)
-  const [deliveredPackagesTotal, setDeliveredPackagesTotal] = useState<number>(0)
-  const [manifestsTotal, setManifestsTotal] = useState<number>(0)
+  const [dashboardData, setDashboardData] = useState<any>(null)
 
   // Month selector state
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth())
@@ -50,21 +32,12 @@ export default function DashboardContent() {
     const fetchDashboardData = useCallback(async () => {
       try {
         setIsLoading(true)
-        const response = await getDashboardData(selectedMonth, selectedYear)
-        setSupplierListData(response?.supplierList?.total)
-        setActivityTimelineData(response?.activityTimeline?.rows as unknown as RequisitionHistory[])
-        setCostEstimateListData(response?.consoleEstimatesList)
-        setCurrentMonthEstimatesListData(response?.currentMonthEstimates)
-        setExpenseAndReturnsData(response?.expenseAndReturns)
-        setUserListData(response?.userList?.rows as unknown as User[])
-        setCustomerListData(response?.customerList?.total)
-        setTripsTotal(response?.tripsTotal || 0)
-        setDeliveredPackagesTotal(response?.deliveredPackagesTotal || 0)
-        setManifestsTotal(response?.manifestsTotal || 0)
-        console.log('Dashboard data fetched successfully:', response?.userList)
+        const response = await getEDMSDashboardData(selectedMonth, selectedYear)
+        setDashboardData(response)
+        console.log('EDMS Dashboard data fetched successfully:', response)
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
-        toast.error('Failed to fetch dashboard data as unknown')
+        toast.error('Failed to fetch dashboard data')
       } finally {
         setIsLoading(false)
       }
@@ -74,10 +47,8 @@ export default function DashboardContent() {
       fetchDashboardData()
     }, [fetchDashboardData])
 
-  // Get top 2 creators for the cards
-  const topCreators = currentMonthEstimatesListData?.creators
-    ?.sort((a: any, b: any) => b.salesTotal - a.salesTotal)
-    ?.slice(0, 2) || [];
+  // Get top 2 drivers for the cards
+  const topDrivers = dashboardData?.driverPerformance?.slice(0, 2) || [];
 
   return (
     <div>
@@ -120,44 +91,32 @@ export default function DashboardContent() {
       
       <Grid container spacing={6}>
         <Grid item xs={12}>
-          <UserListCards 
-            userList={userListData} 
-            isLoading={isLoading} 
-            supplierList={supplierListData} 
-            expenseAndReturns={expenseAndReturnsData}
-            currentMonthEstimates={currentMonthEstimatesListData}
-            tripsTotal={tripsTotal}
-            deliveredPackagesTotal={deliveredPackagesTotal}
-            manifestsTotal={manifestsTotal}
-          />
-        </Grid>
-        <Grid item xs={12}>
           <Sales 
-            totalCustomers={customerListData} 
+            totalCustomers={dashboardData?.vehicleStats?.total || 0} 
             isLoading={isLoading} 
-            totalSales={costEstimateListData?.salesPackages} 
-            totalTransactions={costEstimateListData?.transactionTotal} 
-            totalProfit={costEstimateListData?.salesTotal || 0.00}
+            totalSales={String(dashboardData?.packageStats?.total || 0)} 
+            totalTransactions={dashboardData?.tripStats?.total || 0} 
+            totalProfit={String(dashboardData?.packageStats?.delivered || 0)}
           />
         </Grid>
         
-        {/* Dynamic creator cards */}
-        {topCreators.map((creator: any, index: number) => (
-          <Grid item xs={12} sm={6} md={3} key={creator.name}>
+        {/* Dynamic driver cards */}
+        {topDrivers.map((driver: any, index: number) => (
+          <Grid item xs={12} sm={6} md={3} key={driver.driverId}>
             <CardStatWithImage
-              stats={creator.formattedSalesTotal}
+              stats={driver.completedTrips || 0}
               title='This Month Analytics'
-              subtitle='Total Sales'
-              trend={creator.isPositiveTrend ? 'positive' : 'negative'}
-              trendNumber={creator.trendPercentage}
+              subtitle='Completed Trips'
+              trend={driver.isPositiveTrend ? 'positive' : 'negative'}
+              trendNumber={driver.trendPercentage || 0}
               chipColor={index === 0 ? 'primary' : 'success'}
-              chipText={creator.name}
-              src={creator?.avatar}
+              chipText={driver.driverName || 'Unknown Driver'}
+              src={driver?.avatar || '/images/avatars/1.png'}
             />
           </Grid>
         ))}
         
-        {/* Fallback cards if no creators data */}
+        {/* Fallback cards if no drivers data */}
         {isLoading?  (
           <>
             <Grid item xs={12} sm={6} md={3}>
@@ -183,16 +142,16 @@ export default function DashboardContent() {
               />
             </Grid>
           </>
-        ): topCreators.length === 0 && (
+        ): topDrivers.length === 0 && (
           <>
             <Grid item xs={12} sm={6} md={3}>
               <CardStatWithImage
                 stats={0}
                 title={'This Month Analytics'}
-                subtitle={'Total Sales'}
+                subtitle={'Completed Trips'}
                 trendNumber={0}
                 chipColor='primary'
-                chipText={'No Creator Yet this Month'}
+                chipText={'No Driver Data Yet'}
                 src={'/images/illustrations/characters/13.png'}
               />
             </Grid>
@@ -200,27 +159,24 @@ export default function DashboardContent() {
               <CardStatWithImage
                 stats={0}
                 title={'This Month Analytics'}
-                subtitle={'Total Sales'}
+                subtitle={'Completed Trips'}
                 trendNumber={0}
                 chipColor='primary'
-                chipText={'No Creator Yet this Month'}
+                chipText={'No Driver Data Yet'}
                 src={'/images/illustrations/characters/12.png'}
               />
             </Grid>
           </>
         )}
 
-        {/* <Grid item xs={12} md={6}>
-          <WeeklySalesBg />
-        </Grid> */}
         <Grid item xs={12}>
-          <SalesStatistics monthlyEstimate={currentMonthEstimatesListData} isLoading={isLoading} />
+          <SalesStatistics monthlyEstimate={dashboardData?.packageStats} isLoading={isLoading} />
         </Grid>
         <Grid item xs={12}>
           <ActivityTimeline />
         </Grid>
         <Grid item xs={12} className='max-md:order-3'>
-          <UserTable tableData={userListData as unknown as Users[]} />
+          <UserTable tableData={dashboardData?.driverPerformance} />
         </Grid>
       </Grid>
     </div>

@@ -3,6 +3,8 @@ import { databases, storage } from "../appwrite.config";
 import { appwriteConfig } from '../appwrite.config';
 import { getCustomerList, getSupplierList, getUserList } from "./customer.action";
 import { getRequisitionHistoryList } from "./stores.actions";
+import { getAllTrips } from "./trip.actions";
+import { getManifestStatistics } from "./manifest.actions";
 
 // TypeScript interfaces
 interface SalesDocument {
@@ -123,16 +125,27 @@ export async function getCurrentMonthEstimates(month?: number, year?: number) {
     // Get number of days in current month
     const daysInMonth = endOfMonth.getDate();
     
-    // Query for sales estimates in current month
-    const salesEstimateList = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.orders,
-      [
-        Query.greaterThanEqual('salesDate', startDate),
-        Query.lessThanEqual('salesDate', endDate),
-        Query.limit(500)
-      ]
-    );
+    // Query for sales estimates in current month and expenses for net profit calculation
+    const [salesEstimateList, expensesList] = await Promise.all([
+      databases.listDocuments(
+        appwriteConfig.database,
+        appwriteConfig.orders,
+        [
+          Query.greaterThanEqual('salesDate', startDate),
+          Query.lessThanEqual('salesDate', endDate),
+          Query.limit(500)
+        ]
+      ),
+      databases.listDocuments(
+        appwriteConfig.database,
+        appwriteConfig.expenses,
+        [
+          Query.greaterThanEqual('expenseDate', startDate),
+          Query.lessThanEqual('expenseDate', endDate),
+          Query.limit(500)
+        ]
+      )
+    ]);
     
     if (!salesEstimateList) throw Error;
 
@@ -168,7 +181,7 @@ export async function getCurrentMonthEstimates(month?: number, year?: number) {
     const creatorMap = new Map(creators.documents.map(creator => [creator.$id, creator]));
     
     // Populate relationships with fallback values
-    const processedDocuments = salesEstimateList.documents.map(doc => ({
+    const processedDocuments: any = salesEstimateList.documents.map(doc => ({
       ...doc,
       category: doc.category ? 
         categoryMap.get(doc.category) || { title: 'Unknown Category', $id: doc.category } : 
@@ -177,7 +190,25 @@ export async function getCurrentMonthEstimates(month?: number, year?: number) {
         creatorMap.get(doc.creator) || { name: 'Unknown Creator', avatar: 'Unknown Avatar', $id: doc.creator } : 
         { name: 'Unknown Creator', avatar: 'Unknown Avatar', $id: null }
     }));
+    // Calculate credit sales and cash sales
+    const creditSales = processedDocuments.filter((doc: any) => doc.paymentStatus === 'credit' );
+    const cashSales = processedDocuments.filter((doc: any) => doc.paymentStatus !== 'credit');
 
+    const creditSalesTotal = creditSales.reduce((total: number, item: any) => total + (item.totalPrice || 0), 0);
+    const cashSalesTotal = cashSales.reduce((total: number, item: any) => total + (item.totalPrice || 0), 0);
+    const creditSalesPackages = creditSales.reduce((total: number, item: any) => total + (item.packageQuantity || 0), 0);
+
+    // Calculate total expenses for the month
+    const totalExpenses = expensesList?.documents?.reduce((total: number, expense: any) => total + (expense.amount || expense.totalAmount || 0), 0) || 0;
+    
+    // Calculate overall totals across all categories
+    const overallSalesTotal = processedDocuments.reduce((total: number, item: any) => total + (item.totalPrice || 0), 0);
+    const overallSalesPackages = processedDocuments.reduce((total: number, item: any) => total + (item.packageQuantity || 0), 0);
+
+    // Calculate net profit (total sales - total expenses)
+    const netProfit = overallSalesTotal - totalExpenses;
+    const profitMargin = overallSalesTotal > 0 ? ((netProfit / overallSalesTotal) * 100).toFixed(2) : '0.00';
+    
     // Group orders by category
     const categorizedData = new Map();
     
@@ -186,13 +217,13 @@ export async function getCurrentMonthEstimates(month?: number, year?: number) {
     
     // Get all unique creators for consistent color mapping
     const allCreators = new Set();
-    processedDocuments.forEach((item) => {
+    processedDocuments.forEach((item: any) => {
       const creatorName = item.creator?.name || 'Unknown Creator';
       allCreators.add(creatorName);
     });
     
     // Process each document and group by category and creator
-    processedDocuments.forEach((item) => {
+    processedDocuments.forEach((item: any) => {
       // Category grouping (existing logic)
       const categoryTitle = item.category?.title || 'Uncategorized';
       
@@ -396,21 +427,22 @@ export async function getCurrentMonthEstimates(month?: number, year?: number) {
       };
     });
     
-    // Calculate overall totals across all categories
-      // @ts-ignore
-    const overallSalesTotal = processedDocuments.reduce((total, item) => total + (item.totalPrice || 0), 0);
-      // @ts-ignore
-    const overallSalesPackages = processedDocuments.reduce((total, item) => total + (item.packageQuantity || 0), 0);
-    
     return { 
-      categories: processedCategories, // Array of category data with stacked creator data
-      creators: processedCreators, // Array of creator data for dashboard cards
+      categories: processedCategories,
+      creators: processedCreators,
       overallSalesTotal,
       overallSalesPackages,
+      creditSalesTotal,
+      cashSalesTotal,
+      creditSalesPackages,
+      creditSalesCount: creditSales.length,
+      totalExpenses,
+      netProfit,
+      profitMargin,
       daysInMonth,
       month: new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long' }),
       year: currentYear,
-      allCreators: Array.from(allCreators) // List of all creators for color consistency
+      allCreators: Array.from(allCreators)
     };
   } catch (error) {
     console.log(error);
@@ -611,10 +643,10 @@ export async function getAllMonthsLogisticsToExpenseEstimate(vehicleId: any) {
         salesToExpenseRatio: formattedRatio,
         profitLoss,
         daysInMonth,
-        salesData, // Daily sales totals array
-        expenseData, // Daily expense totals array
-        dayLabels, // Day numbers array
-        weeklyBreakdown, // Weekly breakdown for the month
+        salesData: salesData, // Daily sales totals array
+        expenseData: expenseData, // Daily expense totals array
+        dayLabels: dayLabels, // Day numbers array
+        weeklyBreakdown: weeklyBreakdown, // Weekly breakdown for the month
         // Chart-friendly data
         hasData: month.salesCount > 0 || month.expenseCount > 0
       };
@@ -806,6 +838,71 @@ export async function getConsoleEstimatesList(month?: number, year?: number) {
   }
 }
 
+/**
+ * Get total trips count
+ */
+export async function getTripsTotal() {
+  try {
+    const trips = await getAllTrips();
+    return trips?.length || 0;
+  } catch (error) {
+    console.error('Error fetching trips total:', error);
+    return 0;
+  }
+}
+
+/**
+ * Get total delivered packages count
+ */
+export async function getDeliveredPackagesTotal(month?: number, year?: number) {
+  try {
+    const cacheKey = `delivered_packages_${month}_${year}`;
+    const cached = getCachedData(cacheKey);
+    if (cached) return cached;
+
+    const now = new Date();
+    const currentMonth = month !== undefined ? month : now.getMonth();
+    const currentYear = year !== undefined ? year : now.getFullYear();
+    
+    const startOfMonth = new Date(currentYear, currentMonth, 1);
+    const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
+    
+    const startDate = startOfMonth.toISOString();
+    const endDate = endOfMonth.toISOString();
+
+    const deliveredPackages = await databases.listDocuments(
+      appwriteConfig.database,
+      appwriteConfig.packages,
+      [
+        Query.equal('status', 'delivered'),
+        Query.greaterThanEqual('deliveryDate', startDate),
+        Query.lessThanEqual('deliveryDate', endDate),
+        Query.limit(1000)
+      ]
+    );
+
+    const result = deliveredPackages.total;
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching delivered packages:', error);
+    return 0;
+  }
+}
+
+/**
+ * Get total manifests count
+ */
+export async function getManifestsTotal() {
+  try {
+    const stats = await getManifestStatistics();
+    return stats?.total || 0;
+  } catch (error) {
+    console.error('Error fetching manifests total:', error);
+    return 0;
+  }
+}
+
 export async function getDashboardData(month?: number, year?: number) {
   try {
     // PARALLEL EXECUTION - Major performance improvement
@@ -816,7 +913,10 @@ export async function getDashboardData(month?: number, year?: number) {
       consoleEstimatesList,
       currentMonthEstimates,
       activityTimeline,
-      expenseAndReturns
+      expenseAndReturns,
+      tripsTotal,
+      deliveredPackagesTotal,
+      manifestsTotal
     ] = await Promise.all([
       getUserList(),
       getCustomerList(),
@@ -824,7 +924,10 @@ export async function getDashboardData(month?: number, year?: number) {
       getConsoleEstimatesList(month, year),
       getCurrentMonthEstimates(month, year),
       getRequisitionHistoryList(5), // Limit to 5 recent activities
-      getMonthExpenseAndReturnedProducts(month, year)
+      getMonthExpenseAndReturnedProducts(month, year),
+      getTripsTotal(),
+      getDeliveredPackagesTotal(month, year),
+      getManifestsTotal()
     ]);
 
     return { 
@@ -834,153 +937,13 @@ export async function getDashboardData(month?: number, year?: number) {
       supplierList, 
       activityTimeline, 
       customerList, 
-      expenseAndReturns 
+      expenseAndReturns,
+      tripsTotal,
+      deliveredPackagesTotal,
+      manifestsTotal
     };
   } catch (error) {
     console.log(error);
     return undefined;
   }
-}
-
-// ============= DELIVERY SERVICE DASHBOARD FUNCTIONS =============
-
-import type { 
-  DeliveryDashboardData, 
-  PackageTrackingType, 
-  VehicleType, 
-  DriverType, 
-  TripType, 
-  CustomerType,
-  DeliveryHistory 
-} from '@/types/apps/deliveryTypes';
-
-// Mock data generators for development - Replace with real Appwrite queries when collections are ready
-
-
-
-function generateMockVehicles(count: number): VehicleType[] {
-  const types: Array<'truck' | 'van' | 'motorcycle' | 'bicycle'> = ['truck', 'van', 'motorcycle', 'bicycle'];
-  const vehicleTypes: Array<'truck' | 'van' | 'bike' | 'car'> = ['truck', 'van', 'bike', 'car'];
-  const statuses: Array<'active' | 'maintenance' | 'available' | 'unavailable' | 'retired'> = 
-    ['active', 'maintenance', 'available', 'unavailable'];
-  const brands = ['Toyota', 'Ford', 'Hyundai', 'Isuzu'];
-  const models = ['Hiace', 'Transit', 'H100', 'NPR'];
-  
-  return Array.from({ length: count }, (_, i) => ({
-    $id: `veh-${i + 1}`,
-    vehicleNumber: `VH-${(i + 1).toString().padStart(3, '0')}`,
-    licensePlate: `GH-${Math.floor(Math.random() * 9999)}-${Math.floor(Math.random() * 99)}`,
-    vehicleType: vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)],
-    type: types[Math.floor(Math.random() * types.length)],
-    brand: brands[Math.floor(Math.random() * brands.length)],
-    model: models[Math.floor(Math.random() * models.length)],
-    year: 2020 + Math.floor(Math.random() * 4),
-    status: statuses[Math.floor(Math.random() * statuses.length)],
-    ownership: Math.random() > 0.5 ? 'owned' : 'rented',
-    monthlyRentalCost: Math.random() > 0.5 ? Math.floor(Math.random() * 2000) + 1000 : 0,
-    driver: `driver-${i + 1}`,
-    driverId: `driver-${i + 1}`,
-    driverName: `Driver ${i + 1}`,
-    assignedRoute: Math.random() > 0.5 ? `route-${i + 1}` : undefined,
-    capacity: Math.floor(Math.random() * 5) + 1,
-    location: 'Accra Central',
-    batteryLevel: Math.floor(Math.random() * 100),
-    fuelLevel: Math.floor(Math.random() * 100),
-    lastMaintenance: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-    nextMaintenance: new Date(Date.now() + Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
-    $createdAt: new Date().toISOString(),
-    $updatedAt: new Date().toISOString()
-  }));
-}
-
-function generateMockDrivers(count: number): DriverType[] {
-  const statuses: Array<'active' | 'offline' | 'on-trip'> = ['active', 'offline', 'on-trip'];
-  const vehicleTypes = ['Truck', 'Van', 'Motorcycle', 'Bicycle'];
-  
-  return Array.from({ length: count }, (_, i) => ({
-    $id: `driver-${i + 1}`,
-    name: `Driver ${i + 1}`,
-    email: `driver${i + 1}@delivery.com`,
-    phone: `+233${Math.floor(Math.random() * 900000000) + 200000000}`,
-    avatar: `/images/avatars/${(i % 8) + 1}.png`,
-    rating: Math.round((Math.random() * 2 + 3) * 10) / 10, // 3.0 to 5.0
-    totalDeliveries: Math.floor(Math.random() * 500) + 50,
-    completedDeliveries: Math.floor(Math.random() * 450) + 40,
-    onTimeDeliveries: Math.floor(Math.random() * 400) + 35,
-    vehicleId: `vehicle-${i + 1}`,
-    vehicleType: vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)],
-    status: statuses[Math.floor(Math.random() * statuses.length)],
-    todayEarnings: Math.floor(Math.random() * 500) + 100,
-    monthlyEarnings: Math.floor(Math.random() * 5000) + 1000,
-    licenseNumber: `DL-${Math.floor(Math.random() * 999999)}`,
-    licenseExpiry: new Date(Date.now() + Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString(),
-    $createdAt: new Date().toISOString(),
-    $updatedAt: new Date().toISOString()
-  }));
-}
-
-function generateMockTrips(count: number): TripType[] {
-  const statuses: Array<'scheduled' | 'in-progress' | 'completed' | 'cancelled' | 'delayed'> = 
-    ['scheduled', 'in-progress', 'completed', 'cancelled', 'delayed'];
-  
-  return Array.from({ length: count }, (_, i) => ({
-    $id: `trip-${i + 1}`,
-    tripNumber: `TR${String(Math.random()).slice(2, 6)}`,
-    driverId: `driver-${i + 1}`,
-    driverName: `Driver ${i + 1}`,
-    vehicleId: `vehicle-${i + 1}`,
-    vehicleLicense: `GH-${Math.floor(Math.random() * 9999)}-${Math.floor(Math.random() * 99)}`,
-    route: 'Accra → Kumasi → Tamale',
-    origin: 'Accra',
-    destination: 'Tamale',
-    status: statuses[Math.floor(Math.random() * statuses.length)],
-    startTime: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000).toISOString(),
-    estimatedArrival: new Date(Date.now() + Math.random() * 12 * 60 * 60 * 1000).toISOString(),
-    actualArrival: Math.random() > 0.5 ? new Date().toISOString() : undefined,
-    packages: [`pkg-${i + 1}`, `pkg-${i + 2}`],
-    packagesCount: Math.floor(Math.random() * 10) + 1,
-    completedDeliveries: Math.floor(Math.random() * 8),
-    revenue: Math.floor(Math.random() * 2000) + 200,
-    distance: `${Math.floor(Math.random() * 500) + 50} km`,
-    fuelCost: Math.floor(Math.random() * 200) + 30,
-    tolls: Math.floor(Math.random() * 50) + 10,
-    $createdAt: new Date().toISOString(),
-    $updatedAt: new Date().toISOString()
-  })) as unknown as TripType[];
-}
-
-function generateMockCustomers(count: number): CustomerType[] {
-  return Array.from({ length: count }, (_, i) => ({
-    $id: `customer-${i + 1}`,
-    name: `Customer ${i + 1}`,
-    email: `customer${i + 1}@example.com`,
-    phone: `+233${Math.floor(Math.random() * 900000000) + 200000000}`,
-    address: `Address ${i + 1}, Accra`,
-    avatar: `/images/avatars/${(i % 8) + 1}.png`,
-    totalPackages: Math.floor(Math.random() * 50) + 1,
-    totalSpent: Math.floor(Math.random() * 5000) + 100,
-    preferredDeliveryTime: '9:00 AM - 5:00 PM',
-    $createdAt: new Date().toISOString(),
-    $updatedAt: new Date().toISOString()
-  }));
-}
-
-function generateMockDeliveryHistory(count: number): DeliveryHistory[] {
-  const statuses: Array<'pending' | 'picked-up' | 'in-transit' | 'out-for-delivery' | 'delivered' | 'failed'> = 
-    ['pending', 'picked-up', 'in-transit', 'out-for-delivery', 'delivered', 'failed'];
-  
-  return Array.from({ length: count }, (_, i) => ({
-    $id: `history-${i + 1}`,
-    packageId: `pkg-${i + 1}`,
-    packageTrackingNumber: `TN${String(Math.random()).slice(2, 8)}`,
-    status: statuses[Math.floor(Math.random() * statuses.length)],
-    location: 'Accra Central',
-    timestamp: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-    description: `Package ${statuses[Math.floor(Math.random() * statuses.length)].replace('-', ' ')}`,
-    driverName: `Driver ${i + 1}`,
-    driverId: `driver-${i + 1}`,
-    completed: Math.random() > 0.3,
-    $createdAt: new Date().toISOString(),
-    $updatedAt: new Date().toISOString()
-  }));
 }

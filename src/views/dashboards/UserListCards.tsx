@@ -9,7 +9,7 @@ import HorizontalWithSubtitle from '@components/card-statistics/HorizontalWithSu
 import Shimmer from '@/components/layout/shared/Shimmer'
 
 
-const UserListCards = ({userList, supplierList, expenseAndReturns, isLoading }: any) => {
+const UserListCards = ({userList, supplierList, expenseAndReturns, isLoading, tripsTotal, deliveredPackagesTotal, manifestsTotal }: any) => {
 
   const formattedExpenseTotal = new Intl.NumberFormat('en-GH', {
     style: 'currency',
@@ -21,32 +21,32 @@ const UserListCards = ({userList, supplierList, expenseAndReturns, isLoading }: 
   // Vars
   const data: UserDataType[] = [
     {
-      title: 'Session (Active Users)',
+      title: 'Users',
       stats: isLoading ? <Shimmer width={70} height={37} /> : userList?.length.toString() || '0',
       avatarIcon: 'ri-group-line',
       avatarColor: 'primary',
       subtitle: 'Total Users'
     },
     {
-      title: 'Suppliers',
-      stats: supplierList?.toString() || <Shimmer width={70} height={37} />,
-      avatarIcon: 'ri-luggage-cart-line',
+      title: 'Total Trips',
+      stats: isLoading ? <Shimmer width={70} height={37} /> : tripsTotal?.toString() || '0',
+      avatarIcon: 'ri-route-line',
       avatarColor: 'error',
-      subtitle: 'Total Suppliers'
+      subtitle: 'All Trips'
     },
     {
-      title: 'Products Returned',
-      stats: isLoading ? <Shimmer width={70} height={37} /> : expenseAndReturns?.returnedPackages?.toString() || '0',
-      avatarIcon: 'ri-refund-line',
+      title: 'Packages Delivered',
+      stats: isLoading ? <Shimmer width={70} height={37} /> : deliveredPackagesTotal?.toString() || '0',
+      avatarIcon: 'ri-checkbox-circle-line',
       avatarColor: 'success',
       subtitle: 'This month analytics'
     },
     {
-      title: 'Expenses',
-      stats: isLoading ? <Shimmer width={70} height={37} /> : formattedExpenseTotal,
-      avatarIcon: 'ri-refund-2-line',
-      avatarColor: 'warning',
-      subtitle: 'This month analytics'
+      title: 'Total Manifests',
+      stats: isLoading ? <Shimmer width={70} height={37} /> : manifestsTotal?.toString() || '0',
+      avatarIcon: 'ri-file-list-3-line',
+      avatarColor: 'info',
+      subtitle: 'All Manifests'
     }
   ]
 

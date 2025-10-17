@@ -1,0 +1,110 @@
+EDMS Activity History Implementation Guide
+
+COLLECTION SCHEMA:
+Create a collection named "activityhistory" in your Appwrite database with these attributes:
+- entityType (string, required) - Type of entity: trip, route, manifest, package, pickup-location, dropoff-location, user, permission, role, vehicle
+- entityId (string, required) - ID of the entity
+- entityName (string, required) - Human-readable name
+- action (string, required) - Action type: created, updated, deleted, status-changed
+- description (string, required) - Description of the action
+- userId (string, required) - User who performed the action
+- userName (string, optional) - Name of the user
+- metadata (string, optional) - JSON string with additional data
+
+IMPLEMENTATION STEPS:
+
+1. Replace "REPLACE_WITH_YOUR_COLLECTION_ID" in appwrite.config.ts with your actual collection ID
+
+2. Import activity history in your action files:
+   import { addActivityHistory } from './activity-history.actions'
+
+3. Add optional userId and userName parameters to your CRUD functions:
+   - createX(data, userId?, userName?)
+   - updateX(id, data, userId?, userName?)
+   - deleteX(id, userId?, userName?)
+
+4. Call addActivityHistory after successful operations:
+
+FOR CREATE:
+await addActivityHistory({
+  entityType: 'vehicle',
+  entityId: newItem.$id,
+  entityName: 'Vehicle Name',
+  action: 'created',
+  description: 'Created vehicle...',
+  userId,
+  userName,
+  metadata: { key: 'value' }
+})
+
+FOR UPDATE:
+await addActivityHistory({
+  entityType: 'vehicle',
+  entityId: itemId,
+  entityName: 'Vehicle Name',
+  action: 'updated',
+  description: 'Updated fields: status, location',
+  userId,
+  userName,
+  metadata: updateData
+})
+
+FOR DELETE:
+await addActivityHistory({
+  entityType: 'vehicle',
+  entityId: itemId,
+  entityName: 'Vehicle Name',
+  action: 'deleted',
+  description: 'Deleted vehicle...',
+  userId,
+  userName
+})
+
+FOR STATUS CHANGE:
+await addActivityHistory({
+  entityType: 'trip',
+  entityId: tripId,
+  entityName: 'Trip #1234',
+  action: 'status-changed',
+  description: `Status changed from ${oldStatus} to ${newStatus}`,
+  userId,
+  userName,
+  metadata: { from: oldStatus, to: newStatus }
+})
+
+FILES TO UPDATE:
+- trip.actions.ts - createTripWithManifestsAndPackages, updateTripStatus
+- route.actions.ts - createRoute, updateRoute, deleteRoute, toggleRouteStatus
+- manifest.actions.ts - createManifest, updateManifest, deleteManifest, updateManifestStatus
+- package.actions.ts - updatePackageStatus, bulkUpdatePackageStatus
+- location.actions.ts - createPickupLocation, updatePickupLocation, deletePickupLocation, createDropoffLocation, updateDropoffLocation, deleteDropoffLocation
+- user.actions.ts - createUser, updateUser, createUserAccount
+- permissions.actions.ts - createPermission, updatePermission, deletePermission
+- roles.actions.ts - createRole, updateRole
+- vehicle.actions.ts - [ALREADY DONE]
+
+UI COMPONENT USAGE:
+In your React components, get user info from useAuth():
+const { user } = useAuth()
+
+Then pass to action functions:
+await createVehicle(vehicleData, user.$id, user.name)
+await updateRoute(routeId, updateData, user.$id, user.name)
+
+ACTIVITY TIMELINE COMPONENT:
+import { getRecentActivity } from '@/libs/actions/activity-history.actions'
+
+const activities = await getRecentActivity(20)
+// Display in your dashboard
+
+FILTERING ACTIVITY:
+import { getActivityHistory } from '@/libs/actions/activity-history.actions'
+
+// Get all vehicle activities
+const vehicleActivities = await getActivityHistory({ entityType: 'vehicle' })
+
+// Get activities for specific entity
+const tripActivities = await getActivityHistory({ entityId: tripId })
+
+// Get user activities
+const userActivities = await getActivityHistory({ userId: user.$id })
