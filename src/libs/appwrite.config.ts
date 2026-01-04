@@ -29,7 +29,6 @@ export const appwriteConfig = {
   sales:'66c2460a00339fb96286',
   endpoint:'https://cloud.appwrite.io/v1',
   users: '68d5eb2a0035c2892e30',
-  packages: '68d5f888003df624b455',
   pickuplocations: '68d5f9f600152a86e41e',
   dropofflocations: '68d5fb6700187a5d2ddd',
   drivers: '68d601d5002442e07af8',

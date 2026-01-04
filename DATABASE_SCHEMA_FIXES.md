@@ -69,6 +69,7 @@
 ---
 
 ### **TRIP Table - Current Status:**
+
 - ✅ `tripNumber` (required, Size: 50) - Correct
 - ✅ `vehicle` (Many-to-one) - Correct
 - ✅ `driver` (Many-to-one) - Correct
@@ -93,6 +94,7 @@
 - ✅ `paymentStatus` (required, Size: 20) - Correct
 
 **Recommendations:**
+
 - ⚠️ Add `endTime` (datetime) - To track when trip ends
 
 ---
@@ -100,6 +102,7 @@
 ## Summary of Code Changes Needed
 
 ### 1. **Package Creation** - Remove these fields from code:
+
 - `packageId` → Use only `trackingNumber`
 - `route` → Not needed
 - `creator` → Not needed

@@ -10,11 +10,15 @@ import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
-import Checkbox from '@mui/material/Checkbox'
-import FormControlLabel from '@mui/material/FormControlLabel'
+import FormControl from '@mui/material/FormControl'
+import InputLabel from '@mui/material/InputLabel'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
 import Divider from '@mui/material/Divider'
 import Chip from '@mui/material/Chip'
 import Alert from '@mui/material/Alert'
+import IconButton from '@mui/material/IconButton'
+import Box from '@mui/material/Box'
 import { TimePicker } from '@mui/x-date-pickers-pro'
 import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs'
 import { LocalizationProvider } from '@mui/x-date-pickers-pro'
@@ -23,6 +27,13 @@ import dayjs from 'dayjs'
 
 LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
 
+// Package size options
+const PACKAGE_SIZES = [
+  { value: 'small', label: 'Small Packages' },
+  { value: 'medium', label: 'Medium Packages' },
+  { value: 'big', label: 'Big Packages' }
+] as const
+
 // Type Imports
 import type { WizardStepProps, ManifestData } from './types'
 import type { RouteStopType } from '@/types/apps/deliveryTypes'
@@ -30,11 +41,19 @@ import type { RouteStopType } from '@/types/apps/deliveryTypes'
 // Actions
 import { getRouteDropoffLocations } from '@/libs/actions/route.actions'
 
+// Interface for manifest entry with unique ID
+interface ManifestEntry extends Partial<ManifestData> {
+  id: string
+  locationId: string
+  locationName: string
+  address: string
+  sequence: number
+}
+
 const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }: WizardStepProps) => {
   // States
   const [dropoffLocations, setDropoffLocations] = useState<RouteStopType[]>([])
-  const [selectedLocations, setSelectedLocations] = useState<Set<string>>(new Set())
-  const [manifestDetails, setManifestDetails] = useState<Map<string, Partial<ManifestData>>>(new Map())
+  const [manifests, setManifests] = useState<ManifestEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   // Load dropoff locations from route
@@ -50,14 +69,20 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
 
         // Pre-populate if returning to this step
         if (wizardData.manifests.length > 0) {
-          const selected = new Set(wizardData.manifests.map(m => m.dropoffLocationId))
-          setSelectedLocations(selected)
-
-          const details = new Map()
-          wizardData.manifests.forEach(manifest => {
-            details.set(manifest.dropoffLocationId, manifest)
-          })
-          setManifestDetails(details)
+          const existingManifests: ManifestEntry[] = wizardData.manifests.map((m, index) => ({
+            id: `manifest-${Date.now()}-${index}`,
+            locationId: m.dropoffLocationId,
+            locationName: m.dropoffLocationName,
+            address: m.dropoffAddress,
+            sequence: index + 1,
+            manifestNumber: m.manifestNumber,
+            packageSize: m.packageSize,
+            packageCount: m.packageCount,
+            departureTime: m.departureTime,
+            estimatedArrival: m.estimatedArrival,
+            notes: m.notes
+          }))
+          setManifests(existingManifests)
         }
       } catch (error) {
         console.error('Error loading dropoff locations:', error)
@@ -69,30 +94,6 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
     loadDropoffs()
   }, [wizardData.tripDetails.routeId, wizardData.manifests])
 
-  const handleLocationToggle = (locationId: string, locationName: string, address: string, sequence: number) => {
-    const newSelected = new Set(selectedLocations)
-    
-    if (newSelected.has(locationId)) {
-      newSelected.delete(locationId)
-      const newDetails = new Map(manifestDetails)
-      newDetails.delete(locationId)
-      setManifestDetails(newDetails)
-    } else {
-      newSelected.add(locationId)
-      // Initialize manifest details for this location
-      const newDetails = new Map(manifestDetails)
-      newDetails.set(locationId, {
-        manifestNumber: generateManifestNumber(),
-        dropoffLocationId: locationId,
-        dropoffLocationName: locationName,
-        dropoffAddress: address
-      })
-      setManifestDetails(newDetails)
-    }
-    
-    setSelectedLocations(newSelected)
-  }
-
   const generateManifestNumber = () => {
     const date = new Date()
     const year = date.getFullYear().toString().slice(-2)
@@ -102,46 +103,72 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
     return `MAN-${year}${month}${day}-${random}`
   }
 
-  const updateManifestDetail = (locationId: string, field: string, value: string) => {
-    const newDetails = new Map(manifestDetails)
-    const current = newDetails.get(locationId) || {}
-    newDetails.set(locationId, { ...current, [field]: value })
-    setManifestDetails(newDetails)
+  const addManifestForLocation = (location: RouteStopType, sequence: number) => {
+    const newManifest: ManifestEntry = {
+      id: `manifest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      locationId: location.locationId,
+      locationName: location.locationName,
+      address: location.address,
+      sequence,
+      manifestNumber: generateManifestNumber(),
+      packageSize: 'small',
+      packageCount: 0,
+      estimatedArrival: location.estimatedArrival
+    }
+    setManifests([...manifests, newManifest])
+  }
+
+  const removeManifest = (manifestId: string) => {
+    setManifests(manifests.filter(m => m.id !== manifestId))
+  }
+
+  const updateManifest = (manifestId: string, field: string, value: string | number) => {
+    setManifests(manifests.map(m => 
+      m.id === manifestId ? { ...m, [field]: value } : m
+    ))
+  }
+
+  const getManifestsForLocation = (locationId: string) => {
+    return manifests.filter(m => m.locationId === locationId)
   }
 
   const handleSubmit = () => {
-    if (selectedLocations.size === 0) {
-      alert('Please select at least one dropoff location for manifest creation')
+    if (manifests.length === 0) {
+      alert('Please add at least one manifest')
       return
     }
 
-    // Validate all selected locations have manifest numbers
-    for (const locationId of selectedLocations) {
-      const details = manifestDetails.get(locationId)
-      if (!details?.manifestNumber) {
-        alert('Please ensure all selected locations have manifest numbers')
+    // Validate all manifests
+    for (const manifest of manifests) {
+      if (!manifest.manifestNumber) {
+        alert('Please ensure all manifests have manifest numbers')
+        return
+      }
+      if (!manifest.packageSize) {
+        alert('Please select a package size for all manifests')
+        return
+      }
+      if (manifest.packageCount === undefined || manifest.packageCount < 1) {
+        alert('Please enter a valid package count (at least 1) for all manifests')
         return
       }
     }
 
     // Convert to array of ManifestData
-    const manifests: ManifestData[] = Array.from(selectedLocations).map((locationId, index) => {
-      const details = manifestDetails.get(locationId)!
-      const location = dropoffLocations.find(loc => loc.locationId === locationId)!
-      
-      return {
-        tempId: `manifest-${Date.now()}-${index}`,
-        dropoffLocationId: locationId,
-        dropoffLocationName: location.locationName,
-        dropoffAddress: location.address,
-        manifestNumber: details.manifestNumber!,
-        departureTime: details.departureTime,
-        estimatedArrival: details.estimatedArrival || location.estimatedArrival,
-        notes: details.notes
-      }
-    })
+    const manifestData: ManifestData[] = manifests.map((m, index) => ({
+      tempId: m.id,
+      dropoffLocationId: m.locationId,
+      dropoffLocationName: m.locationName,
+      dropoffAddress: m.address,
+      manifestNumber: m.manifestNumber!,
+      packageSize: m.packageSize as 'small' | 'medium' | 'big',
+      packageCount: m.packageCount!,
+      departureTime: m.departureTime,
+      estimatedArrival: m.estimatedArrival,
+      notes: m.notes
+    }))
 
-    updateWizardData({ manifests })
+    updateWizardData({ manifests: manifestData })
     handleNext()
   }
 
@@ -176,177 +203,206 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Grid container spacing={5}>
         <Grid item xs={12}>
-        <Typography variant='h5' className='mb-1'>
-          Create Manifests for Dropoff Locations
-        </Typography>
-        <Typography variant='body2' className='mb-2'>
-          Select dropoff locations that will have manifests. This includes all intermediate stops and the final destination. Not all locations require manifests.
-        </Typography>
-        <Typography variant='body2' color='text.secondary'>
-          Route: <strong>{wizardData.tripDetails.routeName}</strong> 
-        </Typography>
-        <Typography variant='body2' color='primary'>
-          {dropoffLocations.length} dropoff location{dropoffLocations.length !== 1 ? 's' : ''} available (includes intermediate stops + final destination)
-        </Typography>
-      </Grid>
-
-      <Grid item xs={12}>
-        <Alert severity='info' icon={<i className='ri-route-line' />}>
-          <Typography variant='body2' className='font-semibold mb-1'>Route Structure</Typography>
-          <Typography variant='caption'>
-            This route includes: <strong>1 Pickup Location</strong> → <strong>{dropoffLocations.length - 1} Intermediate Stop(s)</strong> → <strong>1 Final Destination</strong>
-            <br />
-            All intermediate stops and the final destination are dropoff locations where manifests can be created.
+          <Typography variant='h5' className='mb-1'>
+            Create Manifests for Dropoff Locations
           </Typography>
-        </Alert>
-      </Grid>
-
-      {selectedLocations.size > 0 && (
-        <Grid item xs={12}>
-          <Chip 
-            label={`${selectedLocations.size} manifest(s) selected`} 
-            color='primary' 
-            variant='tonal'
-          />
+          <Typography variant='body2' className='mb-2'>
+            Add manifests to each dropoff location. You can add <strong>multiple manifests</strong> per location 
+            (e.g., one for small packages and one for medium packages).
+          </Typography>
+          <Typography variant='body2' color='text.secondary'>
+            Route: <strong>{wizardData.tripDetails.routeName}</strong> 
+          </Typography>
+          <Typography variant='body2' color='primary'>
+            {dropoffLocations.length} dropoff location{dropoffLocations.length !== 1 ? 's' : ''} available
+          </Typography>
         </Grid>
-      )}
 
-      {dropoffLocations.map((location, index) => {
-        const isSelected = selectedLocations.has(location.locationId)
-        const details = manifestDetails.get(location.locationId)
+        <Grid item xs={12}>
+          <Alert severity='info' icon={<i className='ri-information-line' />}>
+            <Typography variant='body2' className='font-semibold mb-1'>How to use</Typography>
+            <Typography variant='caption'>
+              Click <strong>"Add Manifest"</strong> for each package size type you need to deliver to a location.
+              For example, if a location receives both small and big packages, add two manifests - one for each size.
+            </Typography>
+          </Alert>
+        </Grid>
 
-        return (
-          <Grid item xs={12} key={location.locationId}>
-            <Card variant='outlined' className={isSelected ? 'border-primary' : ''}>
-              <CardContent>
-                <Grid container spacing={3}>
-                  {/* Location Header */}
-                  <Grid item xs={12}>
-                    <div className='flex items-start justify-between'>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={isSelected}
-                            onChange={() => handleLocationToggle(
-                              location.locationId,
-                              location.locationName,
-                              location.address,
-                              location.sequence || index + 1
-                            )}
-                          />
-                        }
-                        label={
-                          <div>
-                            <div className='flex items-center gap-2 mb-1'>
-                              <Typography variant='h6' className='font-semibold'>
-                                Stop {location.sequence || index + 1}: {location.locationName}
-                              </Typography>
-                              {index === dropoffLocations.length - 1 ? (
-                                <Chip label='Final Destination' color='success' size='small' variant='tonal' />
-                              ) : (
-                                <Chip label='Intermediate Stop' color='info' size='small' variant='tonal' />
-                              )}
-                            </div>
-                            <Typography variant='body2' color='text.secondary'>
-                              {location.address || 'No address provided'}
-                            </Typography>
-                            {location.estimatedArrival && (
-                              <Typography variant='caption' color='text.secondary'>
-                                Est. Arrival: {location.estimatedArrival}
-                              </Typography>
-                            )}
-                          </div>
-                        }
-                      />
-                    </div>
-                  </Grid>
-
-                  {/* Manifest Details (shown when selected) */}
-                  {isSelected && (
-                    <>
-                      <Grid item xs={12}>
-                        <Divider />
-                      </Grid>
-                      
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label='Manifest Number'
-                          value={details?.manifestNumber || ''}
-                          onChange={(e) => updateManifestDetail(location.locationId, 'manifestNumber', e.target.value)}
-                          required
-                          size='small'
-                        />
-                      </Grid>
-
-                      <Grid item xs={12} sm={6}>
-                        <TimePicker
-                          label='Estimated Arrival Time'
-                          value={(details?.estimatedArrival || location.estimatedArrival) ? dayjs((details?.estimatedArrival || location.estimatedArrival), 'HH:mm') : null}
-                          onChange={(time) => {
-                            const timeString = time ? time.format('HH:mm') : ''
-                            updateManifestDetail(location.locationId, 'estimatedArrival', timeString)
-                          }}
-                          slotProps={{
-                            textField: {
-                              fullWidth: true,
-                              size: 'small'
-                            }
-                          }}
-                        />
-                      </Grid>
-
-                      <Grid item xs={12} sm={6}>
-                        <TimePicker
-                          label='Departure Time (Optional)'
-                          value={details?.departureTime ? dayjs(details?.departureTime, 'HH:mm') : null}
-                          onChange={(time) => {
-                            const timeString = time ? time.format('HH:mm') : ''
-                            updateManifestDetail(location.locationId, 'departureTime', timeString)
-                          }}
-                          slotProps={{
-                            textField: {
-                              fullWidth: true,
-                              size: 'small'
-                            }
-                          }}
-                        />
-                      </Grid>
-
-                      <Grid item xs={12}>
-                        <TextField
-                          fullWidth
-                          multiline
-                          rows={2}
-                          label='Notes (Optional)'
-                          value={details?.notes || ''}
-                          onChange={(e) => updateManifestDetail(location.locationId, 'notes', e.target.value)}
-                          size='small'
-                          placeholder='Special instructions for this dropoff...'
-                        />
-                      </Grid>
-                    </>
-                  )}
-                </Grid>
-              </CardContent>
-            </Card>
+        {manifests.length > 0 && (
+          <Grid item xs={12}>
+            <Chip 
+              label={`${manifests.length} manifest(s) created`} 
+              color='primary' 
+              variant='tonal'
+            />
           </Grid>
-        )
-      })}
+        )}
 
-      <Grid item xs={12}>
-        <div className='flex items-center justify-between'>
-          <Button variant='outlined' onClick={handlePrev}>
-            Previous: Trip Details
-          </Button>
-          <Button 
-            variant='contained' 
-            onClick={handleSubmit}
-            disabled={selectedLocations.size === 0}
-          >
-            Next: Add Packages
-          </Button>
-        </div>
+        {/* Dropoff Locations */}
+        {dropoffLocations.map((location, index) => {
+          const locationManifests = getManifestsForLocation(location.locationId)
+
+          return (
+            <Grid item xs={12} key={location.locationId}>
+              <Card variant='outlined' className={locationManifests.length > 0 ? 'border-primary' : ''}>
+                <CardContent>
+                  {/* Location Header */}
+                  <Box className='flex items-start justify-between mb-4'>
+                    <div>
+                      <div className='flex items-center gap-2 mb-1'>
+                        <Typography variant='h6' className='font-semibold'>
+                          Stop {location.sequence || index + 1}: {location.locationName}
+                        </Typography>
+                        {index === dropoffLocations.length - 1 ? (
+                          <Chip label='Final Destination' color='success' size='small' variant='tonal' />
+                        ) : (
+                          <Chip label='Intermediate Stop' color='info' size='small' variant='tonal' />
+                        )}
+                        {locationManifests.length > 0 && (
+                          <Chip 
+                            label={`${locationManifests.length} manifest(s)`} 
+                            color='primary' 
+                            size='small' 
+                          />
+                        )}
+                      </div>
+                      <Typography variant='body2' color='text.secondary'>
+                        {location.address || 'No address provided'}
+                      </Typography>
+                      {location.estimatedArrival && (
+                        <Typography variant='caption' color='text.secondary'>
+                          Est. Arrival: {location.estimatedArrival}
+                        </Typography>
+                      )}
+                    </div>
+                    <Button
+                      variant='contained'
+                      size='small'
+                      startIcon={<i className='ri-add-line' />}
+                      onClick={() => addManifestForLocation(location, location.sequence || index + 1)}
+                    >
+                      Add Manifest
+                    </Button>
+                  </Box>
+
+                  {/* Manifests for this location */}
+                  {locationManifests.length > 0 && (
+                    <Box className='space-y-4'>
+                      {locationManifests.map((manifest, mIndex) => (
+                        <Box key={manifest.id} className='border rounded-lg p-4 bg-actionHover'>
+                          <Box className='flex items-center justify-between mb-3'>
+                            <Typography variant='subtitle2' className='font-medium'>
+                              Manifest #{mIndex + 1}
+                            </Typography>
+                            <IconButton 
+                              size='small' 
+                              color='error'
+                              onClick={() => removeManifest(manifest.id)}
+                            >
+                              <i className='ri-delete-bin-line' />
+                            </IconButton>
+                          </Box>
+                          
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6} md={3}>
+                              <TextField
+                                fullWidth
+                                label='Manifest Number'
+                                value={manifest.manifestNumber || ''}
+                                onChange={(e) => updateManifest(manifest.id, 'manifestNumber', e.target.value)}
+                                required
+                                size='small'
+                              />
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                              <FormControl fullWidth size='small' required>
+                                <InputLabel>Package Size</InputLabel>
+                                <Select
+                                  value={manifest.packageSize || 'small'}
+                                  label='Package Size'
+                                  onChange={(e) => updateManifest(manifest.id, 'packageSize', e.target.value)}
+                                >
+                                  {PACKAGE_SIZES.map(size => (
+                                    <MenuItem key={size.value} value={size.value}>
+                                      {size.label}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                              <TextField
+                                fullWidth
+                                label='Package Count'
+                                type='number'
+                                value={manifest.packageCount || ''}
+                                onChange={(e) => updateManifest(manifest.id, 'packageCount', parseInt(e.target.value) || 0)}
+                                required
+                                size='small'
+                                inputProps={{ min: 1 }}
+                                helperText='Total packages'
+                              />
+                            </Grid>
+
+                            <Grid item xs={12} sm={6} md={3}>
+                              <TimePicker
+                                label='Est. Arrival'
+                                value={manifest.estimatedArrival ? dayjs(manifest.estimatedArrival, 'HH:mm') : null}
+                                onChange={(time) => {
+                                  const timeString = time ? time.format('HH:mm') : ''
+                                  updateManifest(manifest.id, 'estimatedArrival', timeString)
+                                }}
+                                slotProps={{
+                                  textField: {
+                                    fullWidth: true,
+                                    size: 'small'
+                                  }
+                                }}
+                              />
+                            </Grid>
+
+                            <Grid item xs={12}>
+                              <TextField
+                                fullWidth
+                                label='Notes (Optional)'
+                                value={manifest.notes || ''}
+                                onChange={(e) => updateManifest(manifest.id, 'notes', e.target.value)}
+                                size='small'
+                                placeholder='Special instructions...'
+                              />
+                            </Grid>
+                          </Grid>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+
+                  {locationManifests.length === 0 && (
+                    <Typography variant='body2' color='text.secondary' className='text-center py-4'>
+                      No manifests added for this location. Click "Add Manifest" to create one.
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          )
+        })}
+
+        <Grid item xs={12}>
+          <div className='flex items-center justify-between'>
+            <Button variant='outlined' onClick={handlePrev}>
+              Previous: Trip Details
+            </Button>
+            <Button 
+              variant='contained' 
+              onClick={handleSubmit}
+              disabled={manifests.length === 0}
+            >
+              Next: Review &amp; Create
+            </Button>
+          </div>
         </Grid>
       </Grid>
     </LocalizationProvider>

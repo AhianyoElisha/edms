@@ -18,11 +18,12 @@ function setCachedData(key: string, data: any): void {
 }
 
 /**
- * Get package statistics for a given period
+ * Get manifest statistics for a given period
+ * Previously was getPackageStatistics - now uses manifests with packageCount/deliveredCount
  */
 export async function getPackageStatistics(month?: number, year?: number) {
   try {
-    const cacheKey = `package_stats_${month}_${year}`
+    const cacheKey = `manifest_stats_${month}_${year}`
     const cached = getCachedData(cacheKey)
     if (cached) return cached
 
@@ -36,10 +37,10 @@ export async function getPackageStatistics(month?: number, year?: number) {
     const startDate = startOfMonth.toISOString()
     const endDate = endOfMonth.toISOString()
 
-    // Get all packages for the month
-    const allPackages = await databases.listDocuments(
+    // Get all manifests for the month
+    const allManifests = await databases.listDocuments(
       appwriteConfig.database,
-      appwriteConfig.packages,
+      appwriteConfig.manifests,
       [
         Query.greaterThanEqual('$createdAt', startDate),
         Query.lessThanEqual('$createdAt', endDate),
@@ -47,63 +48,78 @@ export async function getPackageStatistics(month?: number, year?: number) {
       ]
     )
 
-    // Get delivered packages
-    const deliveredPackages = await databases.listDocuments(
+    // Get delivered manifests
+    const deliveredManifests = await databases.listDocuments(
       appwriteConfig.database,
-      appwriteConfig.packages,
+      appwriteConfig.manifests,
       [
         Query.equal('status', 'delivered'),
-        Query.greaterThanEqual('deliveryDate', startDate),
-        Query.lessThanEqual('deliveryDate', endDate),
         Query.limit(1000)
       ]
     )
 
-    // Get pending packages
-    const pendingPackages = await databases.listDocuments(
+    // Get pending manifests (status = pending or loaded)
+    const pendingManifests = await databases.listDocuments(
       appwriteConfig.database,
-      appwriteConfig.packages,
+      appwriteConfig.manifests,
       [
-        Query.equal('status', 'pending'),
+        Query.contains('status', ['pending', 'loaded']),
         Query.limit(1000)
       ]
     )
 
-    // Get in-transit packages
-    const inTransitPackages = await databases.listDocuments(
+    // Get in-transit manifests
+    const inTransitManifests = await databases.listDocuments(
       appwriteConfig.database,
-      appwriteConfig.packages,
+      appwriteConfig.manifests,
       [
         Query.equal('status', 'in-transit'),
         Query.limit(1000)
       ]
     )
 
-    // Calculate daily delivery data
+    // Calculate total packages from manifests
+    let totalPackages = 0
+    let deliveredPackagesCount = 0
+    
+    allManifests.documents.forEach((manifest: any) => {
+      totalPackages += manifest.packageCount || 0
+      deliveredPackagesCount += manifest.deliveredCount || 0
+    })
+
+    // Calculate daily delivery data from delivered manifests
     const daysInMonth = endOfMonth.getDate()
     const dailyDeliveries = Array(daysInMonth).fill(0)
 
-    deliveredPackages.documents.forEach((pkg: any) => {
-      if (pkg.deliveryDate) {
-        const deliveryDay = new Date(pkg.deliveryDate).getDate()
-        dailyDeliveries[deliveryDay - 1]++
+    deliveredManifests.documents.forEach((manifest: any) => {
+      if (manifest.$updatedAt) {
+        const deliveryDay = new Date(manifest.$updatedAt).getDate()
+        const monthOfDelivery = new Date(manifest.$updatedAt).getMonth()
+        if (monthOfDelivery === currentMonth) {
+          dailyDeliveries[deliveryDay - 1] += manifest.deliveredCount || 0
+        }
       }
     })
 
     const result = {
-      totalPackages: allPackages.total,
-      deliveredPackages: deliveredPackages.total,
-      pendingPackages: pendingPackages.total,
-      inTransitPackages: inTransitPackages.total,
-      deliveryRate: allPackages.total > 0 ? ((deliveredPackages.total / allPackages.total) * 100).toFixed(1) : '0',
+      totalPackages,
+      deliveredPackages: deliveredPackagesCount,
+      pendingPackages: totalPackages - deliveredPackagesCount,
+      inTransitPackages: inTransitManifests.documents.reduce((acc: number, m: any) => acc + (m.packageCount || 0) - (m.deliveredCount || 0), 0),
+      deliveryRate: totalPackages > 0 ? ((deliveredPackagesCount / totalPackages) * 100).toFixed(1) : '0',
       dailyDeliveries,
-      dayLabels: Array.from({ length: daysInMonth }, (_, i) => i + 1)
+      dayLabels: Array.from({ length: daysInMonth }, (_, i) => i + 1),
+      // Additional manifest-level stats
+      totalManifests: allManifests.total,
+      deliveredManifests: deliveredManifests.total,
+      pendingManifests: pendingManifests.total,
+      inTransitManifests: inTransitManifests.total
     }
 
     setCachedData(cacheKey, result)
     return result
   } catch (error) {
-    console.error('Error fetching package statistics:', error)
+    console.error('Error fetching manifest/package statistics:', error)
     return {
       totalPackages: 0,
       deliveredPackages: 0,
@@ -111,7 +127,11 @@ export async function getPackageStatistics(month?: number, year?: number) {
       inTransitPackages: 0,
       deliveryRate: '0',
       dailyDeliveries: [],
-      dayLabels: []
+      dayLabels: [],
+      totalManifests: 0,
+      deliveredManifests: 0,
+      pendingManifests: 0,
+      inTransitManifests: 0
     }
   }
 }
@@ -361,55 +381,6 @@ export async function getVehicleStatistics() {
 
 /**
  * Get recent activity (recent packages, trips, etc.)
- */
-export async function getRecentActivity(limit: number = 10) {
-  try {
-    const recentPackages = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.packages,
-      [
-        Query.orderDesc('$createdAt'),
-        Query.limit(limit)
-      ]
-    )
-
-    const recentTrips = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      [
-        Query.orderDesc('$createdAt'),
-        Query.limit(limit)
-      ]
-    )
-
-    // Combine and sort by date
-    const activities = [
-      ...recentPackages.documents.map((pkg: any) => ({
-        id: pkg.$id,
-        type: 'package',
-        title: `Package ${pkg.trackingNumber} created`,
-        description: `Recipient: ${pkg.recipient}`,
-        timestamp: pkg.$createdAt,
-        status: pkg.status
-      })),
-      ...recentTrips.documents.map((trip: any) => ({
-        id: trip.$id,
-        type: 'trip',
-        title: `Trip ${trip.tripNumber} created`,
-        description: `Status: ${trip.status}`,
-        timestamp: trip.$createdAt,
-        status: trip.status
-      }))
-    ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, limit)
-
-    return activities
-  } catch (error) {
-    console.error('Error fetching recent activity:', error)
-    return []
-  }
-}
-
 /**
  * Get all EDMS dashboard data
  */
@@ -421,14 +392,14 @@ export async function getEDMSDashboardData(month?: number, year?: number) {
       driverPerformance,
       routeStats,
       vehicleStats,
-      recentActivity
+      // recentActivity
     ] = await Promise.all([
       getPackageStatistics(month, year),
       getTripStatistics(month, year),
       getDriverPerformance(month, year),
       getRouteStatistics(),
       getVehicleStatistics(),
-      getRecentActivity(10)
+      // getRecentActivity(10)
     ])
 
     return {
@@ -437,7 +408,7 @@ export async function getEDMSDashboardData(month?: number, year?: number) {
       driverPerformance,
       routeStats,
       vehicleStats,
-      recentActivity
+      // recentActivity
     }
   } catch (error) {
     console.error('Error fetching EDMS dashboard data:', error)

@@ -52,19 +52,14 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [manifestToDelete, setManifestToDelete] = useState<ManifestType | null>(null)
   
-  // Helper function to parse packageTypes JSON string
-  const parsePackageTypes = (packageTypesString: string) => {
-    try {
-      const parsed = JSON.parse(packageTypesString)
-      return {
-        small: parsed.small || 0,
-        medium: parsed.medium || 0,
-        big: parsed.big || 0,
-        bin: parsed.bin || 0
-      }
-    } catch (error) {
-      return { small: 0, medium: 0, big: 0, bin: 0 }
+  // Helper function to get package size display label
+  const getPackageSizeLabel = (packageSize: string) => {
+    const labels: Record<string, string> = {
+      'small': 'Small Packages',
+      'medium': 'Medium Packages',
+      'big': 'Big Packages'
     }
+    return labels[packageSize] || packageSize
   }
   
   // Pagination
@@ -301,20 +296,17 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
                       Sequence: {manifest.dropoffSequence}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Packages: {manifest.totalPackages}
+                      Packages: {manifest.packageCount || 0}
                     </Typography>
                   </Box>
                 </TableCell>
                 <TableCell>
                   <Box>
                     <Typography variant="subtitle2">
-                      {manifest.totalPackages} packages
+                      {manifest.packageCount || 0} {getPackageSizeLabel(manifest.packageSize || 'small')}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {(() => {
-                        const types = parsePackageTypes(manifest.packageTypes)
-                        return `S:${types.small} M:${types.medium} L:${types.big} B:${types.bin}`
-                      })()}
+                      Delivered: {manifest.deliveredCount || 0}
                     </Typography>
                   </Box>
                 </TableCell>
@@ -426,16 +418,13 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
                   Package Summary
                 </Typography>
                 <Box mb={2}>
-                  <Typography variant="body2" color="text.secondary">Total Packages</Typography>
-                  <Typography variant="body1">{selectedManifest.totalPackages}</Typography>
+                  <Typography variant="body2" color="text.secondary">Package Size</Typography>
+                  <Typography variant="body1">{getPackageSizeLabel(selectedManifest.packageSize || 'small')}</Typography>
                 </Box>
                 <Box mb={2}>
-                  <Typography variant="body2" color="text.secondary">Package Breakdown</Typography>
+                  <Typography variant="body2" color="text.secondary">Package Count</Typography>
                   <Typography variant="body1">
-                    {(() => {
-                      const types = parsePackageTypes(selectedManifest.packageTypes)
-                      return `Small: ${types.small}, Medium: ${types.medium}, Big: ${types.big}, Bins: ${types.bin}`
-                    })()}
+                    Total: {selectedManifest.packageCount || 0}, Delivered: {selectedManifest.deliveredCount || 0}
                   </Typography>
                 </Box>
               </Grid>

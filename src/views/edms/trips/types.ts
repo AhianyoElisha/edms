@@ -11,34 +11,25 @@ export interface TripDetailsData {
   notes?: string
 }
 
+// NEW: ManifestData now includes package size and count directly
+// Each manifest holds ONE type of package size (small, medium, or big)
 export interface ManifestData {
   tempId: string
   dropoffLocationId: string
   dropoffLocationName: string
   dropoffAddress: string
   manifestNumber: string
+  packageSize: 'small' | 'medium' | 'big' // The type of packages in this manifest
+  packageCount: number // Head count of packages
   departureTime?: string
   estimatedArrival?: string
   notes?: string
 }
 
-export interface PackageData {
-  tempId: string
-  manifestTempId: string
-  packageSize: 'big' | 'medium' | 'small' | 'bin' // Simplified size categories
-  trackingNumber: string
-  recipientName: string
-  recipientPhone: string
-  // Bin-specific fields
-  isBin?: boolean // true if this is a bin containing smaller packages
-  itemCount?: number // Number of small items in the bin (headcount)
-  notes?: string // Optional notes for special instructions
-}
-
+// TripWizardData no longer needs packages array - package info is in manifests
 export interface TripWizardData {
   tripDetails: TripDetailsData
   manifests: ManifestData[]
-  packages: PackageData[]
 }
 
 export interface WizardStepProps {

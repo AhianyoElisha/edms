@@ -852,7 +852,8 @@ export async function getTripsTotal() {
 }
 
 /**
- * Get total delivered packages count
+ * Get total delivered packages count (from manifests)
+ * Since packages are now tracked as counts on manifests, we sum up deliveredCount from all manifests
  */
 export async function getDeliveredPackagesTotal(month?: number, year?: number) {
   try {
@@ -870,18 +871,24 @@ export async function getDeliveredPackagesTotal(month?: number, year?: number) {
     const startDate = startOfMonth.toISOString();
     const endDate = endOfMonth.toISOString();
 
-    const deliveredPackages = await databases.listDocuments(
+    // Query manifests that have been delivered (status = 'delivered')
+    const deliveredManifests = await databases.listDocuments(
       appwriteConfig.database,
-      appwriteConfig.packages,
+      appwriteConfig.manifests,
       [
         Query.equal('status', 'delivered'),
-        Query.greaterThanEqual('deliveryDate', startDate),
-        Query.lessThanEqual('deliveryDate', endDate),
+        Query.greaterThanEqual('manifestDate', startDate),
+        Query.lessThanEqual('manifestDate', endDate),
         Query.limit(1000)
       ]
     );
 
-    const result = deliveredPackages.total;
+    // Sum up deliveredCount from all delivered manifests
+    // If deliveredCount is not available, fall back to packageCount
+    const result = deliveredManifests.documents.reduce((total: number, manifest: any) => {
+      return total + (manifest.deliveredCount || manifest.packageCount || 0);
+    }, 0);
+
     setCachedData(cacheKey, result);
     return result;
   } catch (error) {

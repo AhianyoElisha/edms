@@ -47,6 +47,43 @@ export const getAllManifests = async (filters?: ManifestFilters): Promise<Manife
 }
 
 /**
+ * Get delivered manifests with optional date range filtering
+ * @param startDate - Optional start date in ISO format
+ * @param endDate - Optional end date in ISO format
+ * @returns Array of delivered manifests
+ */
+export const getDeliveredManifests = async (
+  startDate?: string,
+  endDate?: string
+): Promise<ManifestType[]> => {
+  try {
+    const queries: string[] = [Query.equal('status', 'delivered')]
+    
+    if (startDate) {
+      queries.push(Query.greaterThanEqual('manifestDate', startDate))
+    }
+    
+    if (endDate) {
+      queries.push(Query.lessThanEqual('manifestDate', endDate))
+    }
+    
+    queries.push(Query.orderDesc('deliveryTime'))
+    queries.push(Query.limit(1000))
+    
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      MANIFESTS_COLLECTION_ID,
+      queries
+    )
+    
+    return response.documents as unknown as ManifestType[]
+  } catch (error) {
+    console.error('Error fetching delivered manifests:', error)
+    throw new Error('Failed to fetch delivered manifests')
+  }
+}
+
+/**
  * Get a specific manifest by ID
  */
 export const getManifestById = async (manifestId: string): Promise<ManifestType> => {
@@ -87,16 +124,6 @@ export const getManifestByIdWithRelations = async (manifestId: string) => {
       ]
     )
 
-    // Fetch packages separately using one-way relationship
-    const PACKAGES_COLLECTION_ID = appwriteConfig.packages
-    const packagesResponse = await databases.listDocuments(
-      DATABASE_ID,
-      PACKAGES_COLLECTION_ID,
-      [
-        Query.equal('manifest', manifestId),
-        Query.limit(300)
-      ]
-    )
 
     // Get pickup location from trip.route (trip starts from pickup location)
     let pickupLocation = null
@@ -118,7 +145,6 @@ export const getManifestByIdWithRelations = async (manifestId: string) => {
     // Combine all data
     const manifestWithPackages = {
       ...manifest,
-      packages: packagesResponse.documents,
       pickupLocation,
       dropoffLocation,
       // Also add for backward compatibility
@@ -155,15 +181,14 @@ export const createManifest = async (
       {
         ...manifestFields,
         manifestNumber,
-        totalPackages: packageIds?.length || 0,
         status: 'pending' as const
       }
     )
     
-    // If packageIds provided, assign them to this manifest
-    if (packageIds && packageIds.length > 0) {
-      await assignPackagesToManifest(manifest.$id, packageIds)
-    }
+    // // If packageIds provided, assign them to this manifest
+    // if (packageIds && packageIds.length > 0) {
+    //   await assignPackagesToManifest(manifest.$id, packageIds)
+    // }
     
     return manifest as unknown as ManifestType
   } catch (error) {
@@ -353,90 +378,90 @@ export const getManifestsByVehicle = async (vehicleId: string): Promise<Manifest
  * Assign packages to manifest using one-way relationship
  * Updates each package's manifest field to point to this manifest
  */
-export const assignPackagesToManifest = async (
-  manifestId: string,
-  packageIds: string[]
-): Promise<ManifestType> => {
-  try {
-    const PACKAGES_COLLECTION_ID = appwriteConfig.packages
+// export const assignPackagesToManifest = async (
+//   manifestId: string,
+//   packageIds: string[]
+// ): Promise<ManifestType> => {
+//   try {
+//     const PACKAGES_COLLECTION_ID = appwriteConfig.packages
     
-    // Update each package to reference this manifest (one-way relationship)
-    await Promise.all(
-      packageIds.map(packageId =>
-        databases.updateDocument(
-          DATABASE_ID,
-          PACKAGES_COLLECTION_ID,
-          packageId,
-          { manifest: manifestId }
-        )
-      )
-    )
+//     // Update each package to reference this manifest (one-way relationship)
+//     await Promise.all(
+//       packageIds.map(packageId =>
+//         databases.updateDocument(
+//           DATABASE_ID,
+//           PACKAGES_COLLECTION_ID,
+//           packageId,
+//           { manifest: manifestId }
+//         )
+//       )
+//     )
     
-    // Update manifest's totalPackages count
-    // Count packages that reference this manifest
-    const packagesResponse = await databases.listDocuments(
-      DATABASE_ID,
-      PACKAGES_COLLECTION_ID,
-      [Query.equal('manifest', manifestId)]
-    )
+//     // Update manifest's totalPackages count
+//     // Count packages that reference this manifest
+//     const packagesResponse = await databases.listDocuments(
+//       DATABASE_ID,
+//       PACKAGES_COLLECTION_ID,
+//       [Query.equal('manifest', manifestId)]
+//     )
     
-    const manifest = await databases.updateDocument(
-      DATABASE_ID,
-      MANIFESTS_COLLECTION_ID,
-      manifestId,
-      { totalPackages: packagesResponse.total }
-    )
+//     const manifest = await databases.updateDocument(
+//       DATABASE_ID,
+//       MANIFESTS_COLLECTION_ID,
+//       manifestId,
+//       { totalPackages: packagesResponse.total }
+//     )
     
-    return manifest as unknown as ManifestType
-  } catch (error) {
-    console.error('Error assigning packages to manifest:', error)
-    throw new Error('Failed to assign packages to manifest')
-  }
-}
+//     return manifest as unknown as ManifestType
+//   } catch (error) {
+//     console.error('Error assigning packages to manifest:', error)
+//     throw new Error('Failed to assign packages to manifest')
+//   }
+// }
 
 /**
  * Remove packages from manifest using one-way relationship
  * Sets each package's manifest field to null
  */
-export const removePackagesFromManifest = async (
-  manifestId: string,
-  packageIds: string[]
-): Promise<ManifestType> => {
-  try {
-    const PACKAGES_COLLECTION_ID = appwriteConfig.packages
+// export const removePackagesFromManifest = async (
+//   manifestId: string,
+//   packageIds: string[]
+// ): Promise<ManifestType> => {
+//   try {
+//     const PACKAGES_COLLECTION_ID = appwriteConfig.packages
     
-    // Update each package to remove the manifest reference (set to null)
-    await Promise.all(
-      packageIds.map(packageId =>
-        databases.updateDocument(
-          DATABASE_ID,
-          PACKAGES_COLLECTION_ID,
-          packageId,
-          { manifest: null }
-        )
-      )
-    )
+//     // Update each package to remove the manifest reference (set to null)
+//     await Promise.all(
+//       packageIds.map(packageId =>
+//         databases.updateDocument(
+//           DATABASE_ID,
+//           PACKAGES_COLLECTION_ID,
+//           packageId,
+//           { manifest: null }
+//         )
+//       )
+//     )
     
-    // Update manifest's totalPackages count
-    const packagesResponse = await databases.listDocuments(
-      DATABASE_ID,
-      PACKAGES_COLLECTION_ID,
-      [Query.equal('manifest', manifestId)]
-    )
+//     // Update manifest's totalPackages count
+//     const packagesResponse = await databases.listDocuments(
+//       DATABASE_ID,
+//       PACKAGES_COLLECTION_ID,
+//       [Query.equal('manifest', manifestId)]
+//     )
     
-    const manifest = await databases.updateDocument(
-      DATABASE_ID,
-      MANIFESTS_COLLECTION_ID,
-      manifestId,
-      { totalPackages: packagesResponse.total }
-    )
+//     const manifest = await databases.updateDocument(
+//       DATABASE_ID,
+//       MANIFESTS_COLLECTION_ID,
+//       manifestId,
+//       { totalPackages: packagesResponse.total }
+//     )
     
-    return manifest as unknown as ManifestType
-  } catch (error) {
-    console.error('Error removing packages from manifest:', error)
-    throw new Error('Failed to remove packages from manifest')
-  }
-}
+//     return manifest as unknown as ManifestType
+//   } catch (error) {
+//     console.error('Error removing packages from manifest:', error)
+//     throw new Error('Failed to remove packages from manifest')
+//   }
+// }
 
 /**
  * Update manifest with proof of delivery image
@@ -488,7 +513,7 @@ export const updateManifestWithProofImage = async (
 }
 
 /**
- * Update manifest deliveredPackages count and trip checkpoint
+ * Update manifest deliveredCount and trip checkpoint
  * Called when packages are marked as delivered
  */
 export const updateManifestDeliveredCount = async (
@@ -496,13 +521,13 @@ export const updateManifestDeliveredCount = async (
   deliveredCount: number
 ): Promise<ManifestType> => {
   try {
-    // Update manifest
+    // Update manifest with new deliveredCount field
     const manifest = await databases.updateDocument(
       DATABASE_ID,
       MANIFESTS_COLLECTION_ID,
       manifestId,
       {
-        deliveredPackages: deliveredCount
+        deliveredCount: deliveredCount
       }
     ) as any
     
@@ -579,41 +604,35 @@ async function updateCheckpointPackageCount(
 
 /**
  * Mark manifest as delivered/completed with full delivery tracking
- * Updates manifest status, timestamps, and delivered/missing packages
+ * Updates manifest status, timestamps, and delivered/missing counts
  * Also updates the trip's checkpoint for this manifest
+ * 
+ * Note: Updated for new schema - no individual packages, just counts on manifest
  */
 export const markManifestAsDelivered = async (
-  manifestId: string,
-  deliveredPackageIds: string[],
-  missingPackageIds: string[] = []
+  manifestId: string
 ): Promise<ManifestType> => {
   try {
     const now = new Date().toISOString()
     
-    // Fetch packages to get counts
-    const PACKAGES_COLLECTION_ID = appwriteConfig.packages
-    const packagesResponse = await databases.listDocuments(
-      DATABASE_ID,
-      PACKAGES_COLLECTION_ID,
-      [Query.equal('manifest', manifestId)]
-    )
-    
-    // Build update object with all delivery tracking fields
-    const updateData: Record<string, string | number> = {
-      status: 'delivered',
-      deliveryTime: now,
-      actualArrival: now,
-      arrivalTime: now, // Mark arrival time as well
-      deliveredPackages: deliveredPackageIds.length, // count of delivered packages (integer)
-      missingPackages: JSON.stringify(missingPackageIds)
-    }
-    
-    // First, fetch the manifest to get trip relationship
+    // First, fetch the manifest to get current counts and trip relationship
     const existingManifest = await databases.getDocument(
       DATABASE_ID,
       MANIFESTS_COLLECTION_ID,
       manifestId
     ) as any
+    
+    // Get package counts from manifest (new schema)
+    const packageCount = existingManifest.packageCount || 0
+    const deliveredCount = existingManifest.deliveredCount || 0
+    const missingCount = packageCount - deliveredCount
+    
+    // Build update object with all delivery tracking fields
+    const updateData: Record<string, string> = {
+      status: 'delivered',
+      deliveryTime: now,
+      arrivalTime: now // Mark arrival time as well
+    }
     
     // Update manifest
     const manifest = await databases.updateDocument(
@@ -630,8 +649,8 @@ export const markManifestAsDelivered = async (
       await updateTripCheckpoint(
         typeof tripId === 'string' ? tripId : tripId.$id,
         manifestId,
-        deliveredPackageIds.length,
-        missingPackageIds.length,
+        deliveredCount,
+        missingCount,
         now
       )
     } else {
@@ -734,6 +753,7 @@ async function updateTripCheckpoint(
 
 /**
  * Get manifest package statistics
+ * Updated for new schema - counts are stored directly on manifest
  */
 export const getManifestPackageStats = async (manifestId: string): Promise<{
   total: number
@@ -742,17 +762,25 @@ export const getManifestPackageStats = async (manifestId: string): Promise<{
   missing: number
 }> => {
   try {
-    const manifest = await getManifestByIdWithRelations(manifestId)
-    const packages = Array.isArray(manifest.packages) ? manifest.packages : []
+    const manifest = await databases.getDocument(
+      DATABASE_ID,
+      MANIFESTS_COLLECTION_ID,
+      manifestId
+    ) as any
     
-    const stats = {
-      total: packages.length,
-      delivered: packages.filter((pkg: any) => pkg.status === 'delivered').length,
-      pending: packages.filter((pkg: any) => pkg.status === 'pending' || pkg.status === 'in_transit').length,
-      missing: packages.filter((pkg: any) => pkg.status === 'missing' || pkg.status === 'failed').length
+    const total = manifest.packageCount || 0
+    const delivered = manifest.deliveredCount || 0
+    const missing = total - delivered
+    
+    // Pending only applies if manifest is not yet delivered
+    const pending = manifest.status === 'delivered' ? 0 : (total - delivered)
+    
+    return {
+      total,
+      delivered,
+      pending: manifest.status === 'delivered' ? 0 : pending,
+      missing: manifest.status === 'delivered' ? missing : 0
     }
-    
-    return stats
   } catch (error) {
     console.error('Error fetching manifest package stats:', error)
     throw new Error('Failed to fetch manifest package statistics')

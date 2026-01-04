@@ -45,9 +45,9 @@ export interface ProximityValidation {
 
 export interface DeliveryHistory {
   $id: string
-  packageId: string
-  packageTrackingNumber: string
-  status: PackageStatusType
+  manifestId: string
+  manifestNumber: string
+  status: ManifestStatusType
   location: string
   timestamp: string
   description: string
@@ -58,34 +58,14 @@ export interface DeliveryHistory {
   $updatedAt: string
 }
 
-export type PackageStatusType = 'pending' | 'picked-up' | 'in-transit' | 'out-for-delivery' | 'delivered' | 'failed'
+// Package size type - each manifest holds ONE type of package
+export type PackageSizeType = 'small' | 'medium' | 'big'
 
 export type TripStatusType = 'scheduled' | 'in-progress' | 'completed' | 'cancelled' | 'delayed'
 
 export type VehicleStatusType = 'active' | 'maintenance' | 'available' | 'unavailable' | 'retired'
 
 export type DriverStatusType = 'active' | 'offline' | 'on-trip'
-
-export interface PackageTrackingType {
-  $id: string
-  trackingNumber: string
-  // Simplified - no sender info required for driver entry
-  recipient: string // Recipient name
-  recipientPhone: string
-  manifest: string // manifest ID (package -> manifest -> trip relationship)
-  // Note: Locations are accessed through manifest.dropofflocation and trip.route.startLocation
-  // Note: trip relationship removed - access trip via manifest
-  status: PackageStatusType
-  expectedDeliveryDate: string
-  deliveryDate?: string | null
-  // Updated package fields
-  packageSize: 'big' | 'medium' | 'small' | 'bin' // Driver-friendly size categories
-  isBin?: boolean // Is this a bin containing multiple small items?
-  itemCount?: number // Headcount of items in bin (for tracking)
-  notes?: string // Optional special instructions
-  $createdAt: string
-  $updatedAt: string
-}
 
 export interface VehicleType {
   $id: string
@@ -184,14 +164,14 @@ export interface CustomerType {
 }
 
 // Dashboard Data Interfaces
-export interface PackageStats {
-  active: number
+export interface ManifestStatsData {
+  total: number
   delivered: number
   pending: number
   inTransit: number
-  failed: number
-  totalRevenue: number
-  packages?: PackageTrackingType[]
+  loaded: number
+  totalPackages: number // total package count across all manifests
+  deliveredPackages: number // total delivered packages
 }
 
 export interface VehicleStats {
@@ -254,7 +234,7 @@ export interface DeliveryMetrics {
 
 // Main Dashboard Response Interface
 export interface DeliveryDashboardData {
-  packageStats: PackageStats
+  manifestStats: ManifestStatsData
   vehicleStats: VehicleStats
   driverStats: DriverStats
   tripStats: TripStats
@@ -267,6 +247,11 @@ export interface DeliveryDashboardData {
   }
 }
 
+// Package Status Type (used for backwards compatibility)
+export type PackageStatusType = 'pending' | 'loaded' | 'in-transit' | 'delivered' | 'failed'
+
+// DEPRECATED: These interfaces are kept for backwards compatibility
+// Package tracking is now done at the manifest level
 // API Response Interfaces
 export interface CreatePackageRequest {
   trackingNumber: string
@@ -310,15 +295,15 @@ export interface UpdateDriverLocationRequest {
 }
 
 // Search and Filter Types
-export interface PackageSearchFilter {
-  status?: PackageStatusType[]
+export interface ManifestSearchFilter {
+  status?: ManifestStatusType[]
+  packageSize?: PackageSizeType
   dateRange?: {
     start: string
     end: string
   }
   driverId?: string
-  origin?: string
-  destination?: string
+  dropoffLocationId?: string
 }
 
 export interface TripSearchFilter {
@@ -341,6 +326,8 @@ export interface DriverSearchFilter {
 }
 
 // Manifest Types
+// NEW SCHEMA: Each manifest holds ONE type of package size (small, medium, or big)
+// This simplifies the tracking - just head count per manifest
 export type ManifestStatusType = 'pending' | 'loaded' | 'in_transit' | 'delivered' | 'completed'
 
 export interface ManifestType {
@@ -350,25 +337,30 @@ export interface ManifestType {
   dropofflocation: string // direct relationship to dropoff location (manifest serves ONE dropoff location)
   dropoffSequence: number // order in route
   manifestDate: string
-  totalPackages: number
-  packageTypes: string // JSON string: {small: number, medium: number, big: number, bin: number}
+  
+  // NEW: Package tracking by head count - each manifest holds ONE package size type
+  packageSize: PackageSizeType // 'small' | 'medium' | 'big' - the type of packages in this manifest
+  packageCount: number // total head count of packages in this manifest
+  deliveredCount: number // number of packages successfully delivered
+  
   status: ManifestStatusType
   manifestImage?: string | null // uploaded manifest photo
   departureTime?: string | null
   arrivalTime?: string | null
-  actualArrival?: string | null // actual arrival time at dropoff location
   deliveryTime?: string | null
   estimatedArrival?: string | null // estimated arrival time
   notes?: string | null
+  
   // Proof of delivery fields
   proofOfDeliveryImage?: string | null
   deliveryGpsCoordinates?: string | null
   deliveryGpsVerified?: boolean
   gpsVerificationDistance?: number | null
-  deliveredPackages?: number | null // count of delivered packages (integer)
-  missingPackages?: string | null // JSON string of missing package IDs
-  recipientName?: string | null // auto-populated from dropofflocation.contactPerson
-  recipientPhone?: string | null // auto-populated from dropofflocation.contactPhone
+  
+  // Recipient details (auto-populated from dropofflocation)
+  recipientName?: string | null
+  recipientPhone?: string | null
+  
   $createdAt: string
   $updatedAt: string
 }
@@ -402,7 +394,6 @@ export interface RouteStopType {
   address: string
   sequence: number // order in the route
   estimatedArrival?: string
-  actualArrival?: string
 }
 
 export interface RouteType {

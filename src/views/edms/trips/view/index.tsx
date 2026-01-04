@@ -421,14 +421,13 @@ const TripView = ({ tripData }: { tripData: any }) => {
                         <TableCell>Status</TableCell>
                         <TableCell>Packages</TableCell>
                         <TableCell>Dropoff Location</TableCell>
-                        <TableCell>Departure Time</TableCell>
+                        {/* <TableCell>Departure Time</TableCell> */}
                         <TableCell>Arrival Time</TableCell>
                         <TableCell align='right'>Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {tripData.manifests.map((manifest: any) => {
-                        const manifestPackages = Array.isArray(manifest.packages) ? manifest.packages : []
                         const manifestStatus = manifest.status || 'pending'
                         const pickupLocation = manifest.pickupLocation || manifest.pickuplocation
                         const dropoffLocation = manifest.dropoffLocation || manifest.dropofflocation
@@ -459,21 +458,14 @@ const TripView = ({ tripData }: { tripData: any }) => {
                               />
                             </TableCell>
                             <TableCell>
-                              <Typography>{manifestPackages.length} packages</Typography>
-                              {manifest.packageTypes && (
-                                <Typography variant='caption' color='text.secondary' className='block'>
-                                  {(() => {
-                                    try {
-                                      const types = JSON.parse(manifest.packageTypes)
-                                      return Object.entries(types)
-                                        .filter(([_, count]) => (count as number) > 0)
-                                        .map(([type, count]) => `${count} ${type}`)
-                                        .join(', ')
-                                    } catch {
-                                      return 'Mixed'
-                                    }
-                                  })()}
-                                </Typography>
+                              <Typography>{manifest.packageCount} packages</Typography>
+                              {manifest.packageSize && (
+                              <Chip
+                                label={manifest.packageSize.charAt(0).toUpperCase() + manifest.packageSize.slice(1)}
+                                variant='outlined'
+                                color="primary"
+                                size='small'
+                              />
                               )}
                             </TableCell>
                             <TableCell>
@@ -488,11 +480,11 @@ const TripView = ({ tripData }: { tripData: any }) => {
                                 </Typography>
                               )}
                             </TableCell>
-                            <TableCell>
+                            {/* <TableCell>
                               <Typography variant='body2'>
                                 {manifest.departureTime ? new Date(manifest.departureTime).toLocaleString() : 'Not departed'}
                               </Typography>
-                            </TableCell>
+                            </TableCell> */}
                             <TableCell>
                               <Typography variant='body2'>
                                 {manifest.arrivalTime ? new Date(manifest.arrivalTime).toLocaleString() : 'Not arrived'}
@@ -565,6 +557,12 @@ const TripView = ({ tripData }: { tripData: any }) => {
                                   <Typography variant='body2' color='text.secondary'>
                                     Manifest: {checkpoint.manifestNumber || 'Not assigned'}
                                   </Typography>
+                                    <Chip
+                                      label={checkpoint.packageSize?.charAt(0).toUpperCase() + checkpoint.packageSize?.slice(1).replace('_', ' ')}
+                                      variant='outlined'
+                                      color={'secondary'}
+                                      size='small'
+                                    />
                                 </div>
                               </div>
 
@@ -590,15 +588,8 @@ const TripView = ({ tripData }: { tripData: any }) => {
 
                               {/* Timestamps */}
                               <div className='mt-3 space-y-1'>
-                                {checkpoint.arrivalTime && (
-                                  <Typography variant='caption' color='text.secondary' className='block'>
-                                    <i className='ri-time-line mr-1' />
-                                    Arrived: {new Date(checkpoint.arrivalTime).toLocaleString()}
-                                  </Typography>
-                                )}
                                 {checkpoint.completionTime && (
                                   <Typography variant='caption' color='text.secondary' className='block'>
-                                    <i className='ri-check-line mr-1' />
                                     Completed: {new Date(checkpoint.completionTime).toLocaleString()}
                                   </Typography>
                                 )}

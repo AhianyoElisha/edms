@@ -79,7 +79,7 @@ const getTimeSince = (dateString: string): string => {
 
 // Helper function to generate activity description for delivery service
 const getActivityDescription = (item: DeliveryHistory): string => {
-  return item.description || `Package ${item.packageTrackingNumber} status updated to ${item.status}`
+  return item.description || `Manifest ${item.manifestNumber} status updated to ${item.status}`
 }
 
 // Function to determine timeline dot color based on delivery status
@@ -134,7 +134,7 @@ const ActivityTimeline = ({ history, isLoading }: ActivityTimelineProps) => {
                 <TimelineContent>
                   <div className='flex flex-wrap items-center justify-between gap-x-2 mbe-2.5'>
                     <Typography className='font-medium' color='text.primary' style={{ textTransform: 'capitalize' }}>
-                      Package {item.packageTrackingNumber} - {item.status}
+                      Manifest {item.manifestNumber} - {item.status}
                     </Typography>
                     <Typography variant='caption'>
                       {getTimeSince(item.timestamp)}

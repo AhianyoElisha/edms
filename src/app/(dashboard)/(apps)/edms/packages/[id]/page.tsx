@@ -1,8 +1,15 @@
 'use client'
 
-// React Imports
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+/**
+ * DEPRECATED: Individual package pages are no longer used.
+ * Package tracking is now done at the manifest level.
+ * Each manifest has: packageSize, packageCount, and deliveredCount
+ * 
+ * This page redirects to the manifests list.
+ */
+
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 // MUI Imports
 import Grid from '@mui/material/Grid'
@@ -11,91 +18,35 @@ import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
 import CircularProgress from '@mui/material/CircularProgress'
 
-// Component Imports
-import PackageView from '@/views/edms/packages/view'
-import { getPackageByIdWithRelations } from '@/libs/actions/package.actions'
-
 const PackageDetailsPage = () => {
-  const params = useParams()
-  const [packageData, setPackageData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
-    const fetchPackage = async () => {
-      try {
-        setLoading(true)
-        const id = params.id as string
-        const data = await getPackageByIdWithRelations(id)
-        setPackageData(data)
-      } catch (err) {
-        console.error('Error fetching package:', err)
-        setError(err instanceof Error ? err.message : 'Failed to load package')
-      } finally {
-        setLoading(false)
-      }
-    }
+    // Redirect to manifests list after a brief delay
+    const timer = setTimeout(() => {
+      router.replace('/edms/manifests')
+    }, 2000)
 
-    if (params.id) {
-      fetchPackage()
-    }
-  }, [params.id])
+    return () => clearTimeout(timer)
+  }, [router])
 
-  if (loading) {
-    return (
-      <Grid container spacing={6}>
-        <Grid item xs={12}>
-          <Card>
-            <CardContent className='flex flex-col items-center justify-center py-12'>
-              <CircularProgress size={60} className='mb-4' />
-              <Typography variant='h6' color='text.secondary'>
-                Loading package details...
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+  return (
+    <Grid container spacing={6}>
+      <Grid item xs={12}>
+        <Card>
+          <CardContent className='flex flex-col items-center justify-center py-12'>
+            <CircularProgress size={60} className='mb-4' />
+            <Typography variant='h6' color='text.secondary' className='mb-2'>
+              Package tracking has been updated
+            </Typography>
+            <Typography variant='body2' color='text.secondary' className='mb-4'>
+              Packages are now tracked at the manifest level. Redirecting to manifests...
+            </Typography>
+          </CardContent>
+        </Card>
       </Grid>
-    )
-  }
-
-  if (error) {
-    return (
-      <Grid container spacing={6}>
-        <Grid item xs={12}>
-          <Card>
-            <CardContent className='flex flex-col items-center justify-center py-12'>
-              <i className='ri-error-warning-line text-6xl text-error mb-4' />
-              <Typography variant='h6' color='error' className='mb-2'>
-                Error Loading Package
-              </Typography>
-              <Typography variant='body2' color='text.secondary' className='mb-4'>
-                {error}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-    )
-  }
-
-  if (!packageData) {
-    return (
-      <Grid container spacing={6}>
-        <Grid item xs={12}>
-          <Card>
-            <CardContent className='flex flex-col items-center justify-center py-12'>
-              <i className='ri-inbox-line text-6xl text-textSecondary mb-4' />
-              <Typography variant='h6' color='text.secondary'>
-                Package not found
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-    )
-  }
-
-  return <PackageView packageData={packageData} />
+    </Grid>
+  )
 }
 
 export default PackageDetailsPage

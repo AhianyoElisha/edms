@@ -1,5 +1,10 @@
 'use client'
 
+/**
+ * DeliveredPackagesTable - Now shows delivered manifests with package counts
+ * Each manifest tracks: packageSize, packageCount, and deliveredCount
+ */
+
 // React Imports
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -46,7 +51,7 @@ import { toast } from 'react-toastify'
 
 // Type Imports
 import type { ThemeColor } from '@core/types'
-import type { PackageTrackingType } from '@/types/apps/deliveryTypes'
+import type { ManifestType } from '@/types/apps/deliveryTypes'
 
 // Component Imports
 import OptionMenu from '@core/components/option-menu'
@@ -55,7 +60,7 @@ import OpenDialogOnElementClick from '@/components/dialogs/OpenDialogOnElementCl
 import InventoryExportDialog from '@/components/dialogs/stores-dialog'
 
 // Action Imports
-import { getDeliveredPackagesByDateRange } from '@/libs/actions/package.actions'
+import { getDeliveredManifests } from '@/libs/actions/manifest.actions'
 
 // Style Imports
 import tableStyles from '@core/styles/table.module.css'
@@ -72,7 +77,7 @@ declare module '@tanstack/table-core' {
   }
 }
 
-type PackageWithActionsType = PackageTrackingType & {
+type ManifestWithActionsType = ManifestType & {
   actions?: string
 }
 
@@ -117,21 +122,20 @@ const DebouncedInput = ({
 }
 
 const packageSizeObj: PackageSizeType = {
-  small: { label: 'Small', color: 'info' },
+  small: { label: 'Small', color: 'success' },
   medium: { label: 'Medium', color: 'warning' },
-  big: { label: 'Big', color: 'error' },
-  bin: { label: 'Bin', color: 'secondary' }
+  big: { label: 'Big', color: 'error' }
 }
 
 // Column Definitions
-const columnHelper = createColumnHelper<PackageWithActionsType>()
+const columnHelper = createColumnHelper<ManifestWithActionsType>()
 
 const DeliveredPackagesTable = () => {
   // States
-  const [data, setData] = useState<PackageTrackingType[]>([])
+  const [data, setData] = useState<ManifestType[]>([])
   const [filteredData, setFilteredData] = useState(data)
   const [globalFilter, setGlobalFilter] = useState('')
-  const [globalFilteredData, setGlobalFilteredData] = useState<PackageTrackingType[]>([])
+  const [globalFilteredData, setGlobalFilteredData] = useState<ManifestType[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().subtract(7, 'days'))
   const [endDate, setEndDate] = useState<Dayjs | null>(dayjs())
@@ -139,42 +143,47 @@ const DeliveredPackagesTable = () => {
   // Hooks
   const router = useRouter()
   
-  // Fetch delivered packages
-  const fetchDeliveredPackages = useCallback(async () => {
+  // Fetch delivered manifests
+  const fetchDeliveredManifests = useCallback(async () => {
     try {
       setIsLoading(true)
       
       const startDateISO = startDate ? startDate.startOf('day').toISOString() : undefined
       const endDateISO = endDate ? endDate.endOf('day').toISOString() : undefined
       
-      const packages = await getDeliveredPackagesByDateRange(startDateISO, endDateISO)
+      const manifests = await getDeliveredManifests(startDateISO, endDateISO)
       
-      setData(packages)
-      setFilteredData(packages)
+      setData(manifests)
+      setFilteredData(manifests)
       
     } catch (error) {
-      console.error('Error fetching delivered packages:', error)
-      toast.error('Failed to fetch delivered packages')
+      console.error('Error fetching delivered manifests:', error)
+      toast.error('Failed to fetch delivered manifests')
     } finally {
       setIsLoading(false)
     }
   }, [startDate, endDate])
 
   useEffect(() => {
-    fetchDeliveredPackages()
-  }, [fetchDeliveredPackages])
+    fetchDeliveredManifests()
+  }, [fetchDeliveredManifests])
 
-  const columns = useMemo<ColumnDef<PackageWithActionsType, any>[]>(
+  // Calculate total delivered packages
+  const totalDeliveredPackages = useMemo(() => {
+    return filteredData.reduce((sum, m) => sum + (m.deliveredCount || m.packageCount || 0), 0)
+  }, [filteredData])
+
+  const columns = useMemo<ColumnDef<ManifestWithActionsType, any>[]>(
     () => [
-      columnHelper.accessor('trackingNumber', {
-        header: 'Tracking Number',
+      columnHelper.accessor('manifestNumber', {
+        header: 'Manifest Number',
         cell: ({ row }) => (
           <div className='flex flex-col'>
             <Typography className='font-medium' color='text.primary'>
-              {row.original.trackingNumber}
+              {row.original.manifestNumber}
             </Typography>
             <Typography variant='body2' color='text.secondary'>
-              {row.original.recipient}
+              {row.original.recipientName || 'Unknown recipient'}
             </Typography>
           </div>
         )
@@ -182,34 +191,51 @@ const DeliveredPackagesTable = () => {
       columnHelper.accessor('recipientPhone', {
         header: 'Recipient Phone',
         cell: ({ row }) => (
-          <Typography color='text.primary'>{row.original.recipientPhone}</Typography>
+          <Typography color='text.primary'>{row.original.recipientPhone || 'N/A'}</Typography>
         )
       }),
       columnHelper.accessor('packageSize', {
         header: 'Package Size',
         cell: ({ row }) => {
-          const size = row.original.isBin ? 'bin' : row.original.packageSize
+          const size = row.original.packageSize || 'unknown'
           return (
-            <div className='flex items-center gap-2'>
-              <Chip
-                label={packageSizeObj[size]?.label || size}
-                variant='tonal'
-                color={packageSizeObj[size]?.color || 'default'}
-                size='small'
-              />
-              {row.original.isBin && row.original.itemCount && (
-                <Typography variant='body2' color='text.secondary'>
-                  ({row.original.itemCount} items)
-                </Typography>
-              )}
-            </div>
+            <Chip
+              label={packageSizeObj[size]?.label || size}
+              variant='tonal'
+              color={packageSizeObj[size]?.color || 'default'}
+              size='small'
+            />
           )
         }
       }),
-      columnHelper.accessor('deliveryDate', {
+      columnHelper.accessor('packageCount', {
+        header: 'Package Count',
+        cell: ({ row }) => (
+          <Typography color='text.primary' className='font-medium'>
+            {row.original.packageCount || 0}
+          </Typography>
+        )
+      }),
+      columnHelper.accessor('deliveredCount', {
+        header: 'Delivered',
+        cell: ({ row }) => {
+          const delivered = row.original.deliveredCount || 0
+          const total = row.original.packageCount || 0
+          const isComplete = delivered >= total
+          return (
+            <Chip
+              label={`${delivered}/${total}`}
+              variant='tonal'
+              color={isComplete ? 'success' : 'warning'}
+              size='small'
+            />
+          )
+        }
+      }),
+      columnHelper.accessor('deliveryTime', {
         header: 'Delivery Date',
         cell: ({ row }) => {
-          const dateString = row.original.deliveryDate
+          const dateString = row.original.deliveryTime
           let formattedDate = 'N/A'
           
           if (dateString) {
@@ -226,10 +252,10 @@ const DeliveredPackagesTable = () => {
           return <Typography>{formattedDate}</Typography>
         }
       }),
-      columnHelper.accessor('expectedDeliveryDate', {
-        header: 'Expected Date',
+      columnHelper.accessor('manifestDate', {
+        header: 'Manifest Date',
         cell: ({ row }) => {
-          const dateString = row.original.expectedDeliveryDate
+          const dateString = row.original.manifestDate
           let formattedDate = 'N/A'
           
           if (dateString) {
@@ -257,26 +283,6 @@ const DeliveredPackagesTable = () => {
           />
         )
       }),
-      columnHelper.accessor('$createdAt', {
-        header: 'Created Date',
-        cell: ({ row }) => {
-          const dateString = row.original.$createdAt
-          let formattedDate = 'N/A'
-          
-          if (dateString) {
-            try {
-              const date = new Date(dateString)
-              if (!isNaN(date.getTime())) {
-                formattedDate = format(date, 'MMM dd, yyyy')
-              }
-            } catch (error) {
-              console.error('Error parsing date:', error)
-            }
-          }
-          
-          return <Typography>{formattedDate}</Typography>
-        }
-      }),
       columnHelper.accessor('actions', {
         header: 'Actions',
         cell: ({ row }) => (
@@ -288,7 +294,7 @@ const DeliveredPackagesTable = () => {
                 { 
                   text: 'View Details', 
                   icon: 'ri-eye-line',
-                  menuItemProps: { onClick: () => router.push(`/edms/packages/${row.original.$id}`) }
+                  menuItemProps: { onClick: () => router.push(`/edms/manifests/${row.original.$id}`) }
                 }
               ]}
             />
@@ -301,7 +307,7 @@ const DeliveredPackagesTable = () => {
   )
 
   const table = useReactTable({
-    data: filteredData as PackageTrackingType[],
+    data: filteredData as ManifestType[],
     columns,
     filterFns: {
       fuzzy: fuzzyFilter
@@ -376,7 +382,7 @@ const DeliveredPackagesTable = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <Button
                   variant='contained'
-                  onClick={fetchDeliveredPackages}
+                  onClick={fetchDeliveredManifests}
                   disabled={isLoading}
                   fullWidth
                   startIcon={<i className='ri-refresh-line' />}
@@ -407,11 +413,11 @@ const DeliveredPackagesTable = () => {
             <DebouncedInput
               value={globalFilter ?? ''}
               onChange={value => setGlobalFilter(String(value))}
-              placeholder='Search Tracking Number or Recipient'
+              placeholder='Search Manifest Number or Recipient'
               className='max-sm:is-full'
             />
             <Chip 
-              label={`${filteredData.length} Packages Delivered`} 
+              label={`${filteredData.length} Manifests (${totalDeliveredPackages} Packages)`} 
               color='success' 
               variant='tonal'
             />
@@ -461,7 +467,7 @@ const DeliveredPackagesTable = () => {
               <tbody>
                 <tr>
                   <td colSpan={table.getVisibleFlatColumns().length} className='text-center'>
-                    {isLoading ? <LoaderDark /> : 'No delivered packages found for the selected date range'}
+                    {isLoading ? <LoaderDark /> : 'No delivered manifests found for the selected date range'}
                   </td>
                 </tr>
               </tbody>

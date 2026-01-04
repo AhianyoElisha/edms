@@ -16,7 +16,6 @@ import { styled } from '@mui/material/styles'
 // Component Imports
 import StepTripDetails from './StepTripDetails'
 import StepManifests from './StepManifests'
-import StepPackages from './StepPackages'
 import StepReview from './StepReview'
 import StepperCustomDot from '@components/stepper-dot'
 
@@ -33,11 +32,7 @@ const steps = [
   },
   {
     title: 'Manifests',
-    subtitle: 'Assign to Dropoff Locations'
-  },
-  {
-    title: 'Packages',
-    subtitle: 'Add Packages to Manifests'
+    subtitle: 'Packages by Size & Location'
   },
   {
     title: 'Review & Complete',
@@ -66,8 +61,7 @@ const TripWizard = () => {
       startTime: '',
       notes: ''
     },
-    manifests: [],
-    packages: []
+    manifests: []
   })
 
   const handleNext = () => {
@@ -102,8 +96,6 @@ const TripWizard = () => {
       case 1:
         return <StepManifests {...commonProps} />
       case 2:
-        return <StepPackages {...commonProps} />
-      case 3:
         return <StepReview {...commonProps} />
       default:
         return null

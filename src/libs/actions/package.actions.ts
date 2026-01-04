@@ -1,169 +1,139 @@
+/**
+ * @deprecated Package actions are deprecated.
+ * Package information is now stored directly on manifests.
+ * Each manifest tracks: packageSize, packageCount, and deliveredCount
+ * 
+ * For package-related queries, use manifest.actions.ts instead.
+ * - manifest.packageSize: 'small' | 'medium' | 'big'
+ * - manifest.packageCount: Total number of packages on this manifest
+ * - manifest.deliveredCount: Number of packages delivered
+ */
+
 import { Query } from 'appwrite'
 import { appwriteConfig, databases, tablesDB } from '@/libs/appwrite.config'
-import type { PackageTrackingType } from '@/types/apps/deliveryTypes'
+import type { ManifestType } from '@/types/apps/deliveryTypes'
 
 const DATABASE_ID = appwriteConfig.database
-const PACKAGES_COLLECTION_ID = appwriteConfig.packages
+const MANIFESTS_COLLECTION_ID = appwriteConfig.manifests
 
-export const getPackageById = async (packageId: string): Promise<PackageTrackingType> => {
+/**
+ * @deprecated Use getManifestById from manifest.actions.ts instead
+ * Get manifest package information by manifest ID
+ */
+export const getManifestPackageInfo = async (manifestId: string): Promise<{
+  packageSize: string
+  packageCount: number
+  deliveredCount: number
+}> => {
   try {
-    const pkg = await databases.getDocument(
+    const manifest = await databases.getDocument(
       DATABASE_ID,
-      PACKAGES_COLLECTION_ID,
-      packageId
-    )
+      MANIFESTS_COLLECTION_ID,
+      manifestId
+    ) as unknown as ManifestType
 
-    return pkg as unknown as PackageTrackingType
-  } catch (error) {
-    console.error('Error fetching package:', error)
-    throw new Error('Failed to fetch package')
-  }
-}
-
-export const getPackageByIdWithRelations = async (packageId: string) => {
-  try {
-    // Fetch package with manifest (including dropofflocation) and trip relationships
-    const pkg = await tablesDB.getRow(
-      DATABASE_ID,
-      PACKAGES_COLLECTION_ID,
-      packageId,
-      [
-        Query.select([
-          '*',
-          'manifest.*',
-          'manifest.dropofflocation.*', // fetch dropoff location from manifest
-          'manifest.trip.*',
-          'manifest.trip.vehicle.*',
-          'manifest.trip.driver.*',
-          'manifest.trip.route.*'
-        ])
-      ]
-    ) as any
-
-    // Get locations from the manifest and trip relationships
-    let pickupLocation = null
-    let dropoffLocation = pkg.manifest?.dropofflocation || null // dropoff from manifest
-
-    // Get pickup location from trip's route (startLocation is the pickup point)
-    if (pkg.manifest?.trip?.route?.startLocation) {
-      try {
-        pickupLocation = await databases.getDocument(
-          DATABASE_ID,
-          appwriteConfig.pickuplocations,
-          pkg.manifest.trip.route.startLocation
-        )
-      } catch (error) {
-        console.warn('Could not fetch pickup location from trip route')
-      }
-    }
-
-    // Combine all data
     return {
-      ...pkg,
-      pickupLocation,
-      dropoffLocation
+      packageSize: manifest.packageSize || 'unknown',
+      packageCount: manifest.packageCount || 0,
+      deliveredCount: manifest.deliveredCount || 0
     }
   } catch (error) {
-    console.error('Error fetching package with relations:', error)
-    throw new Error('Failed to fetch package details')
+    console.error('Error fetching manifest package info:', error)
+    throw new Error('Failed to fetch manifest package info')
   }
 }
 
 /**
- * Bulk update package statuses
+ * Update delivered package count on a manifest
  */
-export const bulkUpdatePackageStatus = async (
-  packageIds: string[],
-  status: string,
-  deliveryDate?: string
-): Promise<void> => {
+export const updateManifestDeliveredCount = async (
+  manifestId: string,
+  deliveredCount: number
+): Promise<ManifestType> => {
   try {
-    const updateData: any = { status }
-    
-    if (status === 'delivered' && deliveryDate) {
-      updateData.deliveryDate = deliveryDate
-    }
-    
-    // Update all packages
-    await Promise.all(
-      packageIds.map(packageId =>
-        databases.updateDocument(
-          DATABASE_ID,
-          PACKAGES_COLLECTION_ID,
-          packageId,
-          updateData
-        )
-      )
-    )
-  } catch (error) {
-    console.error('Error bulk updating package status:', error)
-    throw new Error('Failed to update package statuses')
-  }
-}
-
-/**
- * Update single package status
- */
-export const updatePackageStatus = async (
-  packageId: string,
-  status: string,
-  deliveryDate?: string
-): Promise<PackageTrackingType> => {
-  try {
-    const updateData: any = { status }
-    
-    if (status === 'delivered' && deliveryDate) {
-      updateData.deliveryDate = deliveryDate
-    }
-    
-    const pkg = await databases.updateDocument(
+    const manifest = await databases.updateDocument(
       DATABASE_ID,
-      PACKAGES_COLLECTION_ID,
-      packageId,
-      updateData
+      MANIFESTS_COLLECTION_ID,
+      manifestId,
+      { deliveredCount }
     )
     
-    return pkg as unknown as PackageTrackingType
+    return manifest as unknown as ManifestType
   } catch (error) {
-    console.error('Error updating package status:', error)
-    throw new Error('Failed to update package status')
+    console.error('Error updating manifest delivered count:', error)
+    throw new Error('Failed to update manifest delivered count')
   }
 }
 
 /**
- * Get delivered packages by date range
- * @param startDate - Start date in ISO format (optional)
- * @param endDate - End date in ISO format (optional)
- * @returns Array of delivered packages
+ * Get package count summary across all manifests (by size)
  */
-export const getDeliveredPackagesByDateRange = async (
+export const getPackageCountSummary = async (): Promise<{
+  small: number
+  medium: number
+  big: number
+  total: number
+}> => {
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      MANIFESTS_COLLECTION_ID,
+      [Query.limit(1000)]
+    )
+
+    const manifests = response.documents as unknown as ManifestType[]
+    
+    const summary = manifests.reduce((acc, manifest) => {
+      const size = manifest.packageSize || 'small'
+      const count = manifest.packageCount || 0
+      
+      acc[size as 'small' | 'medium' | 'big'] = (acc[size as 'small' | 'medium' | 'big'] || 0) + count
+      acc.total += count
+      
+      return acc
+    }, { small: 0, medium: 0, big: 0, total: 0 })
+
+    return summary
+  } catch (error) {
+    console.error('Error fetching package count summary:', error)
+    return { small: 0, medium: 0, big: 0, total: 0 }
+  }
+}
+
+/**
+ * Get delivered packages count by date range (from manifests)
+ */
+export const getDeliveredPackagesCountByDateRange = async (
   startDate?: string,
   endDate?: string
-): Promise<PackageTrackingType[]> => {
+): Promise<number> => {
   try {
-    // Build queries
     const queries = [Query.equal('status', 'delivered')]
     
     if (startDate) {
-      queries.push(Query.greaterThanEqual('deliveryDate', startDate))
+      queries.push(Query.greaterThanEqual('manifestDate', startDate))
     }
     
     if (endDate) {
-      queries.push(Query.lessThanEqual('deliveryDate', endDate))
+      queries.push(Query.lessThanEqual('manifestDate', endDate))
     }
     
-    queries.push(Query.orderDesc('deliveryDate'))
     queries.push(Query.limit(1000))
     
     const response = await databases.listDocuments(
       DATABASE_ID,
-      PACKAGES_COLLECTION_ID,
+      MANIFESTS_COLLECTION_ID,
       queries
     )
     
-    return response.documents as unknown as PackageTrackingType[]
+    const manifests = response.documents as unknown as ManifestType[]
+    
+    // Sum up deliveredCount from all manifests
+    return manifests.reduce((total, manifest) => {
+      return total + (manifest.deliveredCount || manifest.packageCount || 0)
+    }, 0)
   } catch (error) {
-    console.error('Error fetching delivered packages:', error)
-    throw new Error('Failed to fetch delivered packages')
+    console.error('Error fetching delivered packages count:', error)
+    return 0
   }
 }

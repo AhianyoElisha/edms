@@ -25,7 +25,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import type { WizardStepProps } from './types'
 
 // Actions
-import { createTripWithManifestsAndPackages } from '@/libs/actions/trip.actions'
+import { createTripWithManifests } from '@/libs/actions/trip.actions'
 
 // Third-party Imports
 import { toast } from 'react-toastify'
@@ -35,28 +35,17 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { tripDetails, manifests, packages } = wizardData
+  const { tripDetails, manifests } = wizardData
 
-  const getPackagesByManifest = (manifestTempId: string) => {
-    return packages.filter(pkg => pkg.manifestTempId === manifestTempId)
-  }
+  // Calculate total packages across all manifests
+  const getTotalPackages = () => manifests.reduce((sum, m) => sum + m.packageCount, 0)
 
-  const getTotalPackages = () => packages.length
-
+  // Get package counts by size
   const getPackageSizeCounts = () => {
-    return packages.reduce((acc, pkg) => {
-      acc[pkg.packageSize] = (acc[pkg.packageSize] || 0) + 1
+    return manifests.reduce((acc, manifest) => {
+      acc[manifest.packageSize] = (acc[manifest.packageSize] || 0) + manifest.packageCount
       return acc
     }, {} as Record<string, number>)
-  }
-
-  const getTotalItemCount = () => {
-    return packages.reduce((total, pkg) => {
-      if (pkg.isBin && pkg.itemCount) {
-        return total + pkg.itemCount
-      }
-      return total + 1
-    }, 0)
   }
 
   const handleSubmit = async () => {
@@ -67,11 +56,11 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
       console.log('📤 Submitting wizard data to backend:', JSON.stringify(wizardData, null, 2))
       console.log('📊 Summary:', {
         manifests: wizardData.manifests.length,
-        packages: wizardData.packages.length,
+        totalPackages: getTotalPackages(),
         tripDate: wizardData.tripDetails.startTime
       })
 
-      const result = await createTripWithManifestsAndPackages(wizardData)
+      const result = await createTripWithManifests(wizardData)
 
       if (result.success) {
         toast.success(`Trip created successfully! Trip Number: ${result.tripNumber}`, {
@@ -181,37 +170,22 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={3}>
+          <Grid item xs={12} sm={4}>
             <Card>
               <CardContent>
                 <Typography variant='body2' color='text.secondary'>
-                  Total Packages/Bins
+                  Total Packages
                 </Typography>
                 <Typography variant='h4' className='font-semibold'>
                   {getTotalPackages()}
                 </Typography>
                 <Typography variant='caption' color='text.secondary'>
-                  Across All Manifests
+                  Head Count Across All Manifests
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={3}>
-            <Card>
-              <CardContent>
-                <Typography variant='body2' color='text.secondary'>
-                  Total Items
-                </Typography>
-                <Typography variant='h4' className='font-semibold'>
-                  {getTotalItemCount()}
-                </Typography>
-                <Typography variant='caption' color='text.secondary'>
-                  Including Bin Contents
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={4}>
             <Card>
               <CardContent>
                 <Typography variant='body2' color='text.secondary' className='mb-2'>
@@ -234,89 +208,67 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
         </Grid>
       </Grid>
 
-      {/* Manifests and Packages Details */}
+      {/* Manifests Details */}
       <Grid item xs={12}>
         <Card>
           <CardContent>
             <Typography variant='h6' className='mb-4'>
-              Manifests & Packages
+              Manifests Overview
             </Typography>
 
-            {manifests.map((manifest, manifestIndex) => {
-              const manifestPackages = getPackagesByManifest(manifest.tempId)
-              
-              return (
-                <div key={manifest.tempId} className='mb-6'>
-                  {manifestIndex > 0 && <Divider className='my-4' />}
-                  
-                  {/* Manifest Header */}
-                  <div className='flex items-start justify-between mb-3'>
-                    <div>
-                      <Typography variant='h6' className='font-semibold'>
-                        {manifest.dropoffLocationName}
-                      </Typography>
-                      <Typography variant='body2' color='text.secondary'>
-                        {manifest.dropoffAddress}
-                      </Typography>
-                      <Typography variant='caption' color='text.secondary'>
-                        Manifest: {manifest.manifestNumber}
-                        {manifest.estimatedArrival && ` • Est. Arrival: ${manifest.estimatedArrival}`}
-                      </Typography>
-                    </div>
-                    <Chip 
-                      label={`${manifestPackages.length} package(s)`}
-                      color='primary'
-                      variant='tonal'
-                    />
-                  </div>
-
-                  {/* Packages Table */}
-                  {manifestPackages.length > 0 && (
-                    <TableContainer>
-                      <Table size='small'>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>#</TableCell>
-                            <TableCell>Tracking Number</TableCell>
-                            <TableCell>Type</TableCell>
-                            <TableCell>Recipient</TableCell>
-                            <TableCell>Phone</TableCell>
-                            <TableCell>Item Count</TableCell>
-                            <TableCell>Notes</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {manifestPackages.map((pkg, pkgIndex) => (
-                            <TableRow key={pkg.tempId}>
-                              <TableCell>{pkgIndex + 1}</TableCell>
-                              <TableCell>{pkg.trackingNumber}</TableCell>
-                              <TableCell>
-                                <Chip 
-                                  label={pkg.packageSize.charAt(0).toUpperCase() + pkg.packageSize.slice(1)} 
-                                  size='small' 
-                                  variant='tonal'
-                                  color={pkg.isBin ? 'info' : 'default'}
-                                />
-                              </TableCell>
-                              <TableCell>{pkg.recipientName}</TableCell>
-                              <TableCell>{pkg.recipientPhone}</TableCell>
-                              <TableCell>
-                                {pkg.isBin && pkg.itemCount ? (
-                                  <Chip label={`${pkg.itemCount} items`} size='small' color='info' variant='tonal' />
-                                ) : (
-                                  <span>1</span>
-                                )}
-                              </TableCell>
-                              <TableCell>{pkg.notes || '-'}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  )}
-                </div>
-              )
-            })}
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>#</TableCell>
+                    <TableCell>Manifest Number</TableCell>
+                    <TableCell>Dropoff Location</TableCell>
+                    <TableCell>Address</TableCell>
+                    <TableCell>Package Size</TableCell>
+                    <TableCell>Package Count</TableCell>
+                    <TableCell>Est. Arrival</TableCell>
+                    <TableCell>Notes</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {manifests.map((manifest, index) => (
+                    <TableRow key={manifest.tempId}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>
+                        <Typography variant='body2' className='font-semibold'>
+                          {manifest.manifestNumber}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{manifest.dropoffLocationName}</TableCell>
+                      <TableCell>
+                        <Typography variant='body2' color='text.secondary'>
+                          {manifest.dropoffAddress}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={manifest.packageSize.charAt(0).toUpperCase() + manifest.packageSize.slice(1)} 
+                          size='small' 
+                          color={
+                            manifest.packageSize === 'small' ? 'success' : 
+                            manifest.packageSize === 'medium' ? 'warning' : 
+                            'error'
+                          }
+                          variant='tonal'
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant='body1' className='font-semibold'>
+                          {manifest.packageCount}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{manifest.estimatedArrival || '-'}</TableCell>
+                      <TableCell>{manifest.notes || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </CardContent>
         </Card>
       </Grid>
@@ -329,7 +281,7 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
             onClick={handlePrev}
             disabled={submitting}
           >
-            Previous: Packages
+            Previous: Manifests
           </Button>
           <Button 
             variant='contained' 
@@ -349,7 +301,10 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
             What happens next?
           </Typography>
           <Typography variant='body2'>
-            • Trip will be created with {manifests.length} manifest(s) and {getTotalPackages()} package(s)
+            • Trip will be created with {manifests.length} manifest(s) containing {getTotalPackages()} total packages
+          </Typography>
+          <Typography variant='body2'>
+            • Each manifest tracks packages of a single size type (small, medium, or big)
           </Typography>
           <Typography variant='body2'>
             • Driver will be able to track progress through each dropoff location
@@ -359,9 +314,6 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
           </Typography>
           <Typography variant='body2'>
             • Manifest proof of delivery with signatures required at each location
-          </Typography>
-          <Typography variant='body2'>
-            • Package checkboxes must be verified during delivery
           </Typography>
         </Alert>
       </Grid>

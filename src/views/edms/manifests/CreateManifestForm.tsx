@@ -26,7 +26,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import dayjs, { Dayjs } from 'dayjs'
 
 // Type Imports
-import { ManifestType } from '@/types/apps/deliveryTypes'
+import { ManifestType, PackageSizeType } from '@/types/apps/deliveryTypes'
 import { VehicleType } from '@/types/apps/deliveryTypes'
 import { PickupLocationType, DropoffLocationType } from '@/types/apps/deliveryTypes'
 
@@ -41,20 +41,15 @@ const CreateManifestForm = () => {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  // Form state
+  // Form state - updated for new manifest structure
   const [formData, setFormData] = useState({
     vehicle: '',
     driver: '',
     pickupLocation: '',
     dropoffLocation: '',
     manifestDate: dayjs(),
-    packages: [] as string[],
-    packageTypes: {
-      small: 0,
-      medium: 0,
-      large: 0,
-      bins: 0
-    },
+    packageSize: 'small' as PackageSizeType, // 'small' | 'medium' | 'big'
+    packageCount: 1, // Head count of packages
     notes: '',
     creator: 'current-user' // This should come from auth context
   })
@@ -93,27 +88,14 @@ const CreateManifestForm = () => {
     setError('')
   }
 
-  const handlePackageTypeChange = (type: keyof typeof formData.packageTypes, value: number) => {
-    setFormData(prev => ({
-      ...prev,
-      packageTypes: {
-        ...prev.packageTypes,
-        [type]: Math.max(0, value)
-      }
-    }))
-  }
-
-  const calculateTotalPackages = () => {
-    return Object.values(formData.packageTypes).reduce((sum, count) => sum + count, 0)
-  }
-
   const validateForm = () => {
     if (!formData.vehicle) return 'Vehicle is required'
     if (!formData.driver) return 'Driver is required'
     if (!formData.pickupLocation) return 'Pickup location is required'
     if (!formData.dropoffLocation) return 'Dropoff location is required'
     if (!formData.manifestDate) return 'Manifest date is required'
-    if (calculateTotalPackages() === 0) return 'At least one package is required'
+    if (!formData.packageSize) return 'Package size is required'
+    if (formData.packageCount < 1) return 'Package count must be at least 1'
     
     return null
   }
@@ -135,8 +117,9 @@ const CreateManifestForm = () => {
         dropofflocation: '', // Will be set when assigned to a trip with dropoff location
         dropoffSequence: 1, // Default sequence, will be updated when added to trip
         manifestDate: formData.manifestDate.toISOString(),
-        totalPackages: calculateTotalPackages(),
-        packageTypes: JSON.stringify(formData.packageTypes), // Convert to JSON string for database
+        packageSize: formData.packageSize, // 'small' | 'medium' | 'big'
+        packageCount: formData.packageCount, // Head count
+        deliveredCount: 0, // Start with 0 delivered
         status: 'pending',
         notes: formData.notes
       }
@@ -335,61 +318,48 @@ const CreateManifestForm = () => {
               <Typography variant="h6" gutterBottom className="mt-4">
                 Package Information
               </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Each manifest contains packages of a single size type. Enter the head count (total number of packages).
+              </Typography>
               <Divider className="mb-4" />
             </Grid>
 
-            <Grid item xs={12} sm={3}>
-              <TextField
-                fullWidth
-                type="number"
-                label="Small Packages"
-                value={formData.packageTypes.small}
-                onChange={(e) => handlePackageTypeChange('small', parseInt(e.target.value) || 0)}
-                InputProps={{ inputProps: { min: 0 } }}
-              />
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Package Size</InputLabel>
+                <Select
+                  value={formData.packageSize}
+                  label="Package Size"
+                  onChange={(e) => handleInputChange('packageSize', e.target.value)}
+                >
+                  <MenuItem value="small">Small</MenuItem>
+                  <MenuItem value="medium">Medium</MenuItem>
+                  <MenuItem value="big">Big</MenuItem>
+                </Select>
+              </FormControl>
             </Grid>
 
-            <Grid item xs={12} sm={3}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 type="number"
-                label="Medium Packages"
-                value={formData.packageTypes.medium}
-                onChange={(e) => handlePackageTypeChange('medium', parseInt(e.target.value) || 0)}
-                InputProps={{ inputProps: { min: 0 } }}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={3}>
-              <TextField
-                fullWidth
-                type="number"
-                label="Large Packages"
-                value={formData.packageTypes.large}
-                onChange={(e) => handlePackageTypeChange('large', parseInt(e.target.value) || 0)}
-                InputProps={{ inputProps: { min: 0 } }}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={3}>
-              <TextField
-                fullWidth
-                type="number"
-                label="Bins"
-                value={formData.packageTypes.bins}
-                onChange={(e) => handlePackageTypeChange('bins', parseInt(e.target.value) || 0)}
-                InputProps={{ inputProps: { min: 0 } }}
+                label="Package Count (Head Count)"
+                value={formData.packageCount}
+                onChange={(e) => handleInputChange('packageCount', parseInt(e.target.value) || 0)}
+                InputProps={{ inputProps: { min: 1 } }}
+                required
+                helperText="Total number of packages in this manifest"
               />
             </Grid>
 
             <Grid item xs={12}>
               <Box display="flex" alignItems="center" gap={2}>
                 <Typography variant="body1">
-                  Total Packages: 
+                  Manifest Summary: 
                 </Typography>
                 <Chip 
-                  label={calculateTotalPackages()} 
-                  color={calculateTotalPackages() > 0 ? 'primary' : 'default'}
+                  label={`${formData.packageCount} ${formData.packageSize} package(s)`} 
+                  color={formData.packageCount > 0 ? 'primary' : 'default'}
                 />
               </Box>
             </Grid>

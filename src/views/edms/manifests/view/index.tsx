@@ -17,38 +17,21 @@ import Chip from '@mui/material/Chip'
 import Divider from '@mui/material/Divider'
 import Button from '@mui/material/Button'
 import Avatar from '@mui/material/Avatar'
-import Tabs from '@mui/material/Tabs'
-import Tab from '@mui/material/Tab'
-import Table from '@mui/material/Table'
-import TableBody from '@mui/material/TableBody'
-import TableCell from '@mui/material/TableCell'
-import TableContainer from '@mui/material/TableContainer'
-import TableHead from '@mui/material/TableHead'
-import TableRow from '@mui/material/TableRow'
-import Paper from '@mui/material/Paper'
-import Checkbox from '@mui/material/Checkbox'
 import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Tooltip from '@mui/material/Tooltip'
+import TextField from '@mui/material/TextField'
+import Box from '@mui/material/Box'
+import LinearProgress from '@mui/material/LinearProgress'
 
 // Component Imports
 import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
 
 // Toast Imports
 import { toast } from 'react-toastify'
-
-// Helper function to parse JSON fields safely
-const parseJSON = (jsonString: string | null | undefined) => {
-  if (!jsonString) return []
-  try {
-    return JSON.parse(jsonString)
-  } catch {
-    return []
-  }
-}
 
 // Helper function to get status color
 const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' => {
@@ -62,7 +45,7 @@ const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | '
     case 'in_transit':
       return 'primary'
     case 'pending':
-    case 'picked-up':
+    case 'loaded':
       return 'warning'
     case 'cancelled':
     case 'canceled':
@@ -73,56 +56,55 @@ const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | '
   }
 }
 
+// Helper function to get package size label
+const getPackageSizeLabel = (size: string): string => {
+  const labels: Record<string, string> = {
+    'small': 'Small Packages',
+    'medium': 'Medium Packages',
+    'big': 'Big Packages'
+  }
+  return labels[size] || size || 'Unknown'
+}
+
+// Helper function to get package size icon
+const getPackageSizeIcon = (size: string): string => {
+  const icons: Record<string, string> = {
+    'small': 'ri-inbox-line',
+    'medium': 'ri-inbox-2-line',
+    'big': 'ri-archive-line'
+  }
+  return icons[size] || 'ri-inbox-line'
+}
+
 const ManifestView = ({ manifestData }: { manifestData: any }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'packages'>('overview')
-  const [selectedPackages, setSelectedPackages] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
-  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; action: 'delivered' | 'submit' | null }>({ open: false, action: null })
+  const [confirmDialog, setConfirmDialog] = useState<{ 
+    open: boolean
+    action: 'update-count' | 'submit' | null
+  }>({ open: false, action: null })
+  const [deliveryCountInput, setDeliveryCountInput] = useState<number>(manifestData.deliveredCount || 0)
   
   const router = useRouter()
   const [refreshKey, setRefreshKey] = useState(0)
 
-  // Parse packages and their related data
-  const packages = Array.isArray(manifestData.packages) ? manifestData.packages : []
-  const packageTypes = parseJSON(manifestData.packageTypes)
-  const packageStatuses = parseJSON(manifestData.packageStatuses)
-
+  // Get related data
   const trip = manifestData.trip
   const dropoffLocation = manifestData?.dropofflocation
-  const pickupLocation = manifestData?.pickuplocation
+  const pickupLocation = trip?.route?.pickuplocation || manifestData?.pickuplocation
 
+  // Package tracking (now count-based on manifest)
+  const packageCount = manifestData.packageCount || 0
+  const deliveredCount = manifestData.deliveredCount || 0
+  const pendingCount = packageCount - deliveredCount
+  const deliveryProgress = packageCount > 0 ? (deliveredCount / packageCount) * 100 : 0
 
-  // Check if manifest can be submitted (has proof image and is not already delivered)
+  // Check if manifest can be submitted
   const hasProofImage = Boolean(manifestData.proofOfDeliveryImage)
   const isDelivered = manifestData.status === 'delivered' || manifestData.status === 'completed'
-  
-  // Check if at least one package has been marked as delivered (to prevent premature submission)
-  const hasDeliveredPackages = packages.some((pkg: any) => pkg.status === 'delivered')
-  const hasUnprocessedPackages = packages.some((pkg: any) => pkg.status !== 'delivered' && pkg.status !== 'missing')
+  const hasDeliveredPackages = deliveredCount > 0
   
   // Can only submit if: has proof, has at least one delivered package, and not already delivered
   const canSubmit = hasProofImage && hasDeliveredPackages && !isDelivered
-  
-  // Handle select all packages
-  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.checked) {
-      const allPackageIds = packages.filter((pkg: any) => pkg.status !== 'delivered').map((pkg: any) => pkg.$id)
-      setSelectedPackages(allPackageIds)
-    } else {
-      setSelectedPackages([])
-    }
-  }
-  
-  // Handle individual package selection
-  const handleSelectPackage = (packageId: string) => {
-    setSelectedPackages(prev => {
-      if (prev.includes(packageId)) {
-        return prev.filter(id => id !== packageId)
-      } else {
-        return [...prev, packageId]
-      }
-    })
-  }
   
   // Handle proof of delivery image upload
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,11 +135,11 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
       
       // Compress image options
       const options = {
-        maxSizeMB: 1, // Maximum file size in MB
-        maxWidthOrHeight: 1920, // Maximum width or height
-        useWebWorker: true, // Use web worker for better performance
-        fileType: 'image/jpeg', // Convert to JPEG for better compression
-        initialQuality: 0.8 // Quality (0-1), 0.8 maintains good quality
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+        fileType: 'image/jpeg' as const,
+        initialQuality: 0.8
       }
       
       // Compress the image
@@ -185,13 +167,12 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
       
       toast.success('Proof of delivery uploaded successfully!')
       
-      // Update local state instead of reloading
+      // Update local state
       Object.assign(manifestData, {
         proofOfDeliveryImage: fileUrl,
         deliveryTime: updatedManifest.deliveryTime
       })
       
-      // Trigger re-render by updating refresh key
       setRefreshKey(prev => prev + 1)
     } catch (error: any) {
       console.error('Error uploading proof image:', error)
@@ -201,49 +182,33 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
     }
   }
   
-  // Handle mark packages as delivered
-  const handleMarkAsDelivered = async () => {
+  // Handle update delivered count
+  const handleUpdateDeliveredCount = async () => {
     try {
       setUploading(true)
-      toast.info('Updating package statuses...')
+      toast.info('Updating delivered count...')
       
-      const { bulkUpdatePackageStatus } = await import('@/libs/actions/package.actions')
       const { updateManifestDeliveredCount } = await import('@/libs/actions/manifest.actions')
       
-      // Update selected packages to delivered
-      await bulkUpdatePackageStatus(selectedPackages, 'delivered', new Date().toISOString())
+      // Validate the input
+      const newCount = Math.min(Math.max(0, deliveryCountInput), packageCount)
       
-      // Update local package statuses
-      packages.forEach((pkg: any) => {
-        if (selectedPackages.includes(pkg.$id)) {
-          pkg.status = 'delivered'
-          pkg.deliveryDate = new Date().toISOString()
-        }
-      })
-      
-      // Count total delivered packages in this manifest
-      const deliveredCount = packages.filter((pkg: any) => pkg.status === 'delivered').length
-      
-      // Update manifest's deliveredPackages count
-      await updateManifestDeliveredCount(manifestData.$id, deliveredCount)
+      // Update manifest's deliveredCount
+      await updateManifestDeliveredCount(manifestData.$id, newCount)
       
       // Update local manifest data
       Object.assign(manifestData, {
-        deliveredPackages: deliveredCount
+        deliveredCount: newCount
       })
       
-      toast.success(`${selectedPackages.length} package(s) marked as delivered!`)
+      toast.success(`Delivered count updated to ${newCount}!`)
       
-      // Clear selection and close dialog
-      setSelectedPackages([])
       setConfirmDialog({ open: false, action: null })
       setUploading(false)
-      
-      // Trigger re-render
       setRefreshKey(prev => prev + 1)
     } catch (error: any) {
-      console.error('Error marking packages as delivered:', error)
-      toast.error(error?.message || 'Failed to update packages. Please try again.')
+      console.error('Error updating delivered count:', error)
+      toast.error(error?.message || 'Failed to update delivered count. Please try again.')
       setUploading(false)
       setConfirmDialog({ open: false, action: null })
     }
@@ -258,30 +223,14 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
       const { markManifestAsDelivered } = await import('@/libs/actions/manifest.actions')
       const { checkAndCompleteTrip } = await import('@/libs/actions/trip.actions')
       
-      // Get delivered and missing package IDs
-      const deliveredPackageIds = packages
-        .filter((pkg: any) => pkg.status === 'delivered')
-        .map((pkg: any) => pkg.$id)
-      
-      const missingPackageIds = packages
-        .filter((pkg: any) => pkg.status !== 'delivered' && pkg.status !== 'pending')
-        .map((pkg: any) => pkg.$id)
-      
-      // Mark manifest as delivered with package tracking
-      const updatedManifest = await markManifestAsDelivered(
-        manifestData.$id,
-        deliveredPackageIds,
-        missingPackageIds
-      )
+      // Mark manifest as delivered (uses deliveredCount already on manifest)
+      const updatedManifest = await markManifestAsDelivered(manifestData.$id)
       
       // Update local manifest data
       Object.assign(manifestData, {
         status: 'delivered',
         deliveryTime: updatedManifest.deliveryTime,
-        actualArrival: updatedManifest.actualArrival,
-        arrivalTime: updatedManifest.arrivalTime,
-        deliveredPackages: updatedManifest.deliveredPackages,
-        missingPackages: updatedManifest.missingPackages
+        arrivalTime: updatedManifest.arrivalTime
       })
       
       // Check if trip should be auto-completed
@@ -297,7 +246,6 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
         toast.success('Manifest submitted successfully!')
       }
       
-      // Close dialog and update UI
       setConfirmDialog({ open: false, action: null })
       setUploading(false)
       setRefreshKey(prev => prev + 1)
@@ -338,16 +286,23 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                 Status:
               </Typography>
               <Chip
-                label={manifestData.status?.charAt(0).toUpperCase() + manifestData.status?.slice(1)}
+                label={manifestData.status?.charAt(0).toUpperCase() + manifestData.status?.slice(1).replace('_', ' ')}
                 variant='tonal'
                 color={getStatusColor(manifestData.status)}
                 size='small'
               />
               <Chip
-                label={`${packages.length} Packages`}
+                label={getPackageSizeLabel(manifestData.packageSize)}
                 color='info'
                 size='small'
                 variant='tonal'
+                icon={<i className={getPackageSizeIcon(manifestData.packageSize)} />}
+              />
+              <Chip
+                label={`${packageCount} Total`}
+                color='default'
+                size='small'
+                variant='outlined'
               />
             </div>
             <div className='flex flex-wrap gap-2'>
@@ -368,30 +323,28 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                       onChange={handleImageUpload}
                     />
                   </Button>
-                  {!isDelivered && (
-                    <Tooltip 
-                      title={
-                        !hasProofImage 
-                          ? "Upload proof of delivery first" 
-                          : !hasDeliveredPackages 
-                          ? "Mark at least one package as delivered in the Packages tab" 
-                          : "Ready to submit"
-                      }
-                    >
-                      <span>
-                        <Button
-                          variant='contained'
-                          size='small'
-                          color='success'
-                          startIcon={<i className='ri-check-double-line' />}
-                          onClick={() => setConfirmDialog({ open: true, action: 'submit' })}
-                          disabled={!canSubmit}
-                        >
-                          Submit Manifest
-                        </Button>
-                      </span>
-                    </Tooltip>
-                  )}
+                  <Tooltip 
+                    title={
+                      !hasProofImage 
+                        ? "Upload proof of delivery first" 
+                        : !hasDeliveredPackages 
+                        ? "Update delivered count first" 
+                        : "Ready to submit"
+                    }
+                  >
+                    <span>
+                      <Button
+                        variant='contained'
+                        size='small'
+                        color='success'
+                        startIcon={<i className='ri-check-double-line' />}
+                        onClick={() => setConfirmDialog({ open: true, action: 'submit' })}
+                        disabled={!canSubmit}
+                      >
+                        Submit Manifest
+                      </Button>
+                    </span>
+                  </Tooltip>
                 </>
               )}
               {manifestData.proofOfDeliveryImage && (
@@ -413,6 +366,111 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
               </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Package Delivery Progress Card */}
+      <Card className='mb-6'>
+        <CardContent>
+          <Typography variant='h6' className='mb-4'>Package Delivery Progress</Typography>
+          
+          <Grid container spacing={4}>
+            {/* Package Size Type */}
+            <Grid item xs={12} md={4}>
+              <Box className='flex items-center gap-3 p-4 rounded-lg bg-actionHover'>
+                <Avatar variant='circular' sx={{ width: 40, height: 40, border: '1px solid' }}>
+                  <i className={`${getPackageSizeIcon(manifestData.packageSize)} text-2xl`} />
+                </Avatar>
+                <div>
+                  <Typography variant='h5' className='font-bold'>
+                    {getPackageSizeLabel(manifestData.packageSize)}
+                  </Typography>
+                  <Typography variant='body2'>
+                    Package Size Type
+                  </Typography>
+                </div>
+              </Box>
+            </Grid>
+
+            {/* Total Count */}
+            <Grid item xs={6} md={2}>
+              <Box className='text-center p-4 rounded-lg bg-actionHover'>
+                <Typography variant='h5' className='font-bold'>
+                  {packageCount}
+                </Typography>
+                <Typography variant='body2' color='text.secondary'>
+                  Total Packages
+                </Typography>
+              </Box>
+            </Grid>
+
+            {/* Delivered Count */}
+            <Grid item xs={6} md={2}>
+              <Box className='text-center p-4 rounded-lg bg-actionHover'>
+                <Typography variant='h5' className='font-bold'>
+                  {deliveredCount}
+                </Typography>
+                <Typography variant='body2' color='text.secondary'>
+                  Delivered
+                </Typography>
+              </Box>
+            </Grid>
+
+            {/* Pending Count */}
+            <Grid item xs={6} md={2}>
+              <Box className='text-center p-4 rounded-lg bg-actionHover'>
+                <Typography variant='h5' className='font-bold'>
+                  {pendingCount}
+                </Typography>
+                <Typography variant='body2'>
+                  Pending
+                </Typography>
+              </Box>
+            </Grid>
+
+            {/* Update Button */}
+            <Grid item xs={6} md={2}>
+              <Box className='flex items-center justify-center h-full'>
+                {!isDelivered || pendingCount > 0 && (
+                  <Button
+                    variant='contained'
+                    color='primary'
+                    startIcon={<i className='ri-edit-line' />}
+                    onClick={() => {
+                      setDeliveryCountInput(deliveredCount)
+                      setConfirmDialog({ open: true, action: 'update-count' })
+                    }}
+                    fullWidth
+                  >
+                    Update Count
+                  </Button>
+                )}
+                {isDelivered && pendingCount === 0 && (
+                  <Chip label='Completed' color='success' variant='tonal' />
+                )}
+              </Box>
+            </Grid>
+
+            {/* Progress Bar */}
+            <Grid item xs={12}>
+              <Box className='mt-2'>
+                <Box className='flex justify-between mb-1'>
+                  <Typography variant='body2' color='text.secondary'>
+                    Delivery Progress
+                  </Typography>
+                  <Typography variant='body2' className='font-medium'>
+                    {deliveryProgress.toFixed(0)}%
+                  </Typography>
+                </Box>
+                <LinearProgress 
+                  variant='determinate' 
+                  value={deliveryProgress} 
+                  color={deliveryProgress === 100 ? 'success' : 'primary'}
+                  sx={{ height: 10, borderRadius: 5 }}
+                />
+              </Box>
+            </Grid>
+          </Grid>
         </CardContent>
       </Card>
 
@@ -443,594 +501,428 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
         </Card>
       )}
 
-      {/* Tabs */}
+      {/* Main Details Card */}
       <Card>
-        <Tabs
-          value={activeTab}
-          onChange={(e, newValue) => setActiveTab(newValue)}
-          aria-label='manifest details tabs'
-        >
-          <Tab 
-            label='Overview' 
-            value='overview'
-            icon={<i className='ri-dashboard-line' />}
-            iconPosition='start'
-          />
-          <Tab 
-            label={`Packages (${packages.length})`}
-            value='packages'
-            icon={<i className='ri-inbox-line' />}
-            iconPosition='start'
-          />
-        </Tabs>
-
         <CardContent>
-          {/* Overview Tab */}
-          {activeTab === 'overview' && (
-            <Grid container spacing={6}>
-              {/* Manifest Summary */}
-              <Grid item xs={12} sm={6} lg={3}>
-                <div className='flex items-center gap-4'>
-                  <Avatar variant='rounded' className='bg-primary'>
-                    <i className='ri-file-list-3-line' />
-                  </Avatar>
-                  <div className='overflow-hidden'>
-                    <Typography variant='h5' className='truncate'>{manifestData.manifestNumber}</Typography>
-                    <Typography variant='body2'>Manifest Number</Typography>
-                  </div>
+          <Grid container spacing={6}>
+            {/* Manifest Info */}
+            <Grid item xs={12}>
+              <Typography variant='h6' className='mb-4'>Manifest Information</Typography>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} lg={3}>
+              <div className='flex items-center gap-4'>
+                <Avatar variant='rounded' className='bg-primary'>
+                  <i className='ri-file-list-3-line' />
+                </Avatar>
+                <div className='overflow-hidden'>
+                  <Typography variant='h6' className='truncate'>{manifestData.manifestNumber}</Typography>
+                  <Typography variant='body2' color='text.secondary'>Manifest Number</Typography>
                 </div>
-              </Grid>
-              <Grid item xs={12} sm={6} lg={3}>
-                <div className='flex items-center gap-4'>
-                  <Avatar variant='rounded' className='bg-info'>
-                    <i className='ri-inbox-line' />
-                  </Avatar>
-                  <div className='overflow-hidden'>
-                    <Typography variant='h5'>{packages.length}</Typography>
-                    <Typography variant='body2'>Total Packages</Typography>
-                  </div>
-                </div>
-              </Grid>
-              <Grid item xs={12} sm={6} lg={3}>
-                <div className='flex items-center gap-4'>
-                  <Avatar variant='rounded' className='bg-success'>
-                    <i className='ri-check-line' />
-                  </Avatar>
-                  <div className='overflow-hidden'>
-                    <Typography variant='h5'>
-                      {manifestData.deliveredPackages || 0}
-                    </Typography>
-                    <Typography variant='body2'>Delivered</Typography>
-                  </div>
-                </div>
-              </Grid>
-              <Grid item xs={12} sm={6} lg={3}>
-                <div className='flex items-center gap-4'>
-                  <Avatar variant='rounded' className='bg-error'>
-                    <i className='ri-close-line' />
-                  </Avatar>
-                  <div className='overflow-hidden'>
-                    <Typography variant='h5'>
-                      {(() => {
-                        try {
-                          const missing = JSON.parse(manifestData.missingPackages || '[]')
-                          return Array.isArray(missing) ? missing.length : 0
-                        } catch {
-                          return 0
-                        }
-                      })()}
-                    </Typography>
-                    <Typography>Missing</Typography>
-                  </div>
-                </div>
-              </Grid>
+              </div>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} lg={3}>
+              <Typography variant='body2' color='text.secondary'>Dropoff Sequence</Typography>
+              <Typography className='font-medium'>Stop #{manifestData.dropoffSequence || 1}</Typography>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} lg={3}>
+              <Typography variant='body2' color='text.secondary'>Manifest Date</Typography>
+              <Typography className='font-medium'>
+                {manifestData.manifestDate ? new Date(manifestData.manifestDate).toLocaleDateString() : 'N/A'}
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} lg={3}>
+              <Typography variant='body2' color='text.secondary'>Estimated Arrival</Typography>
+              <Typography className='font-medium'>
+                {manifestData.estimatedArrival || 'Not set'}
+              </Typography>
+            </Grid>
 
-              {/* Package Types Breakdown */}
-              {manifestData.packageTypes && (
-                <>
-                  <Grid item xs={12}>
-                    <Divider />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant='h6' className='mb-4'>Package Types Breakdown</Typography>
-                  </Grid>
-                  {(() => {
-                    try {
-                      const types = JSON.parse(manifestData.packageTypes)
-                      return Object.entries(types).map(([type, count]: [string, any]) => (
-                        count > 0 && (
-                          <Grid item xs={6} md={3} key={type}>
-                            <Typography color='text.secondary'>{type.charAt(0).toUpperCase() + type.slice(1)}</Typography>
-                            <Typography className='font-medium'>{count} packages</Typography>
-                          </Grid>
-                        )
-                      ))
-                    } catch {
-                      return null
-                    }
-                  })()}
-                </>
-              )}
+            {/* Divider */}
+            <Grid item xs={12}>
+              <Divider />
+            </Grid>
 
-              {/* Divider */}
-              <Grid item xs={12}>
-                <Divider />
-              </Grid>
+            {/* Timeline Information */}
+            <Grid item xs={12}>
+              <Typography variant='h6' className='mb-4'>Timeline</Typography>
+            </Grid>
+            <Grid item xs={12} sm={6} lg={3}>
+              <Typography variant='body2' color='text.secondary'>Arrival Time</Typography>
+              <Typography className='font-medium'>
+                {manifestData.arrivalTime || 'Not arrived'}
+              </Typography>
+            </Grid>
+            <Grid item xs={12} sm={6} lg={3}>
+              <Typography variant='body2' color='text.secondary'>Delivery Time</Typography>
+              <Typography className='font-medium'>
+                {manifestData.deliveryTime ? new Date(manifestData.deliveryTime).toLocaleString() : 'Not delivered'}
+              </Typography>
+            </Grid>
+            <Grid item xs={12} sm={6} lg={3}>
+              <Typography variant='body2' color='text.secondary'>Status</Typography>
+              <Chip
+                label={manifestData.status?.charAt(0).toUpperCase() + manifestData.status?.slice(1).replace('_', ' ')}
+                variant='tonal'
+                color={getStatusColor(manifestData.status)}
+                size='small'
+              />
+            </Grid>
 
-              {/* Timeline Information */}
-              <Grid item xs={12} sm={6} lg={3}>
-                <Typography variant='body2' color='text.secondary'>Manifest Date</Typography>
-                <Typography className='font-medium'>
-                  {manifestData.manifestDate ? new Date(manifestData.manifestDate).toLocaleDateString() : 'N/A'}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6} lg={3}>
-                <Typography variant='body2' color='text.secondary'>Departure Time</Typography>
-                <Typography className='font-medium'>
-                  {manifestData.departureTime ? new Date(manifestData.departureTime).toLocaleString() : 'Not departed'}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6} lg={3}>
-                <Typography variant='body2' color='text.secondary'>Arrival Time</Typography>
-                <Typography className='font-medium'>
-                  {manifestData.arrivalTime ? new Date(manifestData.arrivalTime).toLocaleString() : 'Not arrived'}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6} lg={3}>
-                <Typography variant='body2' color='text.secondary'>Delivery Time</Typography>
-                <Typography className='font-medium'>
-                  {manifestData.deliveryTime ? new Date(manifestData.deliveryTime).toLocaleString() : 'Not delivered'}
-                </Typography>
-              </Grid>
+            {/* Divider */}
+            <Grid item xs={12}>
+              <Divider />
+            </Grid>
 
-              {/* Divider */}
-              <Grid item xs={12}>
-                <Divider />
-              </Grid>
-
-              {/* Vehicle & Driver Info */}
-              <Grid item xs={12} md={6}>
-                <Typography variant='h6' className='mb-4'>Vehicle Information</Typography>
-                <Typography color='text.secondary' className='mb-1'>
-                  <strong>Vehicle ID:</strong> {typeof trip.vehicle === 'object' && trip.vehicle !== null
-                    ? trip.vehicle.vehicleNumber || trip.vehicle.$id
-                    : trip.vehicle || 'N/A'}
-                </Typography>
-                {typeof trip.vehicle === 'object' && trip.vehicle !== null && (
-                  <>
-                    {trip.vehicle.vehicleType && (
-                      <Typography color='text.secondary' className='mb-1'>
-                        <strong>Type:</strong> {trip.vehicle.vehicleType}
-                      </Typography>
-                    )}
-                    {trip.vehicle.brand && (
-                      <Typography color='text.secondary' className='mb-1'>
-                        <strong>Brand & Model:</strong> {trip.vehicle.brand} {trip.vehicle.model}
-                      </Typography>
-                    )}
-                  </>
-                )}
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <Typography variant='h6' className='mb-4'>Driver Information</Typography>
-                <Typography color='text.secondary' className='mb-1'>
-                  <strong>Name:</strong> {trip.driver.name || 'N/A'}
-                </Typography>
-                {typeof trip.driver === 'object' && trip.driver !== null && (
-                  <>
-                    {trip.driver.phone && (
-                      <Typography color='text.secondary' className='mb-1'>
-                        <strong>Phone:</strong> {trip.driver.phone}
-                      </Typography>
-                    )}
-                    {trip.driver.email && (
-                      <Typography color='text.secondary' className='mb-1'>
-                        <strong>Email:</strong> {trip.driver.email}
-                      </Typography>
-                    )}
-                  </>
-                )}
-              </Grid>
-
-              {/* Divider */}
-              <Grid item xs={12}>
-                <Divider />
-              </Grid>
-
-              {/* Location Information */}
-              <Grid item xs={12} md={6}>
-                <Typography variant='h6' className='mb-4'>Pickup Location</Typography>
-                <Typography color='text.secondary' className='mb-2'>
-                  {pickupLocation && typeof pickupLocation === 'object'
-                    ? pickupLocation.address || pickupLocation.city || 'N/A'
-                    : pickupLocation || 'N/A'}
-                </Typography>
-                {pickupLocation && typeof pickupLocation === 'object' && (
-                  <>
-                    {pickupLocation.city && (
-                      <Typography variant='body2' color='text.secondary'>
-                        {pickupLocation.city}, {pickupLocation.state} {pickupLocation.postalCode}
-                      </Typography>
-                    )}
-                    {pickupLocation.country && (
-                      <Typography variant='body2' color='text.secondary'>
-                        {pickupLocation.country}
-                      </Typography>
-                    )}
-                  </>
-                )}
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <Typography variant='h6' className='mb-4'>Dropoff Location</Typography>
-                <Typography color='text.secondary' className='mb-2'>
-                  {dropoffLocation && typeof dropoffLocation === 'object'
-                    ? dropoffLocation.locationName || dropoffLocation.address || dropoffLocation.city || 'N/A'
-                    : dropoffLocation || 'N/A'}
-                </Typography>
-                {dropoffLocation && typeof dropoffLocation === 'object' && (
-                  <>
-                    {dropoffLocation.address && (
-                      <Typography variant='body2' color='text.secondary'>
-                        {dropoffLocation.address}
-                      </Typography>
-                    )}
-                    {dropoffLocation.city && (
-                      <Typography variant='body2' color='text.secondary'>
-                        {dropoffLocation.city}, {dropoffLocation.region} {dropoffLocation.postalCode}
-                      </Typography>
-                    )}
-                    {dropoffLocation.contactPerson && (
-                      <Typography variant='body2' color='text.secondary'>
-                        Contact: {dropoffLocation.contactPerson} {dropoffLocation.contactPhone && `(${dropoffLocation.contactPhone})`}
-                      </Typography>
-                    )}
-                  </>
-                )}
-              </Grid>
-
-              {/* Delivery Recipient Information */}
-              {(manifestData.recipientName || manifestData.recipientPhone) && (
-                <>
-                  <Grid item xs={12}>
-                    <Divider />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant='h6' className='mb-4'>Delivery Recipient</Typography>
-                  </Grid>
-                  {manifestData.recipientName && (
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant='body2' color='text.secondary'>Recipient Name</Typography>
-                      <Typography className='font-medium'>{manifestData.recipientName}</Typography>
-                    </Grid>
-                  )}
-                  {manifestData.recipientPhone && (
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant='body2' color='text.secondary'>Recipient Phone</Typography>
-                      <Typography className='font-medium'>{manifestData.recipientPhone}</Typography>
-                    </Grid>
-                  )}
-                </>
-              )}
-
-              {/* GPS & Proof of Delivery */}
-              {(manifestData.deliveryGpsVerified || manifestData.proofOfDeliveryImage || manifestData.deliveryGpsCoordinates) && (
-                <>
-                  <Grid item xs={12}>
-                    <Divider />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant='h6' className='mb-4'>Delivery Verification</Typography>
-                  </Grid>
-                  {manifestData.deliveryGpsVerified && (
-                    <Grid item xs={12} sm={6} lg={4}>
-                      <Typography variant='body2' color='text.secondary'>GPS Verified</Typography>
-                      <Chip
-                        label={manifestData.deliveryGpsVerified ? 'Verified' : 'Not Verified'}
-                        variant='tonal'
-                        color={manifestData.deliveryGpsVerified ? 'success' : 'warning'}
-                        size='small'
-                      />
-                      {manifestData.gpsVerificationDistance !== null && manifestData.gpsVerificationDistance !== undefined && (
-                        <Typography variant='caption' color='text.secondary' className='block mt-1'>
-                          Distance: {manifestData.gpsVerificationDistance}m
+            {/* Vehicle & Driver Info */}
+            {trip && (
+              <>
+                <Grid item xs={12} md={6}>
+                  <Typography variant='h6' className='mb-4'>Vehicle Information</Typography>
+                  <Typography color='text.secondary' className='mb-1'>
+                    <strong>Vehicle:</strong> {typeof trip.vehicle === 'object' && trip.vehicle !== null
+                      ? trip.vehicle.vehicleNumber || trip.vehicle.$id
+                      : trip.vehicle || 'N/A'}
+                  </Typography>
+                  {typeof trip.vehicle === 'object' && trip.vehicle !== null && (
+                    <>
+                      {trip.vehicle.vehicleType && (
+                        <Typography color='text.secondary' className='mb-1'>
+                          <strong>Type:</strong> {trip.vehicle.vehicleType}
                         </Typography>
                       )}
-                    </Grid>
-                  )}
-                  {manifestData.deliveryGpsCoordinates && (
-                    <Grid item xs={12} sm={6} lg={4}>
-                      <Typography variant='body2' color='text.secondary'>GPS Coordinates</Typography>
-                      <Typography className='font-medium' variant='body2'>{manifestData.deliveryGpsCoordinates}</Typography>
-                    </Grid>
-                  )}
-                  {manifestData.proofOfDeliveryImage && (
-                    <Grid item xs={12} sm={6} lg={4}>
-                      <Typography variant='body2' color='text.secondary'>Proof of Delivery</Typography>
-                      <Button
-                        size='small'
-                        variant='outlined'
-                        startIcon={<i className='ri-image-line' />}
-                        onClick={() => window.open(manifestData.proofOfDeliveryImage, '_blank')}
-                      >
-                        View Image
-                      </Button>
-                    </Grid>
-                  )}
-                </>
-              )}
-
-              {/* Trip Information */}
-              {trip && (
-                <>
-                  <Grid item xs={12}>
-                    <Divider />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant='h6' className='mb-4'>Trip Information</Typography>
-                    <Grid container spacing={4}>
-                      <Grid item xs={12} md={6} lg={3}>
-                        <Typography color='text.secondary'>Trip Number</Typography>
-                        <Typography className='font-medium'>{trip.tripNumber}</Typography>
-                      </Grid>
-                      <Grid item xs={12} md={6} lg={3}>
-                        <Typography color='text.secondary'>Trip Status</Typography>
-                        <Chip
-                          label={trip.status?.charAt(0).toUpperCase() + trip.status?.slice(1)}
-                          variant='tonal'
-                          color={getStatusColor(trip.status)}
-                          size='small'
-                        />
-                      </Grid>
-                      <Grid item xs={12} md={6} lg={3}>
-                        <Typography color='text.secondary'>Driver</Typography>
-                        <Typography className='font-medium'>
-                          {trip.driver.name || trip.driver.email || 'N/A'}
+                      {trip.vehicle.brand && (
+                        <Typography color='text.secondary' className='mb-1'>
+                          <strong>Brand & Model:</strong> {trip.vehicle.brand} {trip.vehicle.model}
                         </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={6} lg={3}>
-                        <Link href={`/edms/trips/${trip.$id}`} passHref>
-                          <Button size='small' variant='outlined' fullWidth>
-                            View Trip Details
-                          </Button>
-                        </Link>
-                      </Grid>
-                    </Grid>
-                  </Grid>
-                </>
-              )}
+                      )}
+                    </>
+                  )}
+                </Grid>
 
-              {/* Additional Details */}
-              <Grid item xs={12}>
-                <Divider />
-              </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant='h6' className='mb-4'>Driver Information</Typography>
+                  <Typography color='text.secondary' className='mb-1'>
+                    <strong>Name:</strong> {typeof trip.driver === 'object' && trip.driver !== null
+                      ? trip.driver.name || 'N/A'
+                      : 'N/A'}
+                  </Typography>
+                  {typeof trip.driver === 'object' && trip.driver !== null && (
+                    <>
+                      {trip.driver.phone && (
+                        <Typography color='text.secondary' className='mb-1'>
+                          <strong>Phone:</strong> {trip.driver.phone}
+                        </Typography>
+                      )}
+                      {trip.driver.email && (
+                        <Typography color='text.secondary' className='mb-1'>
+                          <strong>Email:</strong> {trip.driver.email}
+                        </Typography>
+                      )}
+                    </>
+                  )}
+                </Grid>
+              </>
+            )}
 
-              <Grid item xs={12} md={6} lg={3}>
-                <Typography color='text.secondary'>Created Date</Typography>
-                <Typography className='font-medium'>
-                  {new Date(manifestData.$createdAt).toLocaleDateString()}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} md={6} lg={3}>
-                <Typography color='text.secondary'>Last Updated</Typography>
-                <Typography className='font-medium'>
-                  {new Date(manifestData.$updatedAt).toLocaleDateString()}
-                </Typography>
-              </Grid>
+            {/* Divider */}
+            <Grid item xs={12}>
+              <Divider />
+            </Grid>
 
-              {manifestData.notes && (
+            {/* Location Information */}
+            <Grid item xs={12} md={6}>
+              <Typography variant='h6' className='mb-4'>Pickup Location</Typography>
+              <Typography color='text.secondary' className='mb-2'>
+                {pickupLocation && typeof pickupLocation === 'object'
+                  ? pickupLocation.locationName || pickupLocation.address || pickupLocation.city || 'N/A'
+                  : pickupLocation || 'From Trip Route'}
+              </Typography>
+              {pickupLocation && typeof pickupLocation === 'object' && (
                 <>
-                  <Grid item xs={12}>
-                    <Divider />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant='h6' className='mb-2'>Notes</Typography>
-                    <Typography color='text.secondary'>{manifestData.notes}</Typography>
-                  </Grid>
+                  {pickupLocation.address && (
+                    <Typography variant='body2' color='text.secondary'>
+                      {pickupLocation.address}
+                    </Typography>
+                  )}
+                  {pickupLocation.city && (
+                    <Typography variant='body2' color='text.secondary'>
+                      {pickupLocation.city}, {pickupLocation.region}
+                    </Typography>
+                  )}
                 </>
               )}
             </Grid>
-          )}
 
-          {/* Packages Tab */}
-          {activeTab === 'packages' && (
-            <div className='overflow-x-auto'>
-              {packages.length > 0 ? (
+            <Grid item xs={12} md={6}>
+              <Typography variant='h6' className='mb-4'>Dropoff Location</Typography>
+              <Typography color='text.secondary' className='mb-2'>
+                {dropoffLocation && typeof dropoffLocation === 'object'
+                  ? dropoffLocation.locationName || dropoffLocation.address || dropoffLocation.city || 'N/A'
+                  : dropoffLocation || 'N/A'}
+              </Typography>
+              {dropoffLocation && typeof dropoffLocation === 'object' && (
                 <>
-                  {!hasProofImage && (
-                    <div className='mb-4 p-4 bg-warning/10 rounded'>
-                      <Typography variant='body2' color='warning'>
-                        <i className='ri-alert-line' /> Please upload proof of delivery image before marking packages as delivered
-                      </Typography>
-                    </div>
+                  {dropoffLocation.address && (
+                    <Typography variant='body2' color='text.secondary'>
+                      {dropoffLocation.address}
+                    </Typography>
                   )}
-                  {hasProofImage && !hasDeliveredPackages && (
-                    <div className='mb-4 p-4 bg-info/10 rounded'>
-                      <Typography variant='body2' color='info'>
-                        <i className='ri-information-line' /> Select and mark packages as delivered before submitting the manifest
-                      </Typography>
-                    </div>
+                  {dropoffLocation.city && (
+                    <Typography variant='body2' color='text.secondary'>
+                      {dropoffLocation.city}, {dropoffLocation.region}
+                    </Typography>
                   )}
-                  {hasProofImage && selectedPackages.length > 0 && (
-                    <div className='mb-4 p-4 bg-primary/10 rounded flex items-center justify-between flex-wrap gap-2'>
-                      <Typography variant='body2' color='primary'>
-                        {selectedPackages.length} package{selectedPackages.length > 1 ? 's' : ''} selected
-                      </Typography>
-                      <Button
-                        variant='contained'
-                        size='small'
-                        color='success'
-                        onClick={() => setConfirmDialog({ open: true, action: 'delivered' })}
-                        startIcon={<i className='ri-check-line' />}
-                      >
-                        Mark as Delivered
-                      </Button>
-                    </div>
+                  {dropoffLocation.contactPerson && (
+                    <Typography variant='body2' color='text.secondary'>
+                      Contact: {dropoffLocation.contactPerson} {dropoffLocation.contactPhone && `(${dropoffLocation.contactPhone})`}
+                    </Typography>
                   )}
-                  <TableContainer component={Paper} variant='outlined'>
-                    <Table sx={{ minWidth: 800 }}>
-                      <TableHead>
-                        <TableRow>
-                          {(
-                            <TableCell padding='checkbox'>
-                              <Checkbox
-                                checked={selectedPackages.length > 0 && selectedPackages.length === packages.filter((pkg: any) => pkg.status !== 'delivered').length}
-                                indeterminate={selectedPackages.length > 0 && selectedPackages.length < packages.filter((pkg: any) => pkg.status !== 'delivered').length}
-                                onChange={handleSelectAll}
-                                disabled={!hasProofImage}
-                              />
-                            </TableCell>
-                          )}
-                          <TableCell>Tracking Number</TableCell>
-                          <TableCell>Recipient</TableCell>
-                        <TableCell>Size/Type</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Expected Delivery</TableCell>
-                        <TableCell>Actual Delivery</TableCell>
-                        <TableCell align='right'>Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {packages.map((pkg: any) => (
-                        <TableRow key={pkg.$id} hover>
-                          {(
-                            <TableCell padding='checkbox'>
-                              <Checkbox
-                                checked={selectedPackages.includes(pkg.$id)}
-                                onChange={() => handleSelectPackage(pkg.$id)}
-                                disabled={!hasProofImage || pkg.status === 'delivered'}
-                              />
-                            </TableCell>
-                          )}
-                          <TableCell>
-                            <Typography className='font-medium'>
-                              {pkg.trackingNumber}
-                            </Typography>
-                            {pkg.isBin && (
-                              <Chip
-                                label={`Bin (${pkg.itemCount || 0} items)`}
-                                variant='tonal'
-                                color='secondary'
-                                size='small'
-                                className='mt-1'
-                              />
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant='body2'>
-                              {pkg.recipient || pkg.recipientName || 'N/A'}
-                            </Typography>
-                            {pkg.recipientPhone && (
-                              <Typography variant='caption' color='text.secondary' className='block'>
-                                {pkg.recipientPhone}
-                              </Typography>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant='body2'>
-                              {pkg.packageSize ? pkg.packageSize.charAt(0).toUpperCase() + pkg.packageSize.slice(1) : 'N/A'}
-                            </Typography>
-                            {pkg.packageType && (
-                              <Typography variant='caption' color='text.secondary' className='block'>
-                                {pkg.packageType}
-                              </Typography>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={pkg.status?.charAt(0).toUpperCase() + pkg.status?.slice(1)}
-                              variant='tonal'
-                              color={getStatusColor(pkg.status)}
-                              size='small'
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant='body2'>
-                              {pkg.expectedDeliveryDate ? new Date(pkg.expectedDeliveryDate).toLocaleDateString() : 'N/A'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant='body2'>
-                              {pkg.deliveryDate ? new Date(pkg.deliveryDate).toLocaleDateString() : 
-                               pkg.status === 'delivered' ? 'Check history' : 'Not delivered'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align='right'>
-                            <Link href={`/edms/packages/${pkg.$id}`} passHref>
-                              <Button size='small' variant='outlined'>
-                                View
-                              </Button>
-                            </Link>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
                 </>
-              ) : (
-                <div className='text-center py-12'>
-                  <i className='ri-inbox-line text-6xl text-textSecondary mb-2' />
-                  <Typography variant='h6' color='text.secondary'>
-                    No packages found
-                  </Typography>
-                  <Typography variant='body2' color='text.secondary'>
-                    This manifest doesn't have any packages yet
-                  </Typography>
-                </div>
               )}
-            </div>
-          )}
+            </Grid>
+
+            {/* Delivery Recipient Information */}
+            {(manifestData.recipientName || manifestData.recipientPhone) && (
+              <>
+                <Grid item xs={12}>
+                  <Divider />
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant='h6' className='mb-4'>Delivery Recipient</Typography>
+                </Grid>
+                {manifestData.recipientName && (
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant='body2' color='text.secondary'>Recipient Name</Typography>
+                    <Typography className='font-medium'>{manifestData.recipientName}</Typography>
+                  </Grid>
+                )}
+                {manifestData.recipientPhone && (
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant='body2' color='text.secondary'>Recipient Phone</Typography>
+                    <Typography className='font-medium'>{manifestData.recipientPhone}</Typography>
+                  </Grid>
+                )}
+              </>
+            )}
+
+            {/* GPS & Proof of Delivery */}
+            {(manifestData.deliveryGpsVerified || manifestData.deliveryGpsCoordinates) && (
+              <>
+                <Grid item xs={12}>
+                  <Divider />
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant='h6' className='mb-4'>Delivery Verification</Typography>
+                </Grid>
+                {manifestData.deliveryGpsVerified !== undefined && (
+                  <Grid item xs={12} sm={6} lg={4}>
+                    <Typography variant='body2' color='text.secondary'>GPS Verified</Typography>
+                    <Chip
+                      label={manifestData.deliveryGpsVerified ? 'Verified' : 'Not Verified'}
+                      variant='tonal'
+                      color={manifestData.deliveryGpsVerified ? 'success' : 'warning'}
+                      size='small'
+                    />
+                    {manifestData.gpsVerificationDistance !== null && manifestData.gpsVerificationDistance !== undefined && (
+                      <Typography variant='caption' color='text.secondary' className='block mt-1'>
+                        Distance: {manifestData.gpsVerificationDistance}m
+                      </Typography>
+                    )}
+                  </Grid>
+                )}
+                {manifestData.deliveryGpsCoordinates && (
+                  <Grid item xs={12} sm={6} lg={4}>
+                    <Typography variant='body2' color='text.secondary'>GPS Coordinates</Typography>
+                    <Typography className='font-medium' variant='body2'>{manifestData.deliveryGpsCoordinates}</Typography>
+                  </Grid>
+                )}
+              </>
+            )}
+
+            {/* Trip Information */}
+            {trip && (
+              <>
+                <Grid item xs={12}>
+                  <Divider />
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant='h6' className='mb-4'>Trip Information</Typography>
+                  <Grid container spacing={4}>
+                    <Grid item xs={12} md={6} lg={3}>
+                      <Typography color='text.secondary'>Trip Number</Typography>
+                      <Typography className='font-medium'>{trip.tripNumber}</Typography>
+                    </Grid>
+                    <Grid item xs={12} md={6} lg={3}>
+                      <Typography color='text.secondary'>Trip Status</Typography>
+                      <Chip
+                        label={trip.status?.charAt(0).toUpperCase() + trip.status?.slice(1).replace('_', ' ')}
+                        variant='tonal'
+                        color={getStatusColor(trip.status)}
+                        size='small'
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={6} lg={3}>
+                      <Typography color='text.secondary'>Trip Date</Typography>
+                      <Typography className='font-medium'>
+                        {trip.tripDate ? new Date(trip.tripDate).toLocaleDateString() : 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} md={6} lg={3}>
+                      <Link href={`/edms/trips/${trip.$id}`} passHref>
+                        <Button size='small' variant='outlined' fullWidth>
+                          View Trip Details
+                        </Button>
+                      </Link>
+                    </Grid>
+                  </Grid>
+                </Grid>
+              </>
+            )}
+
+            {/* Additional Details */}
+            <Grid item xs={12}>
+              <Divider />
+            </Grid>
+
+            <Grid item xs={12} md={6} lg={3}>
+              <Typography color='text.secondary'>Created Date</Typography>
+              <Typography className='font-medium'>
+                {new Date(manifestData.$createdAt).toLocaleDateString()}
+              </Typography>
+            </Grid>
+            <Grid item xs={12} md={6} lg={3}>
+              <Typography color='text.secondary'>Last Updated</Typography>
+              <Typography className='font-medium'>
+                {new Date(manifestData.$updatedAt).toLocaleDateString()}
+              </Typography>
+            </Grid>
+
+            {manifestData.notes && (
+              <>
+                <Grid item xs={12}>
+                  <Divider />
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant='h6' className='mb-2'>Notes</Typography>
+                  <Typography color='text.secondary'>{manifestData.notes}</Typography>
+                </Grid>
+              </>
+            )}
+          </Grid>
         </CardContent>
       </Card>
 
-      {/* Confirmation Dialog */}
-      <Dialog open={confirmDialog.open} onClose={() => !uploading && setConfirmDialog({ open: false, action: null })}>
-        <DialogTitle>
-          {confirmDialog.action === 'delivered' ? 'Mark Packages as Delivered' : 'Submit Manifest'}
-        </DialogTitle>
+      {/* Update Delivered Count Dialog */}
+      <Dialog 
+        open={confirmDialog.open && confirmDialog.action === 'update-count'} 
+        onClose={() => !uploading && setConfirmDialog({ open: false, action: null })}
+        maxWidth='sm'
+        fullWidth
+      >
+        <DialogTitle>Update Delivered Count</DialogTitle>
         <DialogContent>
-          {confirmDialog.action === 'delivered' ? (
-            <Typography>
-              Are you sure you want to mark {selectedPackages.length} package{selectedPackages.length > 1 ? 's' : ''} as delivered?
+          <Box className='pt-2'>
+            <Typography variant='body2' color='text.secondary' className='mb-4'>
+              Enter the number of packages that have been delivered for this manifest.
             </Typography>
-          ) : (
-            <div>
-              <Typography gutterBottom>
-                Are you sure you want to submit this manifest as delivered?
+            
+            <Box className='mb-4 p-4 bg-actionHover rounded-lg'>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant='body2' color='text.secondary'>Package Size</Typography>
+                  <Typography className='font-medium'>{getPackageSizeLabel(manifestData.packageSize)}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant='body2' color='text.secondary'>Total Packages</Typography>
+                  <Typography className='font-medium'>{packageCount}</Typography>
+                </Grid>
+              </Grid>
+            </Box>
+            
+            <TextField
+              fullWidth
+              label='Delivered Count'
+              type='number'
+              value={deliveryCountInput}
+              onChange={(e) => setDeliveryCountInput(Math.min(Math.max(0, parseInt(e.target.value) || 0), packageCount))}
+              inputProps={{ min: 0, max: packageCount }}
+              helperText={`Enter a value between 0 and ${packageCount}`}
+            />
+            
+            {deliveryCountInput > 0 && deliveryCountInput < packageCount && (
+              <Typography variant='body2' color='warning.main' className='mt-2'>
+                {packageCount - deliveryCountInput} package(s) will remain pending
               </Typography>
-              <div className='mt-4 p-3 bg-gray-50 rounded'>
-                <Typography variant='body2' className='mb-2'>
-                  <strong>Summary:</strong>
-                </Typography>
-                <Typography variant='body2' color='success.main'>
-                  • Delivered: {packages.filter((pkg: any) => pkg.status === 'delivered').length} package(s)
-                </Typography>
-                {hasUnprocessedPackages && (
-                  <Typography variant='body2' color='warning.main'>
-                    • Remaining: {packages.filter((pkg: any) => pkg.status !== 'delivered' && pkg.status !== 'missing').length} package(s) (will be marked as missing)
-                  </Typography>
-                )}
-              </div>
-              <Typography variant='body2' color='text.secondary' className='mt-3'>
-                This action will finalize the manifest and update the trip checkpoint.
+            )}
+            {deliveryCountInput === packageCount && (
+              <Typography variant='body2' color='success.main' className='mt-2'>
+                All packages will be marked as delivered
               </Typography>
-            </div>
-          )}
+            )}
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmDialog({ open: false, action: null })} disabled={uploading}>
             Cancel
           </Button>
           <Button
-            onClick={confirmDialog.action === 'delivered' ? handleMarkAsDelivered : handleSubmitManifest}
+            onClick={handleUpdateDeliveredCount}
             variant='contained'
-            color={confirmDialog.action === 'delivered' ? 'success' : 'primary'}
+            color='primary'
             disabled={uploading}
             startIcon={uploading ? <CircularProgress size={16} /> : <i className='ri-check-line' />}
           >
-            {uploading ? 'Processing...' : 'Confirm'}
+            {uploading ? 'Updating...' : 'Update Count'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Submit Manifest Confirmation Dialog */}
+      <Dialog 
+        open={confirmDialog.open && confirmDialog.action === 'submit'} 
+        onClose={() => !uploading && setConfirmDialog({ open: false, action: null })}
+      >
+        <DialogTitle>Submit Manifest</DialogTitle>
+        <DialogContent>
+          <Typography gutterBottom>
+            Are you sure you want to submit this manifest as delivered?
+          </Typography>
+          <Box className='mt-4 p-3 bg-actionHover rounded'>
+            <Typography variant='body2' className='mb-2'>
+              <strong>Summary:</strong>
+            </Typography>
+            <Typography variant='body2' color='text.secondary'>
+              • Package Size: {getPackageSizeLabel(manifestData.packageSize)}
+            </Typography>
+            <Typography variant='body2' color='success.main'>
+              • Delivered: {deliveredCount} package(s)
+            </Typography>
+            {pendingCount > 0 && (
+              <Typography variant='body2' color='warning.main'>
+                • Pending: {pendingCount} package(s)
+              </Typography>
+            )}
+          </Box>
+          <Typography variant='body2' color='text.secondary' className='mt-3'>
+            This action will finalize the manifest and update the trip status.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialog({ open: false, action: null })} disabled={uploading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmitManifest}
+            variant='contained'
+            color='success'
+            disabled={uploading}
+            startIcon={uploading ? <CircularProgress size={16} /> : <i className='ri-check-double-line' />}
+          >
+            {uploading ? 'Submitting...' : 'Submit Manifest'}
           </Button>
         </DialogActions>
       </Dialog>
