@@ -276,6 +276,13 @@ export const updateManifestStatus = async (
         break
     }
     
+    // Get the manifest first to retrieve the trip ID
+    const existingManifest = await databases.getDocument(
+      DATABASE_ID,
+      MANIFESTS_COLLECTION_ID,
+      manifestId
+    ) as any
+    
     // Perform the update - Appwrite will preserve all other fields including relationships
     const manifest = await databases.updateDocument(
       DATABASE_ID,
@@ -283,6 +290,18 @@ export const updateManifestStatus = async (
       manifestId,
       updateData
     )
+    
+    // Update trip status based on manifest progress
+    if (existingManifest.trip) {
+      const tripId = typeof existingManifest.trip === 'string' ? existingManifest.trip : existingManifest.trip.$id
+      try {
+        const { checkAndUpdateTripStatus } = await import('./trip.actions')
+        await checkAndUpdateTripStatus(tripId)
+      } catch (error) {
+        console.warn('Could not update trip status:', error)
+        // Don't fail the manifest update if trip update fails
+      }
+    }
     
     return manifest as unknown as ManifestType
   } catch (error) {
@@ -646,13 +665,27 @@ export const markManifestAsDelivered = async (
     const tripId = existingManifest.trip || manifest.trip
     if (tripId) {
       console.log('Updating trip checkpoint for trip:', tripId, 'manifest:', manifestId)
+      const tripIdStr = typeof tripId === 'string' ? tripId : tripId.$id
+      
       await updateTripCheckpoint(
-        typeof tripId === 'string' ? tripId : tripId.$id,
+        tripIdStr,
         manifestId,
         deliveredCount,
         missingCount,
         now
       )
+      
+      // Update trip status based on manifest progress
+      try {
+        const { checkAndUpdateTripStatus } = await import('./trip.actions')
+        const result = await checkAndUpdateTripStatus(tripIdStr)
+        if (result.updated) {
+          console.log('Trip status updated to:', result.newStatus)
+        }
+      } catch (error) {
+        console.warn('Could not update trip status:', error)
+        // Don't fail the manifest update if trip update fails
+      }
     } else {
       console.warn('No trip found for manifest:', manifestId)
     }

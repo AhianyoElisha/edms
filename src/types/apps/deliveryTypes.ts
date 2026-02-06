@@ -451,3 +451,231 @@ export interface TripDetailsType {
   $createdAt: string
   $updatedAt: string
 }
+
+// ============================================
+// RATE CARDS TYPES
+// ============================================
+
+// Truck categories based on size classification
+export type TruckCategoryType = 'small' | 'big'
+
+// Volume tiers in CBM (Cubic Meters) based on truck category
+// Small truck volumes: 10, 14, 18 CBM
+// Big truck volumes: 37, 41, 50, 55, 60 CBM
+export type SmallTruckVolumeType = 10 | 14 | 18
+export type BigTruckVolumeType = 37 | 41 | 50 | 55 | 60
+export type TruckVolumeType = SmallTruckVolumeType | BigTruckVolumeType
+
+// Tonnage corresponding to volume tiers
+// Small truck: 3, 3.5, 5 tons
+// Big truck: 7, 8, 10, 12, 15 tons
+export type SmallTruckTonnageType = 3 | 3.5 | 5
+export type BigTruckTonnageType = 7 | 8 | 10 | 12 | 15
+export type TruckTonnageType = SmallTruckTonnageType | BigTruckTonnageType
+
+// Volume tier configuration for display purposes
+export interface VolumeTierConfig {
+  volume: number // CBM
+  revisedVolume: number // Revised CBM
+  tonnage: number // Tons
+  truckCategory: TruckCategoryType
+}
+
+// All available volume tiers
+export const VOLUME_TIERS: VolumeTierConfig[] = [
+  // Small truck tiers
+  { volume: 10, revisedVolume: 10, tonnage: 3, truckCategory: 'small' },
+  { volume: 14, revisedVolume: 15, tonnage: 3.5, truckCategory: 'small' },
+  { volume: 18, revisedVolume: 18, tonnage: 5, truckCategory: 'small' },
+  // Big truck tiers
+  { volume: 37, revisedVolume: 37, tonnage: 7, truckCategory: 'big' },
+  { volume: 41, revisedVolume: 41, tonnage: 8, truckCategory: 'big' },
+  { volume: 50, revisedVolume: 50, tonnage: 10, truckCategory: 'big' },
+  { volume: 55, revisedVolume: 55, tonnage: 12, truckCategory: 'big' },
+  { volume: 60, revisedVolume: 60, tonnage: 15, truckCategory: 'big' },
+]
+
+// Price entry for a specific volume tier
+export interface VolumePrice {
+  volume: number // CBM (10, 14, 18, 37, 41, 50, 55, 60)
+  tonnage: number // Corresponding tonnage
+  rate: number // Price in local currency (GH₵)
+}
+
+// Rate Card Type - Now route-based with volume tiers
+export interface RateCardType {
+  $id: string
+  clientName: string // Name of the importer/client (e.g., "JUMIA", "FRANKO")
+  clientCode: string // Unique code for the client
+  routeCode: string // Route code (e.g., "Route A", "Route B", "VDO 1")
+  routeDescription: string // Route description (e.g., "GH-Primary-Tema", "GH-Primary-Dansoman")
+  // Volume-based pricing - JSON string stored in DB, parsed to array
+  volumePrices: VolumePrice[] | string // Array of prices per volume tier
+  effectiveFrom: string // Date this rate becomes effective (ISO string)
+  effectiveTo?: string // Date this rate expires (null = still active)
+  isActive: boolean
+  notes?: string
+  creator: string // User ID who created this rate card
+  $createdAt: string
+  $updatedAt: string
+}
+
+export interface RateCardInput {
+  clientName: string
+  clientCode: string
+  routeCode: string
+  routeDescription: string
+  volumePrices: VolumePrice[] // Array of prices per volume tier
+  effectiveFrom: string
+  effectiveTo?: string
+  isActive?: boolean
+  notes?: string
+}
+
+export interface RateCardFilters {
+  clientCode?: string
+  routeCode?: string
+  truckCategory?: TruckCategoryType
+  isActive?: boolean
+  search?: string
+}
+
+// Legacy type kept for compatibility
+export type VehicleSizeType = 'small' | 'medium' | 'large' | 'extra-large'
+
+// ============================================
+// RETURN WAY BILLS TYPES
+// ============================================
+
+export type ReturnReasonType = 'rejected' | 'damaged' | 'wrong_delivery' | 'customer_return' | 'other'
+export type ReturnWaybillStatusType = 'pending' | 'in_transit' | 'delivered' | 'processed'
+
+export interface PackageBreakdown {
+  small: number
+  medium: number
+  big: number
+}
+
+export interface ReturnWaybillType {
+  $id: string
+  waybillNumber: string // Unique way bill number (e.g., "RWB-2026-001234")
+  trip: string | any // Relationship to trips collection
+  manifest?: string | any // Source manifest (optional)
+  dropofflocation: string | any // Origin of return (dropoff location)
+  pickuplocation: string | any // Destination (pickup location)
+  returnDate: string // Date the return was initiated
+  returnReason: ReturnReasonType
+  reasonNotes?: string // Additional details about return reason
+  packageCount: number // Total count of packages being returned
+  packageDetails?: string | PackageBreakdown // JSON breakdown by size or parsed object
+  status: ReturnWaybillStatusType
+  deliveredAt?: string // When the return was delivered to pickup location
+  receivedBy?: string // Name of person who received the return
+  receiverSignature?: string // File ID of signature image
+  waybillImage?: string // File ID of waybill document image
+  proofOfDelivery?: string // File ID of proof of delivery image
+  notes?: string
+  $createdAt: string
+  $updatedAt: string
+}
+
+export interface ReturnWaybillInput {
+  tripId: string
+  manifestId?: string
+  dropoffLocationId: string
+  pickupLocationId: string
+  returnDate: string
+  returnReason: ReturnReasonType
+  reasonNotes?: string
+  packageCount: number
+  packageDetails?: PackageBreakdown
+  notes?: string
+}
+
+export interface ReturnWaybillFilters {
+  tripId?: string
+  dropoffLocationId?: string
+  pickupLocationId?: string
+  status?: ReturnWaybillStatusType
+  returnReason?: ReturnReasonType
+  dateRange?: {
+    start: string
+    end: string
+  }
+  search?: string
+}
+
+// ============================================
+// EXPENSES TYPES (ENHANCED)
+// ============================================
+
+export type ExpenseTypeCategory = 
+  | 'fuel' 
+  | 'maintenance' 
+  | 'tools' 
+  | 'equipment' 
+  | 'vehicle_purchase' 
+  | 'office' 
+  | 'salary' 
+  | 'communication' 
+  | 'utilities' 
+  | 'trip_related'
+  | 'other'
+
+export type PaymentMethodType = 'cash' | 'bank_transfer' | 'mobile_money' | 'cheque' | 'credit'
+export type PaymentStatusType = 'pending' | 'paid' | 'partial'
+
+export interface ExpenseType {
+  $id: string
+  amount: number
+  totalAmount?: number // Some systems use totalAmount
+  expenseDate: string
+  description: string
+  category?: string
+  expenseType: ExpenseTypeCategory
+  subCategory?: string // Sub-category (e.g., "Oil Change" under maintenance)
+  vendor?: string // Name of vendor/supplier
+  receiptNumber?: string // Invoice/receipt number
+  receiptImage?: string // File ID of receipt image
+  additionalImages?: string | string[] // JSON array of additional image File IDs or parsed array
+  vehicleId?: string // Relationship with vehicles (if expense is vehicle-related)
+  tripId?: string // Relationship with trips (if expense is trip-related)
+  paymentMethod?: PaymentMethodType
+  paymentStatus: PaymentStatusType
+  approvedBy?: string // User ID who approved the expense
+  approvalDate?: string
+  isRecurring?: boolean
+  recurringFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly'
+  creator?: string
+  $createdAt: string
+  $updatedAt: string
+}
+
+export interface ExpenseInput {
+  amount: number
+  expenseDate: string
+  description: string
+  expenseType: ExpenseTypeCategory
+  subCategory?: string
+  vendor?: string
+  receiptNumber?: string
+  vehicleId?: string
+  tripId?: string
+  paymentMethod?: PaymentMethodType
+  paymentStatus?: PaymentStatusType
+  isRecurring?: boolean
+  recurringFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly'
+  notes?: string
+}
+
+export interface ExpenseFilters {
+  expenseType?: ExpenseTypeCategory
+  paymentStatus?: PaymentStatusType
+  vehicleId?: string
+  tripId?: string
+  dateRange?: {
+    start: string
+    end: string
+  }
+  search?: string
+}

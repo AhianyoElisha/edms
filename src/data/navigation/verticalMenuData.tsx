@@ -195,6 +195,10 @@ const verticalMenuData = (dictionary: Awaited<ReturnType<typeof getDictionary>>)
               {
                 label: 'Create Route',
                 href: '/edms/routes/create'
+              },
+              {
+                label: 'Rate Cards',
+                href: '/edms/routes/rate-cards'
               }
             ]
           },
@@ -231,6 +235,32 @@ const verticalMenuData = (dictionary: Awaited<ReturnType<typeof getDictionary>>)
           {
             label: 'Manifests',
             href: '/edms/manifests'
+          },
+          {
+            label: 'Return Waybills',
+            children: [
+              {
+                label: 'All Waybills',
+                href: '/edms/returns/waybills'
+              },
+              {
+                label: 'Create Waybill',
+                href: '/edms/returns/waybills/create'
+              }
+            ]
+          },
+          {
+            label: 'Expenses',
+            children: [
+              {
+                label: 'All Expenses',
+                href: '/edms/expenses'
+              },
+              {
+                label: 'Add Expense',
+                href: '/edms/expenses/create'
+              }
+            ]
           },
           {
             label: 'Packages',

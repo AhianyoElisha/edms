@@ -21,6 +21,7 @@ import SalesStatistics from '@/views/dashboards/ReviewsStatistics'; // Updated i
 import UserListCards from '@/views/dashboards/UserListCards';
 import CardStatWithImage from '@/components/card-statistics/Character';
 import Shimmer from '@/components/layout/shared/Shimmer';
+import EnhancedEDMSDashboard from '@/views/edms/dashboard/EnhancedEDMSDashboard';
 
 export default function DashboardContent() {
   const { user } = useAuth();
@@ -47,32 +48,44 @@ export default function DashboardContent() {
 
   const years = Array.from({length: 5}, (_, i) => new Date().getFullYear() - i)
 
-    const fetchDashboardData = useCallback(async () => {
-      try {
-        setIsLoading(true)
-        const response = await getDashboardData(selectedMonth, selectedYear)
-        setSupplierListData(response?.supplierList?.total)
-        setActivityTimelineData(response?.activityTimeline?.rows as unknown as RequisitionHistory[])
-        setCostEstimateListData(response?.consoleEstimatesList)
-        setCurrentMonthEstimatesListData(response?.currentMonthEstimates)
-        setExpenseAndReturnsData(response?.expenseAndReturns)
-        setUserListData(response?.userList?.rows as unknown as User[])
-        setCustomerListData(response?.customerList?.total)
-        setTripsTotal(response?.tripsTotal || 0)
-        setDeliveredPackagesTotal(response?.deliveredPackagesTotal || 0)
-        setManifestsTotal(response?.manifestsTotal || 0)
-        console.log('Dashboard data fetched successfully:', response?.userList)
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error)
-        toast.error('Failed to fetch dashboard data as unknown')
-      } finally {
-        setIsLoading(false)
-      }
-    }, [selectedMonth, selectedYear])
-  
-    useEffect(() => {
+  // Check if user is EDMS user (check for delivery-related permissions)
+  const isEDMSUser = user?.permissions?.some((p: string) => 
+    p.startsWith('trips.') || p.startsWith('vehicles.') || p.startsWith('routes.') || p.startsWith('manifests.')
+  ) || user?.role?.name?.toLowerCase().includes('driver') || user?.role?.name?.toLowerCase().includes('delivery')
+
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      const response = await getDashboardData(selectedMonth, selectedYear)
+      setSupplierListData(response?.supplierList?.total)
+      setActivityTimelineData(response?.activityTimeline?.rows as unknown as RequisitionHistory[])
+      setCostEstimateListData(response?.consoleEstimatesList)
+      setCurrentMonthEstimatesListData(response?.currentMonthEstimates)
+      setExpenseAndReturnsData(response?.expenseAndReturns)
+      setUserListData(response?.userList?.rows as unknown as User[])
+      setCustomerListData(response?.customerList?.total)
+      setTripsTotal(response?.tripsTotal || 0)
+      setDeliveredPackagesTotal(response?.deliveredPackagesTotal || 0)
+      setManifestsTotal(response?.manifestsTotal || 0)
+      console.log('Dashboard data fetched successfully:', response?.userList)
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error)
+      toast.error('Failed to fetch dashboard data as unknown')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [selectedMonth, selectedYear])
+
+  useEffect(() => {
+    if (!isEDMSUser) {
       fetchDashboardData()
-    }, [fetchDashboardData])
+    }
+  }, [fetchDashboardData, isEDMSUser])
+
+  // If EDMS user, show enhanced EDMS dashboard
+  if (isEDMSUser) {
+    return <EnhancedEDMSDashboard />
+  }
 
   // Get top 2 creators for the cards
   const topCreators = currentMonthEstimatesListData?.creators

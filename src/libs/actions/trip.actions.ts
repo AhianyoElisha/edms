@@ -340,30 +340,87 @@ export async function updateTripStatus(tripId: string, status: string): Promise<
 }
 
 /**
- * Check if all manifests in a trip are delivered and auto-complete the trip
+ * Check and update trip status based on manifest progress
+ * Status flow:
+ * - planned: Trip created, no manifests started
+ * - in_progress: At least one manifest has been loaded/started
+ * - completed: All manifests delivered AND all return waybills delivered (if any)
  */
-export async function checkAndCompleteTrip(tripId: string): Promise<boolean> {
+export async function checkAndUpdateTripStatus(tripId: string): Promise<{
+  updated: boolean
+  newStatus: string | null
+}> {
   try {
     // Get trip with all manifests
     const trip = await getTripById(tripId)
     
     if (!trip || !trip.manifests || trip.manifests.length === 0) {
-      return false
+      return { updated: false, newStatus: null }
     }
     
-    // Check if all manifests are delivered
-    const allManifestsDelivered = trip.manifests.every(
-      (manifest: any) => manifest.status === 'delivered' || manifest.status === 'completed'
+    const manifests = trip.manifests
+    const currentStatus = trip.status
+    
+    // Check manifest statuses
+    const manifestStatuses = manifests.map((m: any) => m.status)
+    const hasStartedManifest = manifestStatuses.some((s: string) => 
+      s === 'loaded' || s === 'in_transit' || s === 'delivered' || s === 'completed'
+    )
+    const allManifestsDelivered = manifestStatuses.every((s: string) => 
+      s === 'delivered' || s === 'completed'
     )
     
-    if (allManifestsDelivered && trip.status !== 'completed') {
-      await updateTripStatus(tripId, 'completed')
-      return true
+    // Get return waybills for this trip
+    let allReturnsDelivered = true
+    let hasReturns = false
+    
+    try {
+      const { getReturnWaybillsByTrip } = await import('./returnwaybill.actions')
+      const returnWaybills = await getReturnWaybillsByTrip(tripId)
+      
+      if (returnWaybills.length > 0) {
+        hasReturns = true
+        allReturnsDelivered = returnWaybills.every((rw: any) => 
+          rw.status === 'delivered' || rw.status === 'processed'
+        )
+      }
+    } catch (error) {
+      console.warn('Could not check return waybills:', error)
+      // Continue without return waybill check
     }
     
-    return false
+    // Determine new status
+    let newStatus: string | null = null
+    
+    if (currentStatus === 'planned' && hasStartedManifest) {
+      // Move to in_progress when first manifest is started
+      newStatus = 'in_progress'
+    } else if (allManifestsDelivered && (!hasReturns || allReturnsDelivered)) {
+      // Move to completed only if ALL manifests are delivered
+      // AND (no returns exist OR all returns are delivered)
+      if (currentStatus !== 'completed') {
+        newStatus = 'completed'
+      }
+    }
+    
+    // Update trip if status changed
+    if (newStatus && newStatus !== currentStatus) {
+      await updateTripStatus(tripId, newStatus)
+      return { updated: true, newStatus }
+    }
+    
+    return { updated: false, newStatus: null }
   } catch (error) {
-    console.error('Error checking and completing trip:', error)
-    return false
+    console.error('Error checking and updating trip status:', error)
+    return { updated: false, newStatus: null }
   }
+}
+
+/**
+ * Check if all manifests in a trip are delivered and auto-complete the trip
+ * @deprecated Use checkAndUpdateTripStatus instead
+ */
+export async function checkAndCompleteTrip(tripId: string): Promise<boolean> {
+  const result = await checkAndUpdateTripStatus(tripId)
+  return result.updated && result.newStatus === 'completed'
 }

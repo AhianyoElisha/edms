@@ -1,7 +1,7 @@
 'use client'
 
 // React Imports
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // Next Imports
 import Link from 'next/link'
@@ -31,6 +31,9 @@ import Paper from '@mui/material/Paper'
 
 // Component Imports
 import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
+
+// Action Imports
+import { getReturnWaybillsByTrip } from '@/libs/actions/returnwaybill.actions'
 
 // Timeline Imports
 import TimelineDot from '@mui/lab/TimelineDot'
@@ -84,15 +87,48 @@ const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | '
 }
 
 const TripView = ({ tripData }: { tripData: any }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'manifests' | 'checkpoints'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'manifests' | 'checkpoints' | 'returns'>('overview')
+  const [returnWaybills, setReturnWaybills] = useState<any[]>([])
+  const [loadingReturns, setLoadingReturns] = useState(false)
   
   const router = useRouter()
 
   // Parse checkpoints
   const checkpoints = parseJSON(tripData.checkpoints)
-  // Calculate progress
-  const completedCheckpoints = checkpoints.filter((cp: any) => cp.status === 'completed').length
-  const progressPercentage = checkpoints.length > 0 ? (completedCheckpoints / checkpoints.length) * 100 : 0
+  
+  // Calculate manifest progress
+  const manifests = tripData.manifests || []
+  const completedManifests = manifests.filter((m: any) => 
+    m.status === 'delivered' || m.status === 'completed'
+  ).length
+  
+  // Calculate return waybills progress
+  const completedReturns = returnWaybills.filter((rw: any) => 
+    rw.status === 'delivered' || rw.status === 'processed'
+  ).length
+  
+  // Combined progress: manifests + return waybills (if any returns exist)
+  // A trip is only complete when all manifests AND all return waybills are done
+  const totalItems = manifests.length + (returnWaybills.length > 0 ? returnWaybills.length : 0)
+  const completedItems = completedManifests + completedReturns
+  const progressPercentage = totalItems > 0 ? (completedItems / totalItems) * 100 : 0
+
+  // Fetch return waybills on mount and when tab changes
+  useEffect(() => {
+    if (tripData.$id) {
+      setLoadingReturns(true)
+      getReturnWaybillsByTrip(tripData.$id)
+        .then(data => {
+          setReturnWaybills(data)
+        })
+        .catch(err => {
+          console.error('Error fetching return waybills:', err)
+        })
+        .finally(() => {
+          setLoadingReturns(false)
+        })
+    }
+  }, [tripData.$id])
 
   return (
     <>
@@ -141,6 +177,15 @@ const TripView = ({ tripData }: { tripData: any }) => {
               <Button
                 variant='outlined'
                 size='small'
+                color='warning'
+                startIcon={<i className='ri-arrow-go-back-line' />}
+                onClick={() => router.push(`/edms/returns/waybills/create?tripId=${tripData.$id}`)}
+              >
+                Create Return
+              </Button>
+              <Button
+                variant='outlined'
+                size='small'
                 startIcon={<i className='ri-printer-line' />}
               >
                 Print
@@ -156,20 +201,22 @@ const TripView = ({ tripData }: { tripData: any }) => {
           </div>
 
           {/* Progress Bar */}
-          {checkpoints.length > 0 && (
+          {manifests.length > 0 && (
             <Box className='mt-6'>
               <div className='flex items-center justify-between mb-2'>
                 <Typography variant='body2'>
-                  Trip Progress
+                  Trip Progress {returnWaybills.length > 0 ? '(Manifests + Returns)' : '(Manifests)'}
                 </Typography>
                 <Typography variant='body2' color='text.secondary'>
-                  {completedCheckpoints} / {checkpoints.length} completed
+                  {completedManifests}/{manifests.length} manifests
+                  {returnWaybills.length > 0 && ` • ${completedReturns}/${returnWaybills.length} returns`}
                 </Typography>
               </div>
               <LinearProgress
                 variant='determinate'
                 value={progressPercentage}
                 className='h-2 rounded'
+                color={progressPercentage === 100 ? 'success' : 'primary'}
               />
             </Box>
           )}
@@ -199,6 +246,12 @@ const TripView = ({ tripData }: { tripData: any }) => {
             label={`Checkpoints (${checkpoints.length})`}
             value='checkpoints'
             icon={<i className='ri-map-pin-line' />}
+            iconPosition='start'
+          />
+          <Tab 
+            label={`Returns (${returnWaybills.length})`}
+            value='returns'
+            icon={<i className='ri-arrow-go-back-line' />}
             iconPosition='start'
           />
         </Tabs>
@@ -491,11 +544,34 @@ const TripView = ({ tripData }: { tripData: any }) => {
                               </Typography>
                             </TableCell>
                             <TableCell align='right'>
-                              <Link href={`/edms/manifests/${manifest.$id}`} passHref>
-                                <Button size='small' variant='outlined'>
-                                  View Details
-                                </Button>
-                              </Link>
+                              <div className='flex items-center justify-end gap-2'>
+                                {(manifestStatus === 'delivered' || manifestStatus === 'completed' || manifestStatus === 'in-progress') && (
+                                  <Button 
+                                    size='small' 
+                                    variant='outlined'
+                                    color='warning'
+                                    onClick={() => {
+                                      const dropoffId = dropoffLocation && typeof dropoffLocation === 'object' ? dropoffLocation.$id : ''
+                                      const dropoffName = encodeURIComponent(
+                                        dropoffLocation && typeof dropoffLocation === 'object'
+                                          ? dropoffLocation.locationName || dropoffLocation.address || ''
+                                          : ''
+                                      )
+                                      router.push(
+                                        `/edms/returns/waybills/create?tripId=${tripData.$id}&dropoffId=${dropoffId}&dropoffName=${dropoffName}&manifestId=${manifest.$id}`
+                                      )
+                                    }}
+                                  >
+                                    <i className='ri-arrow-go-back-line mr-1' />
+                                    Return
+                                  </Button>
+                                )}
+                                <Link href={`/edms/manifests/${manifest.$id}`} passHref>
+                                  <Button size='small' variant='outlined'>
+                                    View
+                                  </Button>
+                                </Link>
+                              </div>
                             </TableCell>
                           </TableRow>
                         )
@@ -564,6 +640,25 @@ const TripView = ({ tripData }: { tripData: any }) => {
                                       size='small'
                                     />
                                 </div>
+                                {/* Add Return Waybill Button - visible when checkpoint is completed or in-progress */}
+                                {(isCompleted || isInProgress) && (
+                                  <Button
+                                    variant='outlined'
+                                    size='small'
+                                    color='warning'
+                                    startIcon={<i className='ri-arrow-go-back-line' />}
+                                    onClick={() => {
+                                      const dropoffId = checkpoint.dropoffLocationId || checkpoint.dropofflocation?.$id
+                                      const dropoffName = encodeURIComponent(checkpoint.dropoffLocationName || '')
+                                      const manifestIdParam = checkpoint.manifestId || ''
+                                      router.push(
+                                        `/edms/returns/waybills/create?tripId=${tripData.$id}&dropoffId=${dropoffId}&dropoffName=${dropoffName}&manifestId=${manifestIdParam}`
+                                      )
+                                    }}
+                                  >
+                                    Add Return
+                                  </Button>
+                                )}
                               </div>
 
                               {/* Package delivery stats */}
@@ -623,6 +718,117 @@ const TripView = ({ tripData }: { tripData: any }) => {
                   <Typography variant='body2' color='text.secondary'>
                     This trip doesn't have any checkpoints yet
                   </Typography>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Returns Tab */}
+          {activeTab === 'returns' && (
+            <div className='overflow-x-auto'>
+              {loadingReturns ? (
+                <div className='text-center py-12'>
+                  <Typography variant='body2' color='text.secondary'>
+                    Loading return waybills...
+                  </Typography>
+                </div>
+              ) : returnWaybills.length > 0 ? (
+                <TableContainer component={Paper} variant='outlined'>
+                  <Table sx={{ minWidth: 650 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Waybill Number</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Return Reason</TableCell>
+                        <TableCell>Pickup Location</TableCell>
+                        <TableCell>Dropoff Location</TableCell>
+                        <TableCell>Package Count</TableCell>
+                        <TableCell>Return Date</TableCell>
+                        <TableCell align='right'>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {returnWaybills.map((waybill: any) => {
+                        const pickupLoc = waybill.pickuplocation
+                        const dropoffLoc = waybill.dropofflocation
+
+                        return (
+                          <TableRow key={waybill.$id} hover>
+                            <TableCell>
+                              <Typography className='font-medium'>
+                                {waybill.waybillNumber}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={waybill.status?.replace('_', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                                variant='tonal'
+                                color={getStatusColor(waybill.status)}
+                                size='small'
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant='body2'>
+                                {waybill.returnReason?.replace('_', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant='body2'>
+                                {pickupLoc && typeof pickupLoc === 'object'
+                                  ? pickupLoc.locationName || pickupLoc.address || pickupLoc.city
+                                  : pickupLoc || 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant='body2'>
+                                {dropoffLoc && typeof dropoffLoc === 'object'
+                                  ? dropoffLoc.locationName || dropoffLoc.address || dropoffLoc.city
+                                  : dropoffLoc || 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant='body2'>
+                                {waybill.packageCount || 0} packages
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant='body2'>
+                                {waybill.returnDate 
+                                  ? new Date(waybill.returnDate).toLocaleDateString() 
+                                  : 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align='right'>
+                              <Button 
+                                size='small' 
+                                variant='outlined'
+                                onClick={() => router.push(`/edms/returns/waybills/${waybill.$id}`)}
+                              >
+                                View
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <div className='text-center py-12'>
+                  <i className='ri-arrow-go-back-line text-6xl text-textSecondary mb-2' />
+                  <Typography variant='h6' color='text.secondary'>
+                    No return waybills found
+                  </Typography>
+                  <Typography variant='body2' color='text.secondary' className='mb-4'>
+                    This trip doesn't have any return waybills yet
+                  </Typography>
+                  <Button
+                    variant='contained'
+                    startIcon={<i className='ri-add-line' />}
+                    onClick={() => router.push(`/edms/returns/waybills/create?tripId=${tripData.$id}`)}
+                  >
+                    Create Return Waybill
+                  </Button>
                 </div>
               )}
             </div>

@@ -1,4 +1,5 @@
 import { Client, Account, Databases, Storage, Avatars, TablesDB } from "appwrite";
+import { Client as ServerClient, Databases as ServerDatabases, Storage as ServerStorage } from "node-appwrite";
 
 export const appwriteConfig = {
   api: process.env.APPWRITE_API_KEY!,
@@ -9,7 +10,7 @@ export const appwriteConfig = {
   permissions:'68d5e91c00199b41987c',
   rolePermissions:'68d5e9e700352da19b9c',
   returns: '6836c786002d2e8527e0',
-  expenses: '6835de68001ebc3f8216',
+  expenses: '68d60fa6002c88a35f3f',
   customers: '67816cba000ee1965910',
   suppliers: '6776925b001ca687c855',
   workers: '68344c21001258fc1f54',
@@ -38,6 +39,7 @@ export const appwriteConfig = {
   tripexenses: '68d60fa6002c88a35f3f',
   trips: '68d60fed0006e92089b6',
   ratecards: '68d615200027173fa63e',
+  returnwaybills: '69849a0100368992529a', // Return way bills collection
   notifications: '68d617c100052a1662ee',
   activityhistory: '68f0b6ba003332bc6e3d', // Activity history collection
   machinery: '68d617c100052a1662ee', // Using same as notifications for now
@@ -51,7 +53,7 @@ export const appwriteConfig = {
   stores: '68d617c100052a1662ee', // Using same as notifications for now
 };
 
-
+// Client-side Appwrite client (for browser operations)
 export const client = new Client();
 
 client.setEndpoint('https://cloud.appwrite.io/v1');
@@ -62,3 +64,12 @@ export const databases = new Databases(client);
 export const storage = new Storage(client);
 export const avatars = new Avatars(client);
 export const tablesDB = new TablesDB(client);
+
+// Server-side Appwrite client (for server actions with admin privileges)
+const serverClient = new ServerClient()
+  .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1')
+  .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT || '68c8989000381e194776')
+  .setKey(process.env.APPWRITE_API_KEY!);
+
+export const serverDatabases = new ServerDatabases(serverClient);
+export const serverStorage = new ServerStorage(serverClient);

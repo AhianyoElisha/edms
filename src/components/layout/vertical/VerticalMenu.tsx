@@ -297,8 +297,16 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
                   <MenuItem onClick={() => handleNavigation('/edms/routes/create')}>Create Route</MenuItem>
                 )}
                 {hasAnyPermission(['ratecards.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/edms/routes/ratecards')}>Rate Cards</MenuItem>
-                )}
+                <SubMenu label="Rate Cards">
+                  {hasAnyPermission(['ratecards.view']) && (
+                    <MenuItem onClick={() => handleNavigation('/edms/routes/rate-cards')}>All Rate Cards</MenuItem>
+                  )}
+                  {hasAnyPermission(['ratecards.manage']) && (
+                    <MenuItem onClick={() => handleNavigation('/edms/routes/rate-cards/create')}>Add Rate Card</MenuItem>
+                  )}
+                </SubMenu>
+
+                 )}
               </SubMenu>
             )}
 
@@ -310,6 +318,18 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
                 )}
                 {hasAnyPermission(['trips.create']) && (
                   <MenuItem onClick={() => handleNavigation('/edms/trips/create')}>Create Trip</MenuItem>
+                )}
+              </SubMenu>
+            )}
+
+            {/* Return Waybills SubMenu */}
+            {hasAnyPermission(['deliveries.view', 'trips.view']) && (
+              <SubMenu label="Return Waybills" icon={<i className='ri-arrow-go-back-line' />}>
+                {hasAnyPermission(['deliveries.view', 'trips.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/edms/returns/waybills')}>All Returns</MenuItem>
+                )}
+                {hasAnyPermission(['deliveries.view', 'trips.create']) && (
+                  <MenuItem onClick={() => handleNavigation('/edms/returns/waybills/create')}>Create Return</MenuItem>
                 )}
               </SubMenu>
             )}
@@ -333,14 +353,14 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
             {hasPermission('expenses.view') && (
               <SubMenu label="Trip Expenses" icon={<i className='ri-coins-line' />}>
                 {hasPermission('expenses.create') && (
-                  <MenuItem onClick={() => handleNavigation('/expenses/add')}>Add Expense</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/edms/expenses/create')}>Add Expense</MenuItem>
                 )}
                 {hasPermission('expenses.view') && (
-                  <MenuItem onClick={() => handleNavigation('/expenses/list')}>Expense List</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/edms/expenses')}>Expense List</MenuItem>
                 )}
-                {hasPermission('expenses.view') && (
-                  <MenuItem onClick={() => handleNavigation('/expenses/report')}>Expense Reports</MenuItem>
-                )}
+                {/* {hasPermission('expenses.view') && (
+                  <MenuItem onClick={() => handleNavigation('/edms/expenses/report')}>Expense Reports</MenuItem>
+                )} */}
               </SubMenu>
             )}
           </MenuSection>
@@ -395,20 +415,16 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
         {hasPermission('reports.view') && (
           <MenuSection label="Reports & Analytics">
             <SubMenu label="Operational Reports" icon={<i className='ri-bar-chart-line' />}>
-              <MenuItem onClick={() => handleNavigation('/reports/daily')}>Daily Operations</MenuItem>
-              <MenuItem onClick={() => handleNavigation('/reports/delivery-performance')}>Delivery Performance</MenuItem>
-              <MenuItem onClick={() => handleNavigation('/reports/driver-performance')}>User Performance (Drivers)</MenuItem>
-              <MenuItem onClick={() => handleNavigation('/reports/route-analysis')}>Route Analysis</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/edms/reports/daily-operations')}>Daily Operations</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/edms/reports/delivery-performance')}>Delivery Performance</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/edms/reports/driver-performance')}>Driver Performance</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/edms/reports/route-analysis')}>Route Analysis</MenuItem>
             </SubMenu>
             <SubMenu label="Financial Reports" icon={<i className='ri-money-dollar-circle-line' />}>
-              <MenuItem onClick={() => handleNavigation('/reports/revenue')}>Revenue Reports</MenuItem>
-              <MenuItem onClick={() => handleNavigation('/reports/expenses')}>Expense Reports</MenuItem>
-              <MenuItem onClick={() => handleNavigation('/reports/profitability')}>Profitability Analysis</MenuItem>
-              <MenuItem onClick={() => handleNavigation('/reports/invoicing')}>Invoicing Reports</MenuItem>
-            </SubMenu>
-            <SubMenu label="Package Reports" icon={<i className='ri-package-line' />}>
-              <MenuItem onClick={() => handleNavigation('/reports/package-volume')}>Package Volume</MenuItem>
-              <MenuItem onClick={() => handleNavigation('/reports/package-tracking')}>Package Tracking Analytics</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/edms/reports/revenue')}>Revenue Reports</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/edms/reports/expense-report')}>Expense Reports</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/edms/reports/profitability')}>Profitability Analysis</MenuItem>
+              <MenuItem onClick={() => handleNavigation('/edms/reports/invoicing')}>Invoicing Reports</MenuItem>
             </SubMenu>
           </MenuSection>
         )}
