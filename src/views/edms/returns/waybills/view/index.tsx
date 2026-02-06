@@ -94,7 +94,9 @@ interface ReturnWaybillViewProps {
 }
 
 const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) => {
-  const [uploading, setUploading] = useState(false)
+  const [uploadingWaybill, setUploadingWaybill] = useState(false)
+  const [uploadingProof, setUploadingProof] = useState(false)
+  const [uploadingSignature, setUploadingSignature] = useState(false)
   const [statusUpdating, setStatusUpdating] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState<{ 
     open: boolean
@@ -140,8 +142,15 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
       return
     }
     
+    // Set the correct loading state based on image type
+    const setLoadingState = (loading: boolean) => {
+      if (imageType === 'waybill') setUploadingWaybill(loading)
+      else if (imageType === 'proof') setUploadingProof(loading)
+      else if (imageType === 'signature') setUploadingSignature(loading)
+    }
+    
     try {
-      setUploading(true)
+      setLoadingState(true)
       toast.info('Compressing and uploading image...')
       
       // Import necessary functions
@@ -207,8 +216,15 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
     } catch (error: any) {
       console.error('Error uploading image:', error)
       toast.error(error.message || 'Failed to upload image')
+      // Reset loading state on error
+      if (imageType === 'waybill') setUploadingWaybill(false)
+      else if (imageType === 'proof') setUploadingProof(false)
+      else if (imageType === 'signature') setUploadingSignature(false)
     } finally {
-      setUploading(false)
+      // Reset loading state
+      if (imageType === 'waybill') setUploadingWaybill(false)
+      else if (imageType === 'proof') setUploadingProof(false)
+      else if (imageType === 'signature') setUploadingSignature(false)
     }
   }
   
@@ -320,11 +336,7 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
                   Mark In Transit
                 </Button>
               )}
-              {isPending && !hasWaybillDocument && (
-                <Typography variant='caption' color='warning.main' className='self-center'>
-                  Upload waybill document to mark in transit
-                </Typography>
-              )}
+
               {isInTransit && (
                 <Button
                   variant='contained'
@@ -539,6 +551,11 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
         <Grid item xs={12} lg={4}>
           {/* Waybill Image */}
           <Card className='mb-6'>
+              {isPending && !hasWaybillDocument && (
+                <Typography variant='caption' color='warning.main' className='self-center m-3'>
+                  Upload waybill document to mark in transit
+                </Typography>
+              )}
             <CardHeader title='Waybill Document' />
             <CardContent>
               {waybillData.waybillImage ? (
@@ -561,8 +578,8 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
                   component='label'
                   variant='outlined'
                   fullWidth
-                  startIcon={uploading ? <CircularProgress size={20} /> : <i className='ri-upload-2-line' />}
-                  disabled={uploading}
+                  startIcon={uploadingWaybill ? <CircularProgress size={20} /> : <i className='ri-upload-2-line' />}
+                  disabled={uploadingWaybill}
                   className='mt-4'
                 >
                   {waybillData.waybillImage ? 'Replace Document' : 'Upload Document'}
@@ -606,8 +623,8 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
                   component='label'
                   variant='outlined'
                   fullWidth
-                  startIcon={uploading ? <CircularProgress size={20} /> : <i className='ri-camera-line' />}
-                  disabled={uploading}
+                  startIcon={uploadingProof ? <CircularProgress size={20} /> : <i className='ri-camera-line' />}
+                  disabled={uploadingProof}
                   className='mt-4'
                 >
                   {waybillData.proofOfDelivery ? 'Replace Proof Image' : 'Upload Proof Image'}
@@ -646,8 +663,8 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
                   component='label'
                   variant='outlined'
                   fullWidth
-                  startIcon={uploading ? <CircularProgress size={20} /> : <i className='ri-edit-line' />}
-                  disabled={uploading}
+                  startIcon={uploadingSignature ? <CircularProgress size={20} /> : <i className='ri-edit-line' />}
+                  disabled={uploadingSignature}
                   className='mt-4'
                 >
                   {waybillData.receiverSignature ? 'Replace Signature' : 'Upload Signature'}

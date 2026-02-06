@@ -161,12 +161,23 @@ const EnhancedEDMSDashboard = () => {
     router.push(`/edms/reports/${reportPath}`)
   }
 
+  // Prepare chart data with proper fallbacks
+  const chartCategories = dashboardData?.packageStats?.dayLabels?.length > 0 
+    ? dashboardData.packageStats.dayLabels 
+    : Array.from({ length: 30 }, (_, i) => i + 1)
+  
+  const chartData = dashboardData?.packageStats?.dailyDeliveries?.length > 0 
+    ? dashboardData.packageStats.dailyDeliveries 
+    : Array(30).fill(0)
+
   // Chart options for delivery trends
   const deliveryChartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'area',
       toolbar: { show: false },
-      sparkline: { enabled: false }
+      sparkline: { enabled: false },
+      parentHeightOffset: 0,
+      width: '100%'
     },
     colors: ['#28C76F'],
     stroke: {
@@ -183,7 +194,7 @@ const EnhancedEDMSDashboard = () => {
       }
     },
     xaxis: {
-      categories: dashboardData?.packageStats?.dayLabels || [],
+      categories: chartCategories,
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' }
       },
@@ -193,23 +204,33 @@ const EnhancedEDMSDashboard = () => {
     yaxis: {
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' }
-      }
+      },
+      min: 0
     },
     grid: {
       borderColor: 'var(--mui-palette-divider)',
-      strokeDashArray: 4
+      strokeDashArray: 4,
+      padding: {
+        left: 10,
+        right: 10
+      }
     },
     tooltip: {
       theme: 'dark'
     },
     dataLabels: {
       enabled: false
+    },
+    noData: {
+      text: 'No delivery data available',
+      align: 'center',
+      verticalAlign: 'middle'
     }
   }
 
   const deliveryChartSeries = [{
     name: 'Packages Delivered',
-    data: dashboardData?.packageStats?.dailyDeliveries || []
+    data: chartData
   }]
 
   // Vehicle status chart
@@ -401,12 +422,15 @@ const EnhancedEDMSDashboard = () => {
             }
           />
           <CardContent>
-            <ApexChart
-              type='area'
-              height={320}
-              options={deliveryChartOptions}
-              series={deliveryChartSeries}
-            />
+            <Box sx={{ width: '100%', minHeight: 320 }}>
+              <ApexChart
+                type='area'
+                height={320}
+                width='100%'
+                options={deliveryChartOptions}
+                series={deliveryChartSeries}
+              />
+            </Box>
           </CardContent>
         </Card>
       </Grid>
@@ -416,12 +440,15 @@ const EnhancedEDMSDashboard = () => {
         <Card className='h-full'>
           <CardHeader title='Fleet Status' subheader='Current vehicle status distribution' />
           <CardContent>
-            <ApexChart
-              type='donut'
-              height={280}
-              options={vehicleStatusChartOptions}
-              series={vehicleStatusChartSeries}
-            />
+            <Box sx={{ width: '100%', minHeight: 280 }}>
+              <ApexChart
+                type='donut'
+                height={280}
+                width='100%'
+                options={vehicleStatusChartOptions}
+                series={vehicleStatusChartSeries}
+              />
+            </Box>
           </CardContent>
         </Card>
       </Grid>
@@ -453,7 +480,7 @@ const EnhancedEDMSDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {dashboardData?.driverPerformance?.length === 0 ? (
+                {!dashboardData?.driverPerformance?.topDrivers?.length ? (
                   <TableRow>
                     <TableCell colSpan={4} align='center' className='py-8'>
                       <Typography variant='body2' color='text.secondary'>
@@ -462,7 +489,7 @@ const EnhancedEDMSDashboard = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  dashboardData?.driverPerformance?.slice(0, 5).map((driver: any, index: number) => (
+                  dashboardData?.driverPerformance?.topDrivers?.slice(0, 5).map((driver: any, index: number) => (
                     <TableRow key={driver.driverId || index} hover>
                       <TableCell>
                         <Box className='flex items-center gap-3'>

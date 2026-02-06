@@ -14,7 +14,7 @@ const CardStatWithImage = (props: CardStatsCharacterProps) => {
   const { title, src, stats, subtitle, trendNumber, trend, chipText, chipColor } = props
   const renderStats = (stats: string | ReactNode) => {
     if (typeof stats === 'string') {
-      return <Typography variant='h4'>GH₵ {stats}</Typography>
+      return <Typography variant='h1'>GH₵ {stats}</Typography>
     }
     return stats
   }
@@ -50,7 +50,7 @@ const CardStatWithImage = (props: CardStatsCharacterProps) => {
     const renderTrendNumber = (trendNumber: string | ReactNode) => {
       if (typeof trendNumber === 'string') {
         // @ts-ignore
-        return <Typography color={trend === 'negative' ? 'error.main' : 'success.main'}>
+        return <Typography className=' font-bold' color={trend === 'negative' ? 'error.main' : 'success.main'}>
         {`${trend === 'negative' ? '-' : '+'}${trendNumber}`}
         </Typography>
       }

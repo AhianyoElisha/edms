@@ -1,5 +1,6 @@
 import { getUserData } from '@/app/server/actions'
 import DashboardContent from './DashboardContent'
+import EDMSDashboardContent from './EDMSDashboardContent'
 
 export const metadata = {
   title: 'Dashboard',
@@ -9,7 +10,7 @@ export const metadata = {
 export default async function DashboardECommerce() {
   return (
     <>
-      <DashboardContent />
+      <EDMSDashboardContent />
     </>
   )
 }

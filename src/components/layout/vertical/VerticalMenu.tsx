@@ -328,24 +328,24 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
                 {hasAnyPermission(['deliveries.view', 'trips.view']) && (
                   <MenuItem onClick={() => handleNavigation('/edms/returns/waybills')}>All Returns</MenuItem>
                 )}
-                {hasAnyPermission(['deliveries.view', 'trips.create']) && (
+                {/* {hasAnyPermission(['deliveries.view', 'trips.create']) && (
                   <MenuItem onClick={() => handleNavigation('/edms/returns/waybills/create')}>Create Return</MenuItem>
-                )}
+                )} */}
               </SubMenu>
             )}
 
             {/* Deliveries SubMenu */}
             {hasAnyPermission(['deliveries.view']) && (
               <SubMenu label="Deliveries" icon={<i className='ri-truck-line' />}>
-                {hasAnyPermission(['deliveries.view']) && (
+                {/* {hasAnyPermission(['deliveries.view']) && (
                   <MenuItem onClick={() => handleNavigation('/deliveries/active')}>Active Deliveries</MenuItem>
-                )}
+                )} */}
                 {hasAnyPermission(['deliveries.view']) && (
                   <MenuItem onClick={() => handleNavigation('/deliveries/completed')}>Completed Deliveries</MenuItem>
                 )}
-                {hasAnyPermission(['deliveries.view']) && (
+                {/* {hasAnyPermission(['deliveries.view']) && (
                   <MenuItem onClick={() => handleNavigation('/deliveries/failed')}>Failed Deliveries</MenuItem>
-                )}
+                )} */}
               </SubMenu>
             )}
 
@@ -367,19 +367,6 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
         )}
 
 
-
-        {/* Package History & Tracking Section */}
-        {hasPermission('packages.view') && (
-          <MenuSection label="Tracking & History">
-            <MenuItem onClick={() => handleNavigation('/tracking/realtime')} icon={<i className='ri-gps-line' />}>
-              Real-time Tracking
-            </MenuItem>
-            <MenuItem onClick={() => handleNavigation('/tracking/history')} icon={<i className='ri-file-chart-line' />}>
-              Delivery History
-            </MenuItem>
-          </MenuSection>
-        )}
-
         {/* User Management Section */}
         {(hasPermission('users.view') || hasPermission('roles.view') || hasPermission('permissions.view') || isAdmin) && (
           <MenuSection label="User Management">
@@ -399,13 +386,6 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
             {(hasPermission('permissions.view') || isAdmin) && (
               <MenuItem onClick={() => handleNavigation('/permissions')} icon={<i className='ri-lock-2-line' />}>
                 Access Control
-              </MenuItem>
-            )}
-
-            {/* Notifications */}
-            {hasPermission('notifications.view') && (
-              <MenuItem onClick={() => handleNavigation('/notifications')} icon={<i className='ri-notification-3-line' />}>
-                Notification Center
               </MenuItem>
             )}
           </MenuSection>

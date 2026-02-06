@@ -521,7 +521,7 @@ const ExpenseDetailsView = ({ expenseId }: ExpenseDetailsViewProps) => {
                         {trip.tripNumber}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {trip.route || 'No route'}
+                        {typeof trip.route === 'object' ? trip.route?.routeName : trip.route || 'No route'}
                       </Typography>
                     </Box>
                   </Box>
