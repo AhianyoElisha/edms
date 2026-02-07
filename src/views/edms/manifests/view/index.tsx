@@ -431,7 +431,7 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
             {/* Update Button */}
             <Grid item xs={6} md={2}>
               <Box className='flex items-center justify-center h-full'>
-                {!isDelivered || pendingCount > 0 && (
+                { pendingCount > 0 && (
                   <Button
                     variant='contained'
                     color='primary'
