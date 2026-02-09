@@ -361,14 +361,17 @@ export async function getRouteAnalysisReport(month?: number, year?: number) {
     const endDate = endOfMonth.toISOString()
 
     // Get all routes
-    const routes = await databases.listDocuments(
+    const routes = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.routes,
-      [Query.limit(500)]
+      [
+        Query.limit(500),
+        Query.select(['*', 'startLocation.*', 'endLocation.*']) 
+      ]
     )
 
     // Get all trips for the month
-    const trips = await databases.listDocuments(
+    const trips = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.trips,
       [
@@ -379,7 +382,7 @@ export async function getRouteAnalysisReport(month?: number, year?: number) {
     )
 
     // Get rate cards
-    const rateCards = await databases.listDocuments(
+    const rateCards = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.ratecards,
       [Query.limit(500)]
@@ -388,13 +391,13 @@ export async function getRouteAnalysisReport(month?: number, year?: number) {
     // Build route map
     const routeMap = new Map<string, any>()
     
-    routes.documents.forEach((route: any) => {
-      const rateCard = rateCards.documents.find((rc: any) => rc.routeId === route.$id)
+    routes.rows.forEach((route: any) => {
+      const rateCard = rateCards.rows.find((rc: any) => rc.routeId === route.$id)
       routeMap.set(route.$id, {
         routeId: route.$id,
-        routeName: route.name || 'Unknown Route',
-        origin: route.pickupLocationName || route.origin,
-        destination: route.dropoffLocationNames?.join(', ') || route.destination,
+        routeName: route.routeName || 'Unknown Route',
+        origin: route.startLocation.locationName,
+        destination: route.endLocation.locationName,
         distance: route.distance || 0,
         status: route.status,
         baseRate: rateCard?.baseRate || 0,
@@ -408,7 +411,7 @@ export async function getRouteAnalysisReport(month?: number, year?: number) {
     })
 
     // Aggregate trip data by route
-    trips.documents.forEach((trip: any) => {
+    trips.rows.forEach((trip: any) => {
       const routeId = trip.route
       if (routeId && routeMap.has(routeId)) {
         const route = routeMap.get(routeId)
@@ -438,7 +441,7 @@ export async function getRouteAnalysisReport(month?: number, year?: number) {
         monthName: startOfMonth.toLocaleString('default', { month: 'long' })
       },
       totalRoutes: routes.total,
-      activeRoutes: routes.documents.filter((r: any) => r.status === 'active').length,
+      activeRoutes: routes.rows.filter((r: any) => r.status === 'active').length,
       routes: routeAnalysis,
       topRoutes: routeAnalysis.slice(0, 10),
       summary: {

@@ -331,15 +331,15 @@ const DailyOperationsReport = () => {
                   </TableRow>
                 ) : (
                   reportData.trips.list.map((trip: any) => (
-                    <TableRow key={trip.$id} hover>
+                    <TableRow key={trip.tripNumber} hover>
                       <TableCell>
                         <Typography variant='body2' fontWeight={500}>
-                          {trip.$id.slice(0, 8)}...
+                          {trip.tripNumber}
                         </Typography>
                       </TableCell>
-                      <TableCell>{trip.driverName || 'N/A'}</TableCell>
-                      <TableCell>{trip.vehicleName || trip.vehicle?.slice(0, 8) || 'N/A'}</TableCell>
-                      <TableCell>{trip.routeName || 'N/A'}</TableCell>
+                      <TableCell>{trip.driver?.name || 'N/A'}</TableCell>
+                      <TableCell>{trip.vehicle?.vehicleNumber || 'N/A'}</TableCell>
+                      <TableCell>{trip.route?.routeName || 'N/A'}</TableCell>
                       <TableCell>
                         <TripStatusChip status={trip.status} />
                       </TableCell>
@@ -399,7 +399,7 @@ const DailyOperationsReport = () => {
                           variant='outlined'
                         />
                       </TableCell>
-                      <TableCell>{expense.vehicleId?.slice(0, 8) || 'N/A'}</TableCell>
+                      <TableCell>{expense.vehicleId?.vehicleName}</TableCell>
                       <TableCell>
                         <Chip 
                           size='small' 
