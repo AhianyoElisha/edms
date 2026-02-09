@@ -41,6 +41,7 @@ import type {
 import { createReturnWaybill } from '@/libs/actions/returnwaybill.actions'
 import { getAllTrips, getTripById } from '@/libs/actions/trip.actions'
 import { getAllPickupLocations, getAllDropoffLocations } from '@/libs/actions/location.actions'
+import { getRouteDropoffLocations } from '@/libs/actions/route.actions'
 
 interface ReturnWaybillCreateFormProps {
   tripId?: string
@@ -97,79 +98,79 @@ const ReturnWaybillCreateForm = ({ tripId: initialTripId }: ReturnWaybillCreateF
         
         // If we have a trip context, load trip details
         if (preselectedTripId) {
-          // Load trip data, pickup locations, AND all dropoff locations
-          const [tripData, pickups, allDropoffs] = await Promise.all([
+          // Load trip data and pickup locations
+          const [tripData, pickups] = await Promise.all([
             getTripById(preselectedTripId),
-            getAllPickupLocations({ isActive: true }),
-            getAllDropoffLocations({ isActive: true })
+            getAllPickupLocations({ isActive: true })
           ])
           
           setTripDetails(tripData)
           setPickupLocations(pickups)
-          setDropoffLocations(allDropoffs) // Store all dropoffs for fallback
           
-          // Build dropoff locations list from multiple sources:
-          // 1. From trip's manifests (have associated manifest info)
-          // 2. From route's dropoff locations (may not have manifests assigned)
-          // 3. From all dropoff locations (for any location along the route)
+          // Get ALL dropoff locations from the route using the dedicated function
+          // This returns intermediateStops + endLocation for the route
+          let routeDropoffs: any[] = []
           
-          const dropoffsFromManifests: any[] = []
-          const dropoffsFromRoute: any[] = []
-          
-          // Get dropoffs from manifests
+          if (tripData.route) {
+            const routeId = typeof tripData.route === 'object' ? tripData.route.$id : tripData.route
+            
+            if (routeId) {
+              try {
+                const routeStops = await getRouteDropoffLocations(routeId)
+                
+                routeDropoffs = routeStops.map((stop: any) => ({
+                  $id: stop.locationId,
+                  locationName: stop.locationName || stop.address || `Location ${stop.locationId.substring(0, 8)}`,
+                  sequence: stop.sequence,
+                  hasManifest: false
+                }))
+              } catch (err) {
+                console.warn('Could not fetch route dropoff locations:', err)
+              }
+            }
+          }
+
+          // Enrich with manifest info - mark locations that have manifests
           if (tripData.manifests && tripData.manifests.length > 0) {
             tripData.manifests
               .filter((m: any) => m.dropofflocation)
               .forEach((m: any) => {
-                dropoffsFromManifests.push({
-                  $id: m.dropofflocation.$id,
-                  locationName: m.dropofflocation.locationName || m.dropofflocation.address,
-                  manifestId: m.$id,
-                  manifestNumber: m.manifestNumber,
-                  hasManifest: true
-                })
+                const locId = typeof m.dropofflocation === 'object' ? m.dropofflocation.$id : m.dropofflocation
+                const existing = routeDropoffs.find(d => d.$id === locId)
+                
+                if (existing) {
+                  existing.hasManifest = true
+                  existing.manifestId = m.$id
+                  existing.manifestNumber = m.manifestNumber
+                  // Update name if we got a better one from the manifest's populated dropofflocation
+                  if (m.dropofflocation.locationName) {
+                    existing.locationName = m.dropofflocation.locationName
+                  }
+                } else {
+                  // Manifest points to a location not in the route - add it anyway
+                  routeDropoffs.push({
+                    $id: locId,
+                    locationName: m.dropofflocation.locationName || m.dropofflocation.address || `Location ${locId.substring(0, 8)}`,
+                    hasManifest: true,
+                    manifestId: m.$id,
+                    manifestNumber: m.manifestNumber
+                  })
+                }
               })
           }
           
-          // Get dropoffs from route if available
-          if (tripData.route && tripData.route.dropoffLocations) {
-            const routeDropoffs = Array.isArray(tripData.route.dropoffLocations)
-              ? tripData.route.dropoffLocations
-              : []
+          // If we still have no dropoffs, fallback to all active dropoff locations
+          if (routeDropoffs.length === 0) {
+            const allDropoffs = await getAllDropoffLocations({ isActive: true })
             
-            routeDropoffs.forEach((loc: any) => {
-              const locId = typeof loc === 'object' ? loc.$id : loc
-              const locName = typeof loc === 'object' ? (loc.locationName || loc.address) : ''
-              
-              // Only add if not already in manifest list
-              if (!dropoffsFromManifests.find(d => d.$id === locId)) {
-                dropoffsFromRoute.push({
-                  $id: locId,
-                  locationName: locName || `Location ${locId.substring(0, 8)}`,
-                  hasManifest: false
-                })
-              }
-            })
-          }
-          
-          // Combine and deduplicate - manifest dropoffs take priority (they have more info)
-          const allTripDropoffs = [...dropoffsFromManifests]
-          dropoffsFromRoute.forEach(loc => {
-            if (!allTripDropoffs.find(d => d.$id === loc.$id)) {
-              allTripDropoffs.push(loc)
-            }
-          })
-          
-          // If we still have no dropoffs from trip context, use all active dropoff locations
-          if (allTripDropoffs.length === 0) {
-            const fallbackDropoffs = allDropoffs.map((loc: any) => ({
+            setDropoffLocations(allDropoffs)
+            setTripDropoffLocations(allDropoffs.map((loc: any) => ({
               $id: loc.$id,
               locationName: loc.locationName || loc.address,
               hasManifest: false
-            }))
-            setTripDropoffLocations(fallbackDropoffs)
+            })))
           } else {
-            setTripDropoffLocations(allTripDropoffs)
+            setTripDropoffLocations(routeDropoffs)
           }
           
           // If dropoff was preselected, set it
@@ -177,11 +178,14 @@ const ReturnWaybillCreateForm = ({ tripId: initialTripId }: ReturnWaybillCreateF
             setDropoffLocationId(preselectedDropoffId)
           }
           
-          // Try to auto-select pickup location from trip's route
-          if (tripData.route && tripData.route.pickupLocation) {
-            const pickupLoc = tripData.route.pickupLocation
-            if (typeof pickupLoc === 'object' && pickupLoc.$id) {
-              setPickupLocationId(pickupLoc.$id)
+          // Auto-select pickup location from trip's route startLocation
+          if (tripData.route) {
+            const startLoc = tripData.route.startLocation
+            
+            if (typeof startLoc === 'object' && startLoc?.$id) {
+              setPickupLocationId(startLoc.$id)
+            } else if (typeof startLoc === 'string') {
+              setPickupLocationId(startLoc)
             }
           }
         } else {

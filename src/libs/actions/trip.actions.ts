@@ -44,6 +44,8 @@ export async function createTripWithManifests(wizardData: TripWizardData): Promi
       status: 'planned',
       notes: tripDetails.notes || '',
       totalPackages: totalPackages,
+      tonnage: tripDetails.tonnage || null,
+      tripCost: tripDetails.tripCost || 0,
       creator: tripDetails.driverId, // TODO: Get from auth context
       
       // Initialize checkpoints based on manifests
@@ -259,7 +261,7 @@ export async function getAllTrips(filters?: {
     const response = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.trips,
-      [...queries, Query.select(['*', 'driver.*', 'vehicle.*', 'manifests.length'])]
+      [...queries, Query.select(['*', 'driver.*', 'vehicle.*', 'route.*', 'manifests.length'])]
     )
 
     console.log('Fetched trips:', response)

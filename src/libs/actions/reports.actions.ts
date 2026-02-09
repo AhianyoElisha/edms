@@ -291,7 +291,7 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
         driver.totalTrips++
         if (trip.status === 'completed') {
           driver.completedTrips++
-          driver.totalRevenue += trip.clientRate || 0
+          driver.totalRevenue += trip.tripCost || trip.clientRate || 0
         }
         if (trip.status === 'cancelled') {
           driver.cancelledTrips++
@@ -415,7 +415,7 @@ export async function getRouteAnalysisReport(month?: number, year?: number) {
         route.totalTrips++
         if (trip.status === 'completed') {
           route.completedTrips++
-          route.totalRevenue += trip.clientRate || 0
+          route.totalRevenue += trip.tripCost || trip.clientRate || 0
         }
       }
     })
@@ -498,21 +498,21 @@ export async function getRevenueReport(month?: number, year?: number) {
 
     trips.documents.forEach((trip: any) => {
       const tripDay = new Date(trip.tripDate).getDate() - 1
-      const clientRate = trip.clientRate || 0
+      const tripRevenue = trip.tripCost || trip.clientRate || 0
       
       if (tripDay >= 0 && tripDay < daysInMonth) {
-        dailyRevenue[tripDay].revenue += clientRate
+        dailyRevenue[tripDay].revenue += tripRevenue
         dailyRevenue[tripDay].trips++
       }
 
       if (trip.status === 'completed') {
-        totalRevenue += clientRate
+        totalRevenue += tripRevenue
         totalTrips++
         
         if (trip.paymentStatus === 'paid') {
-          paidRevenue += clientRate
+          paidRevenue += tripRevenue
         } else {
-          pendingRevenue += clientRate
+          pendingRevenue += tripRevenue
         }
       }
     })
@@ -534,7 +534,7 @@ export async function getRevenueReport(month?: number, year?: number) {
       ]
     )
 
-    const prevRevenue = prevTrips.documents.reduce((sum: number, t: any) => sum + (t.clientRate || 0), 0)
+    const prevRevenue = prevTrips.documents.reduce((sum: number, t: any) => sum + (t.tripCost || t.clientRate || 0), 0)
     const revenueChange = prevRevenue > 0 ? (((totalRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1) : '0'
 
     return {
@@ -810,23 +810,23 @@ export async function getInvoicingReport(month?: number, year?: number) {
     }
 
     trips.documents.forEach((trip: any) => {
-      const clientRate = trip.clientRate || 0
+      const tripRevenue = trip.tripCost || trip.clientRate || 0
       
       if (trip.status === 'completed') {
         if (trip.invoiceGenerated) {
           invoicedTrips++
-          totalBilled += clientRate
+          totalBilled += tripRevenue
 
           const status = trip.paymentStatus || 'pending'
           if (invoiceStatus[status]) {
             invoiceStatus[status].count++
-            invoiceStatus[status].amount += clientRate
+            invoiceStatus[status].amount += tripRevenue
           }
 
           if (status === 'paid') {
-            totalPaid += clientRate
+            totalPaid += tripRevenue
           } else {
-            totalPending += clientRate
+            totalPending += tripRevenue
           }
         } else {
           uninvoicedTrips++

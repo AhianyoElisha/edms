@@ -54,6 +54,8 @@ const EXPENSE_CATEGORIES: Record<ExpenseTypeCategory, { label: string; icon: str
   communication: { label: 'Communication', icon: 'ri-phone-line' },
   utilities: { label: 'Utilities', icon: 'ri-lightbulb-line' },
   trip_related: { label: 'Trip Related', icon: 'ri-truck-line' },
+  allowance: { label: 'Allowance', icon: 'ri-hand-coin-line' },
+  truck_rental: { label: 'Truck Rentals', icon: 'ri-truck-line' },
   other: { label: 'Other', icon: 'ri-more-line' }
 }
 

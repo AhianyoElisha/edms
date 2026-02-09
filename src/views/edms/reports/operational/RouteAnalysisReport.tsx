@@ -98,6 +98,7 @@ const RouteAnalysisReport = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [reportData, setReportData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [chartMounted, setChartMounted] = useState(false)
 
   const fetchReport = async () => {
     setLoading(true)
@@ -116,6 +117,11 @@ const RouteAnalysisReport = () => {
   useEffect(() => {
     fetchReport()
   }, [selectedMonth, selectedYear])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setChartMounted(true), 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Generate year options
   const currentYear = new Date().getFullYear()
@@ -151,6 +157,11 @@ const RouteAnalysisReport = () => {
   }
 
   // Chart options for top routes
+  const topRoutes = reportData?.topRoutes || []
+  const topRoutesSlice = topRoutes.slice(0, 8)
+  const hasTopRoutesData = topRoutesSlice.length > 0
+  const allRoutes = reportData?.routes || []
+
   const topRoutesChartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'bar',
@@ -168,7 +179,7 @@ const RouteAnalysisReport = () => {
       enabled: false
     },
     xaxis: {
-      categories: reportData.topRoutes.slice(0, 8).map((r: any) => r.routeName?.substring(0, 15) || 'Unknown'),
+      categories: topRoutesSlice.map((r: any) => (r.routeName || 'Unknown').substring(0, 15)),
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)', fontSize: '10px' },
         rotate: -45,
@@ -187,7 +198,7 @@ const RouteAnalysisReport = () => {
         title: { text: 'Revenue (KES)' },
         labels: {
           style: { colors: 'var(--mui-palette-text-secondary)' },
-          formatter: (val) => `${(val / 1000).toFixed(0)}K`
+          formatter: (val) => val != null ? `${(val / 1000).toFixed(0)}K` : '0K'
         }
       }
     ],
@@ -200,12 +211,17 @@ const RouteAnalysisReport = () => {
     },
     tooltip: {
       theme: 'dark'
+    },
+    noData: {
+      text: 'No route data available',
+      align: 'center',
+      verticalAlign: 'middle'
     }
   }
 
   const topRoutesChartSeries = [
-    { name: 'Trips', data: reportData.topRoutes.slice(0, 8).map((r: any) => r.totalTrips) },
-    { name: 'Revenue', data: reportData.topRoutes.slice(0, 8).map((r: any) => r.totalRevenue) }
+    { name: 'Trips', data: topRoutesSlice.map((r: any) => r.totalTrips || 0) },
+    { name: 'Revenue', data: topRoutesSlice.map((r: any) => r.totalRevenue || 0) }
   ]
 
   // Utilization chart
@@ -221,7 +237,7 @@ const RouteAnalysisReport = () => {
     },
     dataLabels: {
       enabled: true,
-      formatter: (val: number) => `${val.toFixed(0)}%`
+      formatter: (val: number) => val != null ? `${val.toFixed(0)}%` : '0%'
     },
     plotOptions: {
       pie: {
@@ -235,17 +251,22 @@ const RouteAnalysisReport = () => {
               show: true,
               label: 'Total Routes',
               fontSize: '14px',
-              formatter: () => reportData.totalRoutes.toString()
+              formatter: () => String(reportData?.totalRoutes || 0)
             }
           }
         }
       }
+    },
+    noData: {
+      text: 'No route data',
+      align: 'center',
+      verticalAlign: 'middle'
     }
   }
 
   // Calculate utilization distribution
-  const utilizationData = reportData.routes.reduce((acc: any, route: any) => {
-    const score = route.utilizationScore
+  const utilizationData = allRoutes.reduce((acc: any, route: any) => {
+    const score = route.utilizationScore || 0
     if (score >= 70) acc.high++
     else if (score >= 40) acc.medium++
     else if (score >= 10) acc.low++
@@ -254,6 +275,7 @@ const RouteAnalysisReport = () => {
   }, { high: 0, medium: 0, low: 0, unused: 0 })
 
   const utilizationChartSeries = [utilizationData.high, utilizationData.medium, utilizationData.low, utilizationData.unused]
+  const hasUtilizationData = utilizationChartSeries.some((v: number) => v > 0)
 
   return (
     <Grid container spacing={6}>
@@ -346,20 +368,23 @@ const RouteAnalysisReport = () => {
         <Card>
           <CardHeader title='Top Routes Performance' subheader='Trips and revenue by route' />
           <CardContent>
-            {reportData.topRoutes.length > 0 ? (
-              <ApexChart
-                type='bar'
-                height={350}
-                options={topRoutesChartOptions}
-                series={topRoutesChartSeries}
-              />
-            ) : (
-              <Box className='text-center py-12'>
-                <Typography variant='body2' color='text.secondary'>
-                  No route data available
-                </Typography>
-              </Box>
-            )}
+            <Box sx={{ minHeight: 350 }}>
+              {chartMounted && hasTopRoutesData ? (
+                <ApexChart
+                  type='bar'
+                  height={350}
+                  width='100%'
+                  options={topRoutesChartOptions}
+                  series={topRoutesChartSeries}
+                />
+              ) : chartMounted ? (
+                <Box className='text-center py-12'>
+                  <Typography variant='body2' color='text.secondary'>
+                    No route data available
+                  </Typography>
+                </Box>
+              ) : null}
+            </Box>
           </CardContent>
         </Card>
       </Grid>
@@ -369,12 +394,23 @@ const RouteAnalysisReport = () => {
         <Card className='h-full'>
           <CardHeader title='Route Utilization' subheader='Distribution by usage level' />
           <CardContent>
-            <ApexChart
-              type='donut'
-              height={300}
-              options={utilizationChartOptions}
-              series={utilizationChartSeries}
-            />
+            <Box sx={{ minHeight: 300 }}>
+              {chartMounted && hasUtilizationData ? (
+                <ApexChart
+                  type='donut'
+                  height={300}
+                  width='100%'
+                  options={utilizationChartOptions}
+                  series={utilizationChartSeries}
+                />
+              ) : chartMounted ? (
+                <Box className='text-center py-12'>
+                  <Typography variant='body2' color='text.secondary'>
+                    No utilization data available
+                  </Typography>
+                </Box>
+              ) : null}
+            </Box>
           </CardContent>
         </Card>
       </Grid>

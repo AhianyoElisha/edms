@@ -58,6 +58,8 @@ const EXPENSE_CATEGORIES: { value: ExpenseTypeCategory; label: string; icon: str
   { value: 'vehicle_purchase', label: 'Vehicle Purchase', icon: 'ri-car-line' },
   { value: 'office', label: 'Office Supplies', icon: 'ri-building-2-line' },
   { value: 'salary', label: 'Salary & Wages', icon: 'ri-money-dollar-circle-line' },
+  { value: 'allowance', label: 'Allowance', icon: 'ri-hand-coin-line' },
+  { value: 'truck_rental', label: 'Truck Rentals', icon: 'ri-truck-line' },
   { value: 'communication', label: 'Communication', icon: 'ri-phone-line' },
   { value: 'utilities', label: 'Utilities', icon: 'ri-lightbulb-line' },
   { value: 'trip_related', label: 'Trip Related', icon: 'ri-truck-line' },
@@ -73,6 +75,8 @@ const SUB_CATEGORIES: Record<ExpenseTypeCategory, string[]> = {
   vehicle_purchase: ['New Vehicle', 'Used Vehicle', 'Parts'],
   office: ['Stationery', 'Furniture', 'IT Equipment'],
   salary: ['Driver Salary', 'Staff Salary', 'Bonus', 'Overtime'],
+  allowance: ['Driver Allowance', 'Mate Allowance', 'Bonus', 'Overtime'],
+  truck_rental: ['Monthly Rental', 'Trip-based Rental'],
   communication: ['Airtime', 'Internet', 'Phone Bills'],
   utilities: ['Electricity', 'Water', 'Rent'],
   trip_related: ['Toll Fees', 'Parking', 'Loading', 'Accommodation', 'Meals', 'Permits'],
@@ -489,8 +493,9 @@ const ExpenseCreateForm = () => {
                           <MenuItem value="">None</MenuItem>
                           {vehicles.map((vehicle) => (
                             <MenuItem key={vehicle.$id} value={vehicle.$id}>
-                              {vehicle.licensePlate}
+                              {vehicle.vehicleNumber || vehicle.licensePlate}
                               {vehicle.brand && ` - ${vehicle.brand}`}
+                              {vehicle.model && ` ${vehicle.model}`}
                             </MenuItem>
                           ))}
                         </Select>

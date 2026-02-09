@@ -99,6 +99,7 @@ const DriverPerformanceReport = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [reportData, setReportData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [chartMounted, setChartMounted] = useState(false)
 
   const fetchReport = async () => {
     setLoading(true)
@@ -117,6 +118,11 @@ const DriverPerformanceReport = () => {
   useEffect(() => {
     fetchReport()
   }, [selectedMonth, selectedYear])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setChartMounted(true), 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Generate year options
   const currentYear = new Date().getFullYear()
@@ -152,6 +158,9 @@ const DriverPerformanceReport = () => {
   }
 
   // Chart options for top performers
+  const topPerformers = reportData?.topPerformers || []
+  const hasPerformerData = topPerformers.length > 0
+
   const performerChartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'bar',
@@ -166,7 +175,7 @@ const DriverPerformanceReport = () => {
       }
     },
     xaxis: {
-      categories: reportData.topPerformers.map((d: any) => d.driverName?.split(' ')[0] || 'Unknown'),
+      categories: topPerformers.map((d: any) => d.driverName?.split(' ')[0] || 'Unknown'),
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' }
       }
@@ -181,12 +190,17 @@ const DriverPerformanceReport = () => {
     },
     tooltip: {
       theme: 'dark'
+    },
+    noData: {
+      text: 'No driver data available',
+      align: 'center',
+      verticalAlign: 'middle'
     }
   }
 
   const performerChartSeries = [{
     name: 'Completed Trips',
-    data: reportData.topPerformers.map((d: any) => d.completedTrips)
+    data: topPerformers.map((d: any) => d.completedTrips || 0)
   }]
 
   return (
@@ -281,20 +295,23 @@ const DriverPerformanceReport = () => {
         <Card className='h-full'>
           <CardHeader title='Top Performers' subheader='By completed trips' />
           <CardContent>
-            {reportData.topPerformers.length > 0 ? (
-              <ApexChart
-                type='bar'
-                height={300}
-                options={performerChartOptions}
-                series={performerChartSeries}
-              />
-            ) : (
-              <Box className='text-center py-12'>
-                <Typography variant='body2' color='text.secondary'>
-                  No driver data available
-                </Typography>
-              </Box>
-            )}
+            <Box sx={{ minHeight: 300 }}>
+              {chartMounted && hasPerformerData ? (
+                <ApexChart
+                  type='bar'
+                  height={300}
+                  width='100%'
+                  options={performerChartOptions}
+                  series={performerChartSeries}
+                />
+              ) : chartMounted ? (
+                <Box className='text-center py-12'>
+                  <Typography variant='body2' color='text.secondary'>
+                    No driver data available
+                  </Typography>
+                </Box>
+              ) : null}
+            </Box>
           </CardContent>
         </Card>
       </Grid>

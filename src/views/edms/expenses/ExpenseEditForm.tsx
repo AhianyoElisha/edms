@@ -61,6 +61,8 @@ const EXPENSE_CATEGORIES: { value: ExpenseTypeCategory; label: string; icon: str
   { value: 'communication', label: 'Communication', icon: 'ri-phone-line' },
   { value: 'utilities', label: 'Utilities', icon: 'ri-lightbulb-line' },
   { value: 'trip_related', label: 'Trip Related', icon: 'ri-truck-line' },
+  { value: 'allowance', label: 'Allowance', icon: 'ri-hand-coin-line' },
+  { value: 'truck_rental', label: 'Truck Rentals', icon: 'ri-truck-line' },
   { value: 'other', label: 'Other', icon: 'ri-more-line' }
 ]
 
@@ -76,6 +78,8 @@ const SUB_CATEGORIES: Record<ExpenseTypeCategory, string[]> = {
   communication: ['Airtime', 'Internet', 'Phone Bills'],
   utilities: ['Electricity', 'Water', 'Rent'],
   trip_related: ['Toll Fees', 'Parking', 'Loading', 'Accommodation', 'Meals', 'Permits'],
+  allowance: ['Driver Allowance', 'Mate Allowance', 'Bonus', 'Overtime'],
+  truck_rental: ['Monthly Rental', 'Trip-based Rental'],
   other: ['Miscellaneous']
 }
 

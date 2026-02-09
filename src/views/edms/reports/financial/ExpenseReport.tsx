@@ -126,6 +126,7 @@ const ExpenseReport = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [reportData, setReportData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [chartMounted, setChartMounted] = useState(false)
 
   const fetchReport = async () => {
     setLoading(true)
@@ -144,6 +145,11 @@ const ExpenseReport = () => {
   useEffect(() => {
     fetchReport()
   }, [selectedMonth, selectedYear])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setChartMounted(true), 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Generate year options
   const currentYear = new Date().getFullYear()
@@ -179,6 +185,11 @@ const ExpenseReport = () => {
   }
 
   // Expense trend chart options
+  const chartLabels = reportData?.chartData?.labels || []
+  const chartExpenses = reportData?.chartData?.expenses || []
+  const categoryLabels = reportData?.chartData?.categoryLabels || []
+  const categoryAmounts = reportData?.chartData?.categoryAmounts || []
+
   const expenseTrendChartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'bar',
@@ -192,7 +203,7 @@ const ExpenseReport = () => {
       }
     },
     xaxis: {
-      categories: reportData.chartData.labels,
+      categories: chartLabels,
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' }
       },
@@ -200,9 +211,10 @@ const ExpenseReport = () => {
       axisTicks: { show: false }
     },
     yaxis: {
+      min: 0,
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' },
-        formatter: (val) => `KES ${(val / 1000).toFixed(0)}K`
+        formatter: (val) => val != null ? `KES ${(val / 1000).toFixed(0)}K` : 'KES 0K'
       }
     },
     grid: {
@@ -212,26 +224,33 @@ const ExpenseReport = () => {
     tooltip: {
       theme: 'dark',
       y: {
-        formatter: (val) => `KES ${val.toLocaleString()}`
+        formatter: (val) => val != null ? `KES ${val.toLocaleString()}` : 'KES 0'
       }
     },
     dataLabels: {
       enabled: false
+    },
+    noData: {
+      text: 'No expense data available',
+      align: 'center',
+      verticalAlign: 'middle'
     }
   }
 
   const expenseTrendChartSeries = [{
     name: 'Expenses',
-    data: reportData.chartData.expenses
+    data: chartExpenses
   }]
 
   // Category breakdown chart
+  const hasCategoryData = categoryAmounts.length > 0 && categoryAmounts.some((a: number) => a > 0)
+
   const categoryChartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'pie'
     },
     colors: ['#7367F0', '#28C76F', '#FF9F43', '#EA5455', '#00CFE8', '#9C9C9C', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'],
-    labels: reportData.chartData.categoryLabels.map((label: string) => label.replace('_', ' ').toUpperCase()),
+    labels: categoryLabels.map((label: string) => (label || 'other').replace('_', ' ').toUpperCase()),
     legend: {
       show: true,
       position: 'bottom',
@@ -239,7 +258,7 @@ const ExpenseReport = () => {
     },
     dataLabels: {
       enabled: true,
-      formatter: (val: number) => `${val.toFixed(1)}%`
+      formatter: (val: number) => val != null ? `${val.toFixed(1)}%` : '0%'
     },
     plotOptions: {
       pie: {
@@ -247,10 +266,15 @@ const ExpenseReport = () => {
           size: '0%'
         }
       }
+    },
+    noData: {
+      text: 'No category data',
+      align: 'center',
+      verticalAlign: 'middle'
     }
   }
 
-  const categoryChartSeries = reportData.chartData.categoryAmounts
+  const categoryChartSeries = categoryAmounts
 
   return (
     <Grid container spacing={6}>
@@ -310,8 +334,8 @@ const ExpenseReport = () => {
           value={`KES ${reportData.summary.totalExpenses.toLocaleString()}`}
           icon='ri-wallet-3-line'
           color='error'
-          trend={reportData.comparison.trend}
-          trendValue={reportData.comparison.change.toString()}
+          trend={reportData.comparison?.trend}
+          trendValue={String(reportData.comparison?.change ?? 0)}
         />
       </Grid>
       <Grid item xs={12} sm={6} md={3}>
@@ -346,12 +370,17 @@ const ExpenseReport = () => {
         <Card>
           <CardHeader title='Daily Expense Trend' subheader='Expenses recorded each day' />
           <CardContent>
-            <ApexChart
-              type='bar'
-              height={350}
-              options={expenseTrendChartOptions}
-              series={expenseTrendChartSeries}
-            />
+            <Box sx={{ minHeight: 350 }}>
+              {chartMounted && (
+                <ApexChart
+                  type='bar'
+                  height={350}
+                  width='100%'
+                  options={expenseTrendChartOptions}
+                  series={expenseTrendChartSeries}
+                />
+              )}
+            </Box>
           </CardContent>
         </Card>
       </Grid>
@@ -361,20 +390,23 @@ const ExpenseReport = () => {
         <Card className='h-full'>
           <CardHeader title='Category Breakdown' subheader='Expenses by category' />
           <CardContent>
-            {reportData.byCategory.length > 0 ? (
-              <ApexChart
-                type='pie'
-                height={300}
-                options={categoryChartOptions}
-                series={categoryChartSeries}
-              />
-            ) : (
-              <Box className='text-center py-12'>
-                <Typography variant='body2' color='text.secondary'>
-                  No expense data available
-                </Typography>
-              </Box>
-            )}
+            <Box sx={{ minHeight: 300 }}>
+              {chartMounted && hasCategoryData ? (
+                <ApexChart
+                  type='pie'
+                  height={300}
+                  width='100%'
+                  options={categoryChartOptions}
+                  series={categoryChartSeries}
+                />
+              ) : chartMounted ? (
+                <Box className='text-center py-12'>
+                  <Typography variant='body2' color='text.secondary'>
+                    No expense data available
+                  </Typography>
+                </Box>
+              ) : null}
+            </Box>
           </CardContent>
         </Card>
       </Grid>

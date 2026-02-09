@@ -104,6 +104,7 @@ const RevenueReport = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [reportData, setReportData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [chartMounted, setChartMounted] = useState(false)
 
   const fetchReport = async () => {
     setLoading(true)
@@ -122,6 +123,11 @@ const RevenueReport = () => {
   useEffect(() => {
     fetchReport()
   }, [selectedMonth, selectedYear])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setChartMounted(true), 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Generate year options
   const currentYear = new Date().getFullYear()
@@ -157,6 +163,9 @@ const RevenueReport = () => {
   }
 
   // Revenue trend chart options
+  const chartLabels = reportData?.chartData?.labels || []
+  const chartRevenue = reportData?.chartData?.revenue || []
+
   const revenueTrendChartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'area',
@@ -178,7 +187,7 @@ const RevenueReport = () => {
       }
     },
     xaxis: {
-      categories: reportData.chartData.labels,
+      categories: chartLabels,
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' }
       },
@@ -186,9 +195,10 @@ const RevenueReport = () => {
       axisTicks: { show: false }
     },
     yaxis: {
+      min: 0,
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' },
-        formatter: (val) => `KES ${(val / 1000).toFixed(0)}K`
+        formatter: (val) => val != null ? `KES ${(val / 1000).toFixed(0)}K` : 'KES 0K'
       }
     },
     grid: {
@@ -198,20 +208,30 @@ const RevenueReport = () => {
     tooltip: {
       theme: 'dark',
       y: {
-        formatter: (val) => `KES ${val.toLocaleString()}`
+        formatter: (val) => val != null ? `KES ${val.toLocaleString()}` : 'KES 0'
       }
     },
     dataLabels: {
       enabled: false
+    },
+    noData: {
+      text: 'No revenue data available',
+      align: 'center',
+      verticalAlign: 'middle'
     }
   }
 
   const revenueTrendChartSeries = [{
     name: 'Revenue',
-    data: reportData.chartData.revenue
+    data: chartRevenue
   }]
 
   // Collection status chart
+  const paidRevenue = reportData?.summary?.paidRevenue || 0
+  const pendingRevenue = reportData?.summary?.pendingRevenue || 0
+  const totalRevenue = reportData?.summary?.totalRevenue || 0
+  const hasCollectionData = paidRevenue > 0 || pendingRevenue > 0
+
   const collectionChartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'donut'
@@ -224,7 +244,7 @@ const RevenueReport = () => {
     },
     dataLabels: {
       enabled: true,
-      formatter: (val: number) => `${val.toFixed(1)}%`
+      formatter: (val: number) => val != null ? `${val.toFixed(1)}%` : '0%'
     },
     plotOptions: {
       pie: {
@@ -237,21 +257,26 @@ const RevenueReport = () => {
               show: true, 
               fontSize: '18px', 
               fontWeight: 600,
-              formatter: (val) => `KES ${Number(val).toLocaleString()}`
+              formatter: (val) => val != null ? `KES ${Number(val).toLocaleString()}` : 'KES 0'
             },
             total: {
               show: true,
               label: 'Total Revenue',
               fontSize: '12px',
-              formatter: () => `KES ${reportData.summary.totalRevenue.toLocaleString()}`
+              formatter: () => `KES ${totalRevenue.toLocaleString()}`
             }
           }
         }
       }
+    },
+    noData: {
+      text: 'No collection data',
+      align: 'center',
+      verticalAlign: 'middle'
     }
   }
 
-  const collectionChartSeries = [reportData.summary.paidRevenue, reportData.summary.pendingRevenue]
+  const collectionChartSeries = hasCollectionData ? [paidRevenue, pendingRevenue] : [0, 0]
 
   return (
     <Grid container spacing={6}>
@@ -311,8 +336,8 @@ const RevenueReport = () => {
           value={`KES ${reportData.summary.totalRevenue.toLocaleString()}`}
           icon='ri-money-dollar-circle-line'
           color='success'
-          trend={reportData.comparison.trend}
-          trendValue={reportData.comparison.change.toString()}
+          trend={reportData.comparison?.trend}
+          trendValue={String(reportData.comparison?.change ?? 0)}
         />
       </Grid>
       <Grid item xs={12} sm={6} md={3}>
@@ -347,12 +372,17 @@ const RevenueReport = () => {
         <Card>
           <CardHeader title='Daily Revenue Trend' subheader='Revenue generated each day' />
           <CardContent>
-            <ApexChart
-              type='area'
-              height={350}
-              options={revenueTrendChartOptions}
-              series={revenueTrendChartSeries}
-            />
+            <Box sx={{ minHeight: 350 }}>
+              {chartMounted && (
+                <ApexChart
+                  type='area'
+                  height={350}
+                  width='100%'
+                  options={revenueTrendChartOptions}
+                  series={revenueTrendChartSeries}
+                />
+              )}
+            </Box>
           </CardContent>
         </Card>
       </Grid>
@@ -362,12 +392,21 @@ const RevenueReport = () => {
         <Card className='h-full'>
           <CardHeader title='Collection Status' subheader='Revenue collection breakdown' />
           <CardContent>
-            <ApexChart
-              type='donut'
-              height={280}
-              options={collectionChartOptions}
-              series={collectionChartSeries}
-            />
+            <Box sx={{ minHeight: 280 }}>
+              {chartMounted && hasCollectionData ? (
+                <ApexChart
+                  type='donut'
+                  height={280}
+                  width='100%'
+                  options={collectionChartOptions}
+                  series={collectionChartSeries}
+                />
+              ) : chartMounted ? (
+                <Box className='flex items-center justify-center' sx={{ height: 280 }}>
+                  <Typography variant='body2' color='text.secondary'>No collection data available</Typography>
+                </Box>
+              ) : null}
+            </Box>
           </CardContent>
         </Card>
       </Grid>

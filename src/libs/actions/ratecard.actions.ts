@@ -335,6 +335,7 @@ export async function createRateCard(
         clientCode: rateCardData.clientCode.toUpperCase(),
         routeCode: rateCardData.routeCode,
         routeDescription: rateCardData.routeDescription,
+        route: rateCardData.route || null,
         volumePrices: JSON.stringify(rateCardData.volumePrices), // Store as JSON string
         effectiveFrom: rateCardData.effectiveFrom,
         effectiveTo: rateCardData.effectiveTo || null,

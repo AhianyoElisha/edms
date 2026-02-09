@@ -40,6 +40,7 @@ const formSchema = z.object({
   brand: z.string().optional(),
   model: z.string().optional(),
   year: z.number().min(1900).max(new Date().getFullYear() + 1).optional().or(z.literal('')),
+  cbmVolume: z.number().min(0).optional().or(z.literal('')),
   ownership: z.enum(['owned', 'rented'], { message: "Ownership type is required" }),
   monthlyRentalCost: z.number().min(0).optional().or(z.literal('')),
   driver: z.string().optional(),
@@ -69,6 +70,7 @@ const AddLogisticsDrawer = (props: Props) => {
       brand: '',
       model: '',
       year: undefined,
+      cbmVolume: undefined,
       ownership: 'owned',
       monthlyRentalCost: 0,
       driver: '',
@@ -118,6 +120,7 @@ const AddLogisticsDrawer = (props: Props) => {
       const vehicleData = {
         ...data,
         year: data.year ? Number(data.year) : undefined,
+        cbmVolume: data.cbmVolume ? Number(data.cbmVolume) : undefined,
         monthlyRentalCost: data.ownership === 'rented' && data.monthlyRentalCost ? Number(data.monthlyRentalCost) : 0,
         status: 'active' as const,
       }
@@ -271,6 +274,25 @@ const AddLogisticsDrawer = (props: Props) => {
                   error={!!errors.year}
                   helperText={errors.year?.message}
                   inputProps={{ min: 1900, max: new Date().getFullYear() + 1 }}
+                />
+              )}
+            />
+
+            <Controller
+              name='cbmVolume'
+              control={control}
+              render={({ field: { onChange, value, ...field } }) => (
+                <TextField
+                  {...field}
+                  fullWidth
+                  type='number'
+                  label='CBM Volume (Capacity)'
+                  placeholder='e.g., 37, 50, 65'
+                  value={value || ''}
+                  onChange={(e) => onChange(e.target.value ? Number(e.target.value) : '')}
+                  error={!!errors.cbmVolume}
+                  helperText={errors.cbmVolume?.message || 'Cubic meter capacity of the vehicle'}
+                  inputProps={{ min: 0, step: 1 }}
                 />
               )}
             />

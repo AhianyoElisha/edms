@@ -48,6 +48,7 @@ export type Vehicle = {
   brand?: string
   model?: string
   year?: number
+  cbmVolume?: number // CBM volume capacity of the vehicle
   status: 'active' | 'maintenance' | 'retired'| 'inactive'
   ownership: 'owned' | 'rented'
   monthlyRentalCost?: number

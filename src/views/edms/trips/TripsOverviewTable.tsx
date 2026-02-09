@@ -118,6 +118,30 @@ const TripsOverviewTable = () => {
           </Typography>
         )
       }),
+      columnHelper.accessor('route', {
+        header: 'Route',
+        cell: ({ row }) => (
+          <Typography color='text.primary'>
+            {row.original.route?.routeName || 'N/A'}
+          </Typography>
+        )
+      }),
+      columnHelper.accessor('tonnage', {
+        header: 'Tonnage',
+        cell: ({ row }) => (
+          <Typography color='text.primary'>
+            {row.original.tonnage ? `${row.original.tonnage} tons` : '-'}
+          </Typography>
+        )
+      }),
+      columnHelper.accessor('tripCost', {
+        header: 'Price (GH₵)',
+        cell: ({ row }) => (
+          <Typography color='text.primary' className='font-medium'>
+            {row.original.tripCost ? `GH₵ ${Number(row.original.tripCost).toFixed(2)}` : '-'}
+          </Typography>
+        )
+      }),
       columnHelper.accessor('manifests', {
         header: 'Manifests',
         cell: ({ row }) => (

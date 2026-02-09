@@ -112,6 +112,7 @@ const InvoicingReport = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [reportData, setReportData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [chartMounted, setChartMounted] = useState(false)
 
   const fetchReport = async () => {
     setLoading(true)
@@ -130,6 +131,11 @@ const InvoicingReport = () => {
   useEffect(() => {
     fetchReport()
   }, [selectedMonth, selectedYear])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setChartMounted(true), 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Generate year options
   const currentYear = new Date().getFullYear()
@@ -165,6 +171,11 @@ const InvoicingReport = () => {
   }
 
   // Invoice status chart
+  const byStatus = reportData?.byStatus || []
+  const statusAmounts = byStatus.map((s: any) => s.amount || 0)
+  const hasStatusData = statusAmounts.some((a: number) => a > 0)
+  const totalBilled = reportData?.summary?.totalBilled || 0
+
   const statusChartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'donut'
@@ -177,7 +188,7 @@ const InvoicingReport = () => {
     },
     dataLabels: {
       enabled: true,
-      formatter: (val: number) => `${val.toFixed(1)}%`
+      formatter: (val: number) => val != null ? `${val.toFixed(1)}%` : '0%'
     },
     plotOptions: {
       pie: {
@@ -190,23 +201,30 @@ const InvoicingReport = () => {
               show: true, 
               fontSize: '18px', 
               fontWeight: 600,
-              formatter: (val) => `KES ${Number(val).toLocaleString()}`
+              formatter: (val) => val != null ? `KES ${Number(val).toLocaleString()}` : 'KES 0'
             },
             total: {
               show: true,
               label: 'Total Billed',
               fontSize: '12px',
-              formatter: () => `KES ${reportData.summary.totalBilled.toLocaleString()}`
+              formatter: () => `KES ${totalBilled.toLocaleString()}`
             }
           }
         }
       }
+    },
+    noData: {
+      text: 'No invoice data',
+      align: 'center',
+      verticalAlign: 'middle'
     }
   }
 
-  const statusChartSeries = reportData.byStatus.map((s: any) => s.amount)
+  const statusChartSeries = hasStatusData ? statusAmounts : []
 
   // Invoice rate chart
+  const invoiceRate = parseFloat(reportData?.summary?.invoiceRate || '0')
+
   const invoiceRateChartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'radialBar'
@@ -230,7 +248,7 @@ const InvoicingReport = () => {
             show: true,
             fontSize: '24px',
             fontWeight: 600,
-            formatter: (val) => `${val.toFixed(1)}%`
+            formatter: (val) => val != null ? `${Number(val).toFixed(1)}%` : '0%'
           }
         }
       }
@@ -238,7 +256,7 @@ const InvoicingReport = () => {
     labels: ['Invoice Rate']
   }
 
-  const invoiceRateChartSeries = [parseFloat(reportData.summary.invoiceRate)]
+  const invoiceRateChartSeries = [invoiceRate]
 
   return (
     <Grid container spacing={6}>
@@ -333,20 +351,23 @@ const InvoicingReport = () => {
         <Card className='h-full'>
           <CardHeader title='Payment Status Distribution' subheader='By invoice status' />
           <CardContent>
-            {reportData.byStatus.some((s: any) => s.amount > 0) ? (
-              <ApexChart
-                type='donut'
-                height={300}
-                options={statusChartOptions}
-                series={statusChartSeries}
-              />
-            ) : (
-              <Box className='text-center py-12'>
-                <Typography variant='body2' color='text.secondary'>
-                  No invoice data available
-                </Typography>
-              </Box>
-            )}
+            <Box sx={{ minHeight: 300 }}>
+              {chartMounted && hasStatusData ? (
+                <ApexChart
+                  type='donut'
+                  height={300}
+                  width='100%'
+                  options={statusChartOptions}
+                  series={statusChartSeries}
+                />
+              ) : chartMounted ? (
+                <Box className='text-center py-12'>
+                  <Typography variant='body2' color='text.secondary'>
+                    No invoice data available
+                  </Typography>
+                </Box>
+              ) : null}
+            </Box>
           </CardContent>
         </Card>
       </Grid>
@@ -359,12 +380,17 @@ const InvoicingReport = () => {
             <Grid container spacing={4}>
               <Grid item xs={12} sm={6}>
                 <Box className='text-center'>
-                  <ApexChart
-                    type='radialBar'
-                    height={200}
-                    options={invoiceRateChartOptions}
-                    series={invoiceRateChartSeries}
-                  />
+                  <Box sx={{ minHeight: 200 }}>
+                    {chartMounted && (
+                      <ApexChart
+                        type='radialBar'
+                        height={200}
+                        width='100%'
+                        options={invoiceRateChartOptions}
+                        series={invoiceRateChartSeries}
+                      />
+                    )}
+                  </Box>
                   <Typography variant='caption' color='text.secondary'>
                     {reportData.summary.invoicedTrips} of {reportData.summary.invoicedTrips + reportData.summary.uninvoicedTrips} trips invoiced
                   </Typography>
@@ -513,7 +539,7 @@ const InvoicingReport = () => {
                       </TableCell>
                       <TableCell align='right'>
                         <Typography variant='body2' fontWeight={600}>
-                          KES {(trip.clientRate || 0).toLocaleString()}
+                          KES {(trip.tripCost || trip.clientRate || 0).toLocaleString()}
                         </Typography>
                       </TableCell>
                     </TableRow>

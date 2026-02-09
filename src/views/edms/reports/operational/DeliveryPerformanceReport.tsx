@@ -103,6 +103,7 @@ const DeliveryPerformanceReport = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [reportData, setReportData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [chartMounted, setChartMounted] = useState(false)
 
   const fetchReport = async () => {
     setLoading(true)
@@ -121,6 +122,11 @@ const DeliveryPerformanceReport = () => {
   useEffect(() => {
     fetchReport()
   }, [selectedMonth, selectedYear])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setChartMounted(true), 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Generate year options
   const currentYear = new Date().getFullYear()
@@ -156,6 +162,10 @@ const DeliveryPerformanceReport = () => {
   }
 
   // Chart options for delivery trends
+  const chartLabels = reportData?.chartData?.labels || []
+  const chartTrips = reportData?.chartData?.trips || []
+  const chartDeliveries = reportData?.chartData?.deliveries || []
+
   const deliveryChartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'area',
@@ -177,12 +187,13 @@ const DeliveryPerformanceReport = () => {
       }
     },
     xaxis: {
-      categories: reportData.chartData.labels,
+      categories: chartLabels,
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' }
       }
     },
     yaxis: {
+      min: 0,
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' }
       }
@@ -196,12 +207,17 @@ const DeliveryPerformanceReport = () => {
     },
     tooltip: {
       theme: 'dark'
+    },
+    noData: {
+      text: 'No delivery data available',
+      align: 'center',
+      verticalAlign: 'middle'
     }
   }
 
   const deliveryChartSeries = [
-    { name: 'Completed Trips', data: reportData.chartData.trips },
-    { name: 'Delivered Packages', data: reportData.chartData.deliveries }
+    { name: 'Completed Trips', data: chartTrips },
+    { name: 'Delivered Packages', data: chartDeliveries }
   ]
 
   return (
@@ -314,12 +330,17 @@ const DeliveryPerformanceReport = () => {
         <Card>
           <CardHeader title='Daily Delivery Trends' />
           <CardContent>
-            <ApexChart
-              type='area'
-              height={350}
-              options={deliveryChartOptions}
-              series={deliveryChartSeries}
-            />
+            <Box sx={{ minHeight: 350 }}>
+              {chartMounted && (
+                <ApexChart
+                  type='area'
+                  height={350}
+                  width='100%'
+                  options={deliveryChartOptions}
+                  series={deliveryChartSeries}
+                />
+              )}
+            </Box>
           </CardContent>
         </Card>
       </Grid>

@@ -137,6 +137,26 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
                   {new Date(tripDetails.startTime).toLocaleString()}
                 </Typography>
               </Grid>
+              {tripDetails.tonnage && (
+                <Grid item xs={12} sm={6}>
+                  <Typography variant='body2' color='text.secondary'>
+                    Tonnage
+                  </Typography>
+                  <Typography variant='body1' className='font-semibold'>
+                    {tripDetails.tonnage} tons
+                  </Typography>
+                </Grid>
+              )}
+              {tripDetails.tripCost !== undefined && tripDetails.tripCost > 0 && (
+                <Grid item xs={12} sm={6}>
+                  <Typography variant='body2' color='text.secondary'>
+                    Trip Cost
+                  </Typography>
+                  <Typography variant='body1' className='font-semibold' color='primary'>
+                    GH₵ {tripDetails.tripCost.toFixed(2)}
+                  </Typography>
+                </Grid>
+              )}
               {tripDetails.notes && (
                 <Grid item xs={12}>
                   <Typography variant='body2' color='text.secondary'>

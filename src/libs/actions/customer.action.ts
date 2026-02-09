@@ -50,6 +50,7 @@ export async function saveTruckOrTricycleToDB(vehicle: Logistics) {
           monthlyRentalCost: vehicle.monthlyRentalCost || 0,
           driver: vehicle.driver || null,
           assignedRoutes: vehicle.assignedRoutes || [],
+          cbmVolume: vehicle.cbmVolume || null,
         }
     );
     return newVehicle;
@@ -79,6 +80,7 @@ export async function updateTruckOrTricycleInDB(vehicle: Logistics & { id: strin
           monthlyRentalCost: vehicle.monthlyRentalCost || 0,
           driver: vehicle.driver || null,
           assignedRoutes: vehicle.assignedRoutes || [],
+          cbmVolume: vehicle.cbmVolume || null,
       }
     );
     return updatedVehicle;

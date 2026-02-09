@@ -186,62 +186,62 @@ export default function EDMSDashboardContent() {
       </Box>
       
       <Grid container spacing={6}>
-        {/* EDMS Summary Cards - Revenue Overview Style */}
+        {/* EDMS Financial Overview */}
         <Grid item xs={12}>
           <Card className='bs-full'>
             <CardHeader
-              title='Delivery Overview'
+              title='Month Overview'
               action={<OptionMenu options={['Refresh', 'Share', 'Update']} />}
               subheader={
                 <div className='flex items-center gap-2'>
-                  <span>{isLoading ? <Shimmer width={200} height={20} /> : `${months[selectedMonth]} ${selectedYear} Analytics`}</span>
+                  <span>{isLoading ? <Shimmer width={200} height={20} /> : `${months[selectedMonth]} ${selectedYear} Financial Summary`}</span>
                 </div>
               }
             />
             <CardContent>
               <div className='flex flex-wrap justify-between gap-4'>
                 <div className='flex items-center gap-3'>
-                  <CustomAvatar variant='rounded' skin='light' color='primary'>
-                    <i className='ri-car-line'></i>
+                  <CustomAvatar variant='rounded' skin='light' color='success'>
+                    <i className='ri-money-dollar-circle-line'></i>
                   </CustomAvatar>
                   <div>
                     <Typography variant='h5'>
-                      {isLoading ? <Shimmer width={70} height={30} /> : (dashboardData?.vehicleStats?.totalVehicles || 0)}
+                      {isLoading ? <Shimmer width={120} height={30} /> : `GH₵ ${(dashboardData?.tripStats?.totalRevenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     </Typography>
-                    <Typography>Vehicles</Typography>
+                    <Typography>Total Revenue</Typography>
+                  </div>
+                </div>
+                <div className='flex items-center gap-3'>
+                  <CustomAvatar variant='rounded' skin='light' color='error'>
+                    <i className='ri-exchange-funds-line'></i>
+                  </CustomAvatar>
+                  <div>
+                    <Typography variant='h5'>
+                      {isLoading ? <Shimmer width={120} height={30} /> : `GH₵ ${(dashboardData?.expenseStats?.totalExpenses || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    </Typography>
+                    <Typography>Total Expenses</Typography>
                   </div>
                 </div>
                 <div className='flex items-center gap-3'>
                   <CustomAvatar variant='rounded' skin='light' color='warning'>
-                    <i className='ri-archive-line'></i>
+                    <i className='ri-percent-line'></i>
                   </CustomAvatar>
                   <div>
                     <Typography variant='h5'>
-                      {isLoading ? <Shimmer width={130} height={30} /> : (dashboardData?.packageStats?.totalPackages?.toLocaleString() || 0)}
+                      {isLoading ? <Shimmer width={120} height={30} /> : `GH₵ ${((dashboardData?.tripStats?.totalRevenue || 0) * 0.925).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     </Typography>
-                    <Typography>Total Packages</Typography>
+                    <Typography>Revenue After WHT (7.5%)</Typography>
                   </div>
                 </div>
                 <div className='flex items-center gap-3'>
-                  <CustomAvatar variant='rounded' skin='light' color='info'>
-                    <i className='ri-truck-line'></i>
+                  <CustomAvatar variant='rounded' skin='light' color='primary'>
+                    <i className='ri-line-chart-line'></i>
                   </CustomAvatar>
                   <div>
                     <Typography variant='h5'>
-                      {isLoading ? <Shimmer width={70} height={30} /> : (dashboardData?.tripStats?.totalTrips || 0)}
+                      {isLoading ? <Shimmer width={120} height={30} /> : `GH₵ ${(((dashboardData?.tripStats?.totalRevenue || 0) * 0.925) - (dashboardData?.expenseStats?.totalExpenses || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     </Typography>
-                    <Typography>Total Trips</Typography>
-                  </div>
-                </div>
-                <div className='flex items-center gap-3'>
-                  <CustomAvatar variant='rounded' skin='light' color='success'>
-                    <i className='ri-checkbox-circle-line'></i>
-                  </CustomAvatar>
-                  <div>
-                    <Typography variant='h5'>
-                      {isLoading ? <Shimmer width={70} height={30} /> : (dashboardData?.packageStats?.deliveredPackages?.toLocaleString() || 0)}
-                    </Typography>
-                    <Typography>Delivered</Typography>
+                    <Typography>Net Profit</Typography>
                   </div>
                 </div>
               </div>

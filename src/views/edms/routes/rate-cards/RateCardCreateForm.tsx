@@ -33,15 +33,19 @@ import dayjs from 'dayjs'
 
 LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
 
+import Autocomplete from '@mui/material/Autocomplete'
+import CircularProgress from '@mui/material/CircularProgress'
+
 // Third-party Imports
 import { toast } from 'react-toastify'
 
 // Type Imports
-import type { RateCardInput, VolumePrice } from '@/types/apps/deliveryTypes'
+import type { RateCardInput, VolumePrice, RouteType } from '@/types/apps/deliveryTypes'
 import { VOLUME_TIERS } from '@/types/apps/deliveryTypes'
 
 // Actions Imports
 import { createRateCard, getRateCardById, duplicateRateCard } from '@/libs/actions/ratecard.actions'
+import { getAllRoutes } from '@/libs/actions/route.actions'
 
 interface RateCardCreateFormProps {
   mode?: 'create' | 'edit'
@@ -61,7 +65,8 @@ const BIG_TRUCK_VOLUMES = [
   { volume: 41, revisedVolume: 41, tonnage: 8 },
   { volume: 50, revisedVolume: 50, tonnage: 10 },
   { volume: 55, revisedVolume: 55, tonnage: 12 },
-  { volume: 60, revisedVolume: 60, tonnage: 15 }
+  { volume: 60, revisedVolume: 60, tonnage: 15 },
+  { volume: 65, revisedVolume: 65, tonnage: 18 }
 ]
 
 const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCreateFormProps) => {
@@ -78,6 +83,9 @@ const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCre
   const [clientCode, setClientCode] = useState('')
   const [routeCode, setRouteCode] = useState('')
   const [routeDescription, setRouteDescription] = useState('')
+  const [selectedRoute, setSelectedRoute] = useState<RouteType | null>(null)
+  const [routes, setRoutes] = useState<RouteType[]>([])
+  const [routesLoading, setRoutesLoading] = useState(true)
   const [effectiveFrom, setEffectiveFrom] = useState<dayjs.Dayjs | null>(dayjs())
   const [effectiveTo, setEffectiveTo] = useState<dayjs.Dayjs | null>(null)
   const [isActive, setIsActive] = useState(true)
@@ -92,8 +100,27 @@ const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCre
     41: 0,
     50: 0,
     55: 0,
-    60: 0
+    60: 0,
+    65: 0
   })
+
+  // Load routes on mount
+  useEffect(() => {
+    const loadRoutes = async () => {
+      try {
+        setRoutesLoading(true)
+        const allRoutes = await getAllRoutes({ isActive: true })
+        setRoutes(allRoutes)
+      } catch (error) {
+        console.error('Error loading routes:', error)
+        toast.error('Failed to load routes')
+      } finally {
+        setRoutesLoading(false)
+      }
+    }
+
+    loadRoutes()
+  }, [])
 
   // Load data for duplication
   useEffect(() => {
@@ -111,13 +138,19 @@ const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCre
         setRouteDescription(sourceRateCard.routeDescription)
         setEffectiveFrom(dayjs()) // Reset effective date for duplicate
         setNotes(sourceRateCard.notes || '')
+
+        // Try to match route from loaded routes
+        if (sourceRateCard.route) {
+          const matchedRoute = routes.find(r => r.$id === (sourceRateCard.route as any)?.$id || r.$id === sourceRateCard.route)
+          if (matchedRoute) setSelectedRoute(matchedRoute)
+        }
         
         // Populate volume prices
         const prices = typeof sourceRateCard.volumePrices === 'string' 
           ? JSON.parse(sourceRateCard.volumePrices) 
           : sourceRateCard.volumePrices
         
-        const priceMap: Record<number, number> = { 10: 0, 14: 0, 18: 0, 37: 0, 41: 0, 50: 0, 55: 0, 60: 0 }
+        const priceMap: Record<number, number> = { 10: 0, 14: 0, 18: 0, 37: 0, 41: 0, 50: 0, 55: 0, 60: 0, 65: 0 }
         prices.forEach((vp: VolumePrice) => {
           priceMap[vp.volume] = vp.rate
         })
@@ -152,7 +185,7 @@ const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCre
     e.preventDefault()
 
     // Validation
-    if (!clientName || !clientCode || !routeCode || !routeDescription) {
+    if (!clientName || !clientCode || !selectedRoute) {
       toast.error('Please fill in all required fields')
       return
     }
@@ -196,6 +229,7 @@ const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCre
         clientCode: clientCode.trim().toUpperCase(),
         routeCode: routeCode.trim(),
         routeDescription: routeDescription.trim(),
+        route: selectedRoute?.$id,
         volumePrices: volumePricesArray,
         effectiveFrom: effectiveFrom.toISOString(),
         effectiveTo: effectiveTo ? effectiveTo.toISOString() : undefined,
@@ -271,24 +305,58 @@ const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCre
                   Route Information
                 </Typography>
                 <Grid container spacing={4}>
-                  <Grid item xs={12} md={4}>
+                  <Grid item xs={12} md={6}>
+                    <Autocomplete
+                      options={routes}
+                      value={selectedRoute}
+                      loading={routesLoading}
+                      getOptionLabel={(option) => `${option.routeCode} - ${option.routeName}`}
+                      isOptionEqualToValue={(option, value) => option.$id === value.$id}
+                      onChange={(_, newValue) => {
+                        setSelectedRoute(newValue)
+                        if (newValue) {
+                          setRouteCode(newValue.routeCode)
+                          setRouteDescription(newValue.routeName)
+                        } else {
+                          setRouteCode('')
+                          setRouteDescription('')
+                        }
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label='Select Route'
+                          required
+                          placeholder='Search and select a route...'
+                          InputProps={{
+                            ...params.InputProps,
+                            endAdornment: (
+                              <>
+                                {routesLoading ? <CircularProgress color='inherit' size={20} /> : null}
+                                {params.InputProps.endAdornment}
+                              </>
+                            ),
+                          }}
+                        />
+                      )}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={3}>
                     <TextField
                       fullWidth
                       label='Route Code'
                       value={routeCode}
-                      onChange={e => setRouteCode(e.target.value)}
-                      placeholder='e.g., Route A'
-                      required
+                      InputProps={{ readOnly: true }}
+                      helperText='Auto-filled from selected route'
                     />
                   </Grid>
-                  <Grid item xs={12} md={8}>
+                  <Grid item xs={12} md={3}>
                     <TextField
                       fullWidth
                       label='Route Description'
                       value={routeDescription}
-                      onChange={e => setRouteDescription(e.target.value)}
-                      placeholder='e.g., GH-Primary-Tema'
-                      required
+                      InputProps={{ readOnly: true }}
+                      helperText='Auto-filled from selected route'
                     />
                   </Grid>
                 </Grid>

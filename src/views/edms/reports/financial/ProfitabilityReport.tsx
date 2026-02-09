@@ -104,6 +104,7 @@ const ProfitabilityReport = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [reportData, setReportData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [chartMounted, setChartMounted] = useState(false)
 
   const fetchReport = async () => {
     setLoading(true)
@@ -122,6 +123,11 @@ const ProfitabilityReport = () => {
   useEffect(() => {
     fetchReport()
   }, [selectedMonth, selectedYear])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setChartMounted(true), 300)
+    return () => clearTimeout(timer)
+  }, [])
 
   // Generate year options
   const currentYear = new Date().getFullYear()
@@ -157,6 +163,12 @@ const ProfitabilityReport = () => {
   }
 
   // Combined chart options
+  const chartLabels = reportData?.chartData?.labels || []
+  const chartRevenue = reportData?.chartData?.revenue || []
+  const chartExpenses = reportData?.chartData?.expenses || []
+  const chartProfit = reportData?.chartData?.profit || []
+  const profitMargin = reportData?.summary?.profitMargin ?? 0
+
   const combinedChartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'area',
@@ -178,7 +190,7 @@ const ProfitabilityReport = () => {
       }
     },
     xaxis: {
-      categories: reportData.chartData.labels,
+      categories: chartLabels,
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' }
       },
@@ -188,7 +200,7 @@ const ProfitabilityReport = () => {
     yaxis: {
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' },
-        formatter: (val) => `KES ${(val / 1000).toFixed(0)}K`
+        formatter: (val) => val != null ? `KES ${(val / 1000).toFixed(0)}K` : 'KES 0K'
       }
     },
     legend: {
@@ -202,18 +214,23 @@ const ProfitabilityReport = () => {
     tooltip: {
       theme: 'dark',
       y: {
-        formatter: (val) => `KES ${val.toLocaleString()}`
+        formatter: (val) => val != null ? `KES ${val.toLocaleString()}` : 'KES 0'
       }
     },
     dataLabels: {
       enabled: false
+    },
+    noData: {
+      text: 'No profitability data available',
+      align: 'center',
+      verticalAlign: 'middle'
     }
   }
 
   const combinedChartSeries = [
-    { name: 'Revenue', data: reportData.chartData.revenue },
-    { name: 'Expenses', data: reportData.chartData.expenses },
-    { name: 'Profit', data: reportData.chartData.profit }
+    { name: 'Revenue', data: chartRevenue },
+    { name: 'Expenses', data: chartExpenses },
+    { name: 'Profit', data: chartProfit }
   ]
 
   // Profitability gauge
@@ -221,7 +238,7 @@ const ProfitabilityReport = () => {
     chart: {
       type: 'radialBar'
     },
-    colors: [reportData.summary.profitMargin >= 30 ? '#28C76F' : reportData.summary.profitMargin >= 15 ? '#FF9F43' : '#EA5455'],
+    colors: [profitMargin >= 30 ? '#28C76F' : profitMargin >= 15 ? '#FF9F43' : '#EA5455'],
     plotOptions: {
       radialBar: {
         hollow: {
@@ -240,7 +257,7 @@ const ProfitabilityReport = () => {
             show: true,
             fontSize: '24px',
             fontWeight: 600,
-            formatter: (val) => `${val.toFixed(1)}%`
+            formatter: (val) => val != null ? `${Number(val).toFixed(1)}%` : '0%'
           }
         }
       }
@@ -248,7 +265,7 @@ const ProfitabilityReport = () => {
     labels: ['Profit Margin']
   }
 
-  const gaugeChartSeries = [Math.max(0, Math.min(100, reportData.summary.profitMargin))]
+  const gaugeChartSeries = [Math.max(0, Math.min(100, profitMargin))]
 
   return (
     <Grid container spacing={6}>
@@ -324,8 +341,8 @@ const ProfitabilityReport = () => {
           value={`KES ${reportData.summary.grossProfit.toLocaleString()}`}
           icon='ri-line-chart-line'
           color={reportData.summary.grossProfit >= 0 ? 'primary' : 'error'}
-          trend={reportData.comparison.trend}
-          trendValue={reportData.comparison.change.toString()}
+          trend={reportData.comparison?.trend}
+          trendValue={String(reportData.comparison?.change ?? 0)}
         />
       </Grid>
       <Grid item xs={12} sm={6} md={3}>
@@ -343,12 +360,17 @@ const ProfitabilityReport = () => {
         <Card>
           <CardHeader title='Revenue vs Expenses vs Profit' subheader='Daily financial comparison' />
           <CardContent>
-            <ApexChart
-              type='area'
-              height={350}
-              options={combinedChartOptions}
-              series={combinedChartSeries}
-            />
+            <Box sx={{ minHeight: 350 }}>
+              {chartMounted && (
+                <ApexChart
+                  type='area'
+                  height={350}
+                  width='100%'
+                  options={combinedChartOptions}
+                  series={combinedChartSeries}
+                />
+              )}
+            </Box>
           </CardContent>
         </Card>
       </Grid>
@@ -358,12 +380,17 @@ const ProfitabilityReport = () => {
         <Card className='h-full'>
           <CardHeader title='Profit Margin' subheader='Overall profitability indicator' />
           <CardContent className='flex flex-col items-center'>
-            <ApexChart
-              type='radialBar'
-              height={280}
-              options={gaugeChartOptions}
-              series={gaugeChartSeries}
-            />
+            <Box sx={{ minHeight: 280 }}>
+              {chartMounted && (
+                <ApexChart
+                  type='radialBar'
+                  height={280}
+                  width='100%'
+                  options={gaugeChartOptions}
+                  series={gaugeChartSeries}
+                />
+              )}
+            </Box>
             <Box className='w-full mt-4'>
               <Box className='flex items-center justify-between p-3 rounded-lg' sx={{ bgcolor: 'action.hover' }}>
                 <Typography variant='body2'>Status</Typography>

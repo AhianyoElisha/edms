@@ -188,11 +188,19 @@ export async function getTripStatistics(month?: number, year?: number) {
       ]
     )
 
+    // Calculate total revenue from trip costs
+    let totalRevenue = 0
+    allTrips.documents.forEach((trip: any) => {
+      const cost = trip.tripCost || 0
+      totalRevenue += Number(cost)
+    })
+
     const result = {
       totalTrips: allTrips.total,
       completedTrips: completedTrips.total,
       activeTrips: activeTrips.total,
-      completionRate: allTrips.total > 0 ? ((completedTrips.total / allTrips.total) * 100).toFixed(1) : '0'
+      completionRate: allTrips.total > 0 ? ((completedTrips.total / allTrips.total) * 100).toFixed(1) : '0',
+      totalRevenue
     }
 
     setCachedData(cacheKey, result)
@@ -203,7 +211,8 @@ export async function getTripStatistics(month?: number, year?: number) {
       totalTrips: 0,
       completedTrips: 0,
       activeTrips: 0,
-      completionRate: '0'
+      completionRate: '0',
+      totalRevenue: 0
     }
   }
 }

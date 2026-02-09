@@ -122,6 +122,8 @@ export interface TripType {
   route: any // route ID (Many-to-one)
   tripDate: string
   startTime: string
+  tonnage?: string // e.g., '10' for 10 CBM volume tier
+  tripCost?: number // Price from rate card based on route + tonnage
   clientRate?: number
   driverRate?: number
   profit?: number
@@ -493,6 +495,7 @@ export const VOLUME_TIERS: VolumeTierConfig[] = [
   { volume: 50, revisedVolume: 50, tonnage: 10, truckCategory: 'big' },
   { volume: 55, revisedVolume: 55, tonnage: 12, truckCategory: 'big' },
   { volume: 60, revisedVolume: 60, tonnage: 15, truckCategory: 'big' },
+  { volume: 65, revisedVolume: 65, tonnage: 18, truckCategory: 'big' },
 ]
 
 // Price entry for a specific volume tier
@@ -507,6 +510,7 @@ export interface RateCardType {
   $id: string
   clientName: string // Name of the importer/client (e.g., "JUMIA", "FRANKO")
   clientCode: string // Unique code for the client
+  route?: any // Relationship to route document
   routeCode: string // Route code (e.g., "Route A", "Route B", "VDO 1")
   routeDescription: string // Route description (e.g., "GH-Primary-Tema", "GH-Primary-Dansoman")
   // Volume-based pricing - JSON string stored in DB, parsed to array
@@ -523,6 +527,7 @@ export interface RateCardType {
 export interface RateCardInput {
   clientName: string
   clientCode: string
+  route?: string // Route document ID (relationship)
   routeCode: string
   routeDescription: string
   volumePrices: VolumePrice[] // Array of prices per volume tier
@@ -617,6 +622,8 @@ export type ExpenseTypeCategory =
   | 'vehicle_purchase' 
   | 'office' 
   | 'salary' 
+  | 'allowance'
+  | 'truck_rental'
   | 'communication' 
   | 'utilities' 
   | 'trip_related'

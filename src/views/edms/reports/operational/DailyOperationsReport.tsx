@@ -317,7 +317,7 @@ const DailyOperationsReport = () => {
                   <TableCell>Vehicle</TableCell>
                   <TableCell>Route</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell align='right'>Client Rate</TableCell>
+                  <TableCell align='right'>Trip Cost</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -345,7 +345,7 @@ const DailyOperationsReport = () => {
                       </TableCell>
                       <TableCell align='right'>
                         <Typography variant='body2' fontWeight={500}>
-                          KES {(trip.clientRate || 0).toLocaleString()}
+                          KES {(trip.tripCost || trip.clientRate || 0).toLocaleString()}
                         </Typography>
                       </TableCell>
                     </TableRow>

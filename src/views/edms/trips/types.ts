@@ -8,6 +8,8 @@ export interface TripDetailsData {
   routeId: string
   routeName: string
   startTime: string
+  tonnage?: string
+  tripCost?: number
   notes?: string
 }
 
