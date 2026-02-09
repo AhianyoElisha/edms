@@ -47,7 +47,7 @@ export async function getDailyOperationsReport(date?: string) {
       [
         Query.greaterThanEqual('expenseDate', startOfDay),
         Query.lessThanEqual('expenseDate', endOfDay),
-        Query.select(['*', 'trip.*', 'vehicle.*']),
+        Query.select(['*', 'tripId.*', 'vehicleId.*']),
         Query.limit(500)
       ]
     )
