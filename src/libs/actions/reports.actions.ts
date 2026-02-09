@@ -2,7 +2,7 @@
 // Provides data fetching for operational and financial reports
 
 import { Query } from 'appwrite'
-import { appwriteConfig, databases } from '@/libs/appwrite.config'
+import { appwriteConfig, databases, tablesDB } from '@/libs/appwrite.config'
 
 // ============================================
 // OPERATIONAL REPORTS
@@ -18,18 +18,19 @@ export async function getDailyOperationsReport(date?: string) {
     const endOfDay = new Date(targetDate.setHours(23, 59, 59, 999)).toISOString()
 
     // Get trips for the day
-    const trips = await databases.listDocuments(
+    const trips = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.trips,
       [
         Query.greaterThanEqual('tripDate', startOfDay),
         Query.lessThanEqual('tripDate', endOfDay),
+        Query.select(['*', 'vehicle.*', 'driver.*', 'route.*']),
         Query.limit(100)
       ]
     )
 
     // Get manifests for the day
-    const manifests = await databases.listDocuments(
+    const manifests = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.manifests,
       [
@@ -40,34 +41,34 @@ export async function getDailyOperationsReport(date?: string) {
     )
 
     // Get expenses for the day
-    const expenses = await databases.listDocuments(
+    const expenses = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.expenses,
       [
         Query.greaterThanEqual('expenseDate', startOfDay),
         Query.lessThanEqual('expenseDate', endOfDay),
+        Query.select(['*', 'trip.*', 'vehicle.*']),
         Query.limit(500)
       ]
     )
 
     // Calculate statistics
     const totalTrips = trips.total
-    const completedTrips = trips.documents.filter((t: any) => t.status === 'completed').length
-    const inProgressTrips = trips.documents.filter((t: any) => t.status === 'in_progress').length
-    const cancelledTrips = trips.documents.filter((t: any) => t.status === 'cancelled').length
+    const completedTrips = trips.rows.filter((t: any) => t.status === 'completed').length
+    const inProgressTrips = trips.rows.filter((t: any) => t.status === 'in_progress').length
+    const cancelledTrips = trips.rows.filter((t: any) => t.status === 'cancelled').length
 
     const totalManifests = manifests.total
-    const deliveredManifests = manifests.documents.filter((m: any) => m.status === 'delivered').length
+    const deliveredManifests = manifests.rows.filter((m: any) => m.status === 'delivered').length
     
     // Package counts from manifests
-    const totalPackages = manifests.documents.reduce((sum: number, m: any) => sum + (m.packageCount || 0), 0)
-    const deliveredPackages = manifests.documents.reduce((sum: number, m: any) => sum + (m.deliveredCount || 0), 0)
-
-    const totalExpenses = expenses.documents.reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
+    const totalPackages = manifests.rows.reduce((sum: number, m: any) => sum + (m.packageCount || 0), 0)
+    const deliveredPackages = manifests.rows.reduce((sum: number, m: any) => sum + (m.deliveredCount || 0), 0)
+    const totalExpenses = expenses.rows.reduce((sum: number, e: any) => sum + (e.amount || 0), 0)
 
     // Get unique drivers and vehicles
-    const uniqueDrivers = new Set(trips.documents.map((t: any) => t.driver).filter(Boolean))
-    const uniqueVehicles = new Set(trips.documents.map((t: any) => t.vehicle).filter(Boolean))
+    const uniqueDrivers = new Set(trips.rows.map((t: any) => t.driver).filter(Boolean))
+    const uniqueVehicles = new Set(trips.rows.map((t: any) => t.vehicle).filter(Boolean))
 
     return {
       date: targetDate.toISOString().split('T')[0],
@@ -77,13 +78,13 @@ export async function getDailyOperationsReport(date?: string) {
         inProgress: inProgressTrips,
         cancelled: cancelledTrips,
         completionRate: totalTrips > 0 ? ((completedTrips / totalTrips) * 100).toFixed(1) : '0',
-        list: trips.documents
+        list: trips.rows
       },
       manifests: {
         total: totalManifests,
         delivered: deliveredManifests,
         pending: totalManifests - deliveredManifests,
-        list: manifests.documents
+        list: manifests.rows
       },
       packages: {
         total: totalPackages,
@@ -94,7 +95,7 @@ export async function getDailyOperationsReport(date?: string) {
       expenses: {
         total: totalExpenses,
         count: expenses.total,
-        list: expenses.documents
+        list: expenses.rows
       },
       resources: {
         driversActive: uniqueDrivers.size,
@@ -123,7 +124,7 @@ export async function getDeliveryPerformanceReport(month?: number, year?: number
     const endDate = endOfMonth.toISOString()
 
     // Get all trips for the month
-    const trips = await databases.listDocuments(
+    const trips = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.trips,
       [
@@ -134,7 +135,7 @@ export async function getDeliveryPerformanceReport(month?: number, year?: number
     )
 
     // Get all manifests for the month
-    const manifests = await databases.listDocuments(
+    const manifests = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.manifests,
       [
@@ -157,7 +158,7 @@ export async function getDeliveryPerformanceReport(month?: number, year?: number
     }))
 
     // Aggregate trip data by day
-    trips.documents.forEach((trip: any) => {
+    trips.rows.forEach((trip: any) => {
       const tripDay = new Date(trip.tripDate).getDate() - 1
       if (tripDay >= 0 && tripDay < daysInMonth) {
         dailyStats[tripDay].trips++
@@ -168,7 +169,7 @@ export async function getDeliveryPerformanceReport(month?: number, year?: number
     })
 
     // Aggregate manifest data by day
-    manifests.documents.forEach((manifest: any) => {
+    manifests.rows.forEach((manifest: any) => {
       const manifestDay = new Date(manifest.$createdAt).getDate() - 1
       if (manifestDay >= 0 && manifestDay < daysInMonth) {
         dailyStats[manifestDay].manifests++
@@ -182,12 +183,11 @@ export async function getDeliveryPerformanceReport(month?: number, year?: number
 
     // Calculate totals
     const totalTrips = trips.total
-    const completedTrips = trips.documents.filter((t: any) => t.status === 'completed').length
+    const completedTrips = trips.rows.filter((t: any) => t.status === 'completed').length
     const totalManifests = manifests.total
-    const deliveredManifests = manifests.documents.filter((m: any) => m.status === 'delivered').length
-    const totalPackages = manifests.documents.reduce((sum: number, m: any) => sum + (m.packageCount || 0), 0)
-    const deliveredPackages = manifests.documents.reduce((sum: number, m: any) => sum + (m.deliveredCount || 0), 0)
-
+    const deliveredManifests = manifests.rows.filter((m: any) => m.status === 'delivered').length
+    const totalPackages = manifests.rows.reduce((sum: number, m: any) => sum + (m.packageCount || 0), 0)
+    const deliveredPackages = manifests.rows.reduce((sum: number, m: any) => sum + (m.deliveredCount || 0), 0)
     return {
       period: {
         month: currentMonth,
@@ -234,14 +234,14 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
     const endDate = endOfMonth.toISOString()
 
     // Get all users (drivers)
-    const users = await databases.listDocuments(
+    const users = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.users,
       [Query.limit(500)]
     )
 
     // Get all trips for the month
-    const trips = await databases.listDocuments(
+    const trips = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.trips,
       [
@@ -252,7 +252,7 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
     )
 
     // Get expenses for the month
-    const expenses = await databases.listDocuments(
+    const expenses = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.expenses,
       [
@@ -266,7 +266,7 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
     const driverMap = new Map<string, any>()
     
     // Initialize with all users
-    users.documents.forEach((user: any) => {
+    users.rows.forEach((user: any) => {
       driverMap.set(user.$id, {
         driverId: user.$id,
         driverName: user.name || user.email || 'Unknown',
@@ -284,7 +284,7 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
     })
 
     // Aggregate trip data by driver
-    trips.documents.forEach((trip: any) => {
+    trips.rows.forEach((trip: any) => {
       const driverId = trip.driver
       if (driverId && driverMap.has(driverId)) {
         const driver = driverMap.get(driverId)
@@ -301,9 +301,9 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
     })
 
     // Aggregate expense data by trip's driver
-    expenses.documents.forEach((expense: any) => {
+    expenses.rows.forEach((expense: any) => {
       if (expense.tripId) {
-        const trip = trips.documents.find((t: any) => t.$id === expense.tripId)
+        const trip = trips.rows.find((t: any) => t.$id === expense.tripId)
         if (trip && trip.driver && driverMap.has(trip.driver)) {
           const driver = driverMap.get(trip.driver)
           driver.totalExpenses += expense.amount || 0
@@ -334,7 +334,7 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
       topPerformers: driverPerformance.slice(0, 5),
       summary: {
         totalTrips: trips.total,
-        completedTrips: trips.documents.filter((t: any) => t.status === 'completed').length,
+        completedTrips: trips.rows.filter((t: any) => t.status === 'completed').length,
         totalRevenue: driverPerformance.reduce((sum, d) => sum + d.totalRevenue, 0),
         totalExpenses: driverPerformance.reduce((sum, d) => sum + d.totalExpenses, 0)
       }
