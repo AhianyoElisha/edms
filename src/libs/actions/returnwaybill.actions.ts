@@ -370,8 +370,6 @@ export async function markReturnWaybillDelivered(
         status: 'delivered',
         deliveredAt: new Date().toISOString(),
         receivedBy,
-        receiverSignature: signatureFileId || null,
-        proofOfDelivery: podFileId || null
       }
     )
 
