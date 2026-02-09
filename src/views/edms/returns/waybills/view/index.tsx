@@ -272,7 +272,6 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
     }
   }
 
-  console.log(waybillData.proofOfDelivery, 'Proof of delivery URL')
   // Get location name helper
   const getLocationName = (location: any): string => {
     if (!location) return 'N/A'
