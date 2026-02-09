@@ -201,13 +201,13 @@ const InvoicingReport = () => {
               show: true, 
               fontSize: '18px', 
               fontWeight: 600,
-              formatter: (val) => val != null ? `KES ${Number(val).toLocaleString()}` : 'KES 0'
+              formatter: (val) => val != null ? `GH₵ ${Number(val).toLocaleString()}` : 'GH₵ 0'
             },
             total: {
               show: true,
               label: 'Total Billed',
               fontSize: '12px',
-              formatter: () => `KES ${totalBilled.toLocaleString()}`
+              formatter: () => `GH₵ ${totalBilled.toLocaleString()}`
             }
           }
         }
@@ -313,7 +313,7 @@ const InvoicingReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Total Billed'
-          value={`KES ${reportData.summary.totalBilled.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.totalBilled.toLocaleString()}`}
           subtitle={`${reportData.summary.invoicedTrips} invoiced trips`}
           icon='ri-file-list-3-line'
           color='primary'
@@ -322,7 +322,7 @@ const InvoicingReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Collected'
-          value={`KES ${reportData.summary.totalPaid.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.totalPaid.toLocaleString()}`}
           subtitle={`${reportData.summary.collectionRate}% collection rate`}
           icon='ri-checkbox-circle-line'
           color='success'
@@ -331,7 +331,7 @@ const InvoicingReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Pending'
-          value={`KES ${reportData.summary.totalPending.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.totalPending.toLocaleString()}`}
           icon='ri-time-line'
           color='warning'
         />
@@ -453,7 +453,7 @@ const InvoicingReport = () => {
                     </Typography>
                   </Box>
                   <Typography variant='h4' fontWeight={600} className='mb-1'>
-                    KES {status.amount.toLocaleString()}
+                    GH₵ {status.amount.toLocaleString()}
                   </Typography>
                   <Typography variant='body2' color='text.secondary'>
                     {status.count} invoices
@@ -539,7 +539,7 @@ const InvoicingReport = () => {
                       </TableCell>
                       <TableCell align='right'>
                         <Typography variant='body2' fontWeight={600}>
-                          KES {(trip.tripCost || trip.clientRate || 0).toLocaleString()}
+                          GH₵ {(trip.tripCost || trip.clientRate || 0).toLocaleString()}
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -582,7 +582,7 @@ const InvoicingReport = () => {
                       <Typography variant='subtitle2' fontWeight={600}>Pending Collection</Typography>
                     </Box>
                     <Typography variant='body2' color='text.secondary'>
-                      KES {reportData.summary.totalPending.toLocaleString()} awaiting payment
+                      GH₵ {reportData.summary.totalPending.toLocaleString()} awaiting payment
                     </Typography>
                   </Box>
                 </Grid>

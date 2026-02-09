@@ -200,7 +200,7 @@ const ProfitabilityReport = () => {
     yaxis: {
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' },
-        formatter: (val) => val != null ? `KES ${(val / 1000).toFixed(0)}K` : 'KES 0K'
+        formatter: (val) => val != null ? `GH₵ ${(val / 1000).toFixed(0)}K` : 'GH₵ 0K'
       }
     },
     legend: {
@@ -214,7 +214,7 @@ const ProfitabilityReport = () => {
     tooltip: {
       theme: 'dark',
       y: {
-        formatter: (val) => val != null ? `KES ${val.toLocaleString()}` : 'KES 0'
+        formatter: (val) => val != null ? `GH₵ ${val.toLocaleString()}` : 'GH₵ 0'
       }
     },
     dataLabels: {
@@ -322,7 +322,7 @@ const ProfitabilityReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Total Revenue'
-          value={`KES ${reportData.summary.totalRevenue.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.totalRevenue.toLocaleString()}`}
           icon='ri-money-dollar-circle-line'
           color='success'
         />
@@ -330,7 +330,7 @@ const ProfitabilityReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Total Expenses'
-          value={`KES ${reportData.summary.totalExpenses.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.totalExpenses.toLocaleString()}`}
           icon='ri-wallet-3-line'
           color='error'
         />
@@ -338,7 +338,7 @@ const ProfitabilityReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Gross Profit'
-          value={`KES ${reportData.summary.grossProfit.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.grossProfit.toLocaleString()}`}
           icon='ri-line-chart-line'
           color={reportData.summary.grossProfit >= 0 ? 'primary' : 'error'}
           trend={reportData.comparison?.trend}
@@ -428,20 +428,20 @@ const ProfitabilityReport = () => {
                     <Typography variant='subtitle2' fontWeight={600}>Revenue</Typography>
                   </Box>
                   <Typography variant='h6' fontWeight={600} color='success.main'>
-                    KES {reportData.summary.totalRevenue.toLocaleString()}
+                    GH₵ {reportData.summary.totalRevenue.toLocaleString()}
                   </Typography>
                 </Box>
                 <Box className='flex justify-between'>
                   <Box>
                     <Typography variant='caption' color='text.secondary'>Collected</Typography>
                     <Typography variant='body2' fontWeight={500}>
-                      KES {reportData.breakdown.revenueBreakdown.paid.toLocaleString()}
+                      GH₵ {reportData.breakdown.revenueBreakdown.paid.toLocaleString()}
                     </Typography>
                   </Box>
                   <Box className='text-right'>
                     <Typography variant='caption' color='text.secondary'>Pending</Typography>
                     <Typography variant='body2' fontWeight={500}>
-                      KES {reportData.breakdown.revenueBreakdown.pending.toLocaleString()}
+                      GH₵ {reportData.breakdown.revenueBreakdown.pending.toLocaleString()}
                     </Typography>
                   </Box>
                 </Box>
@@ -455,7 +455,7 @@ const ProfitabilityReport = () => {
                     <Typography variant='subtitle2' fontWeight={600}>Expenses</Typography>
                   </Box>
                   <Typography variant='h6' fontWeight={600} color='error.main'>
-                    KES {reportData.summary.totalExpenses.toLocaleString()}
+                    GH₵ {reportData.summary.totalExpenses.toLocaleString()}
                   </Typography>
                 </Box>
                 <Box className='flex flex-wrap gap-2'>
@@ -463,7 +463,7 @@ const ProfitabilityReport = () => {
                     <Chip 
                       key={cat.category}
                       size='small'
-                      label={`${cat.category.replace('_', ' ')}: KES ${cat.amount.toLocaleString()}`}
+                      label={`${cat.category.replace('_', ' ')}: GH₵ ${cat.amount.toLocaleString()}`}
                       variant='outlined'
                     />
                   ))}
@@ -484,7 +484,7 @@ const ProfitabilityReport = () => {
                     fontWeight={600} 
                     color={reportData.summary.grossProfit >= 0 ? 'primary.main' : 'error.main'}
                   >
-                    KES {reportData.summary.grossProfit.toLocaleString()}
+                    GH₵ {reportData.summary.grossProfit.toLocaleString()}
                   </Typography>
                 </Box>
               </Box>
@@ -527,7 +527,7 @@ const ProfitabilityReport = () => {
                   <Box>
                     <Typography variant='caption' color='text.secondary'>Previous Month Profit</Typography>
                     <Typography variant='body1' fontWeight={500}>
-                      KES {reportData.comparison.previousProfit.toLocaleString()}
+                      GH₵ {reportData.comparison.previousProfit.toLocaleString()}
                     </Typography>
                   </Box>
                   <Box className='text-right'>
@@ -554,10 +554,10 @@ const ProfitabilityReport = () => {
                 </Typography>
                 <Box className='flex flex-col gap-2'>
                   <Typography variant='caption'>
-                    • Revenue of KES {reportData.summary.totalRevenue.toLocaleString()} with {reportData.summary.profitMargin}% margin
+                    • Revenue of GH₵ {reportData.summary.totalRevenue.toLocaleString()} with {reportData.summary.profitMargin}% margin
                   </Typography>
                   <Typography variant='caption'>
-                    • {reportData.summary.grossProfit >= 0 ? 'Profitable' : 'Loss-making'} month with KES {Math.abs(reportData.summary.grossProfit).toLocaleString()} {reportData.summary.grossProfit >= 0 ? 'profit' : 'loss'}
+                    • {reportData.summary.grossProfit >= 0 ? 'Profitable' : 'Loss-making'} month with GH₵ {Math.abs(reportData.summary.grossProfit).toLocaleString()} {reportData.summary.grossProfit >= 0 ? 'profit' : 'loss'}
                   </Typography>
                   <Typography variant='caption'>
                     • {reportData.comparison.trend === 'up' ? 'Improvement' : 'Decline'} of {Math.abs(reportData.comparison.change)}% from previous month

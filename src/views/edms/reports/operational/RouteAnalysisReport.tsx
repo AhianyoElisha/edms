@@ -195,7 +195,7 @@ const RouteAnalysisReport = () => {
       },
       {
         opposite: true,
-        title: { text: 'Revenue (KES)' },
+        title: { text: 'Revenue (GH₵)' },
         labels: {
           style: { colors: 'var(--mui-palette-text-secondary)' },
           formatter: (val) => val != null ? `${(val / 1000).toFixed(0)}K` : '0K'
@@ -349,7 +349,7 @@ const RouteAnalysisReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Total Revenue'
-          value={`KES ${reportData.summary.totalRevenue.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.totalRevenue.toLocaleString()}`}
           icon='ri-money-dollar-circle-line'
           color='info'
         />
@@ -480,7 +480,7 @@ const RouteAnalysisReport = () => {
                         <Box className='text-right'>
                           <Typography variant='caption' color='text.secondary'>Revenue</Typography>
                           <Typography variant='body2' fontWeight={600} color='success.main'>
-                            KES {Number(route.totalRevenue).toLocaleString()}
+                            GH₵ {Number(route.totalRevenue).toLocaleString()}
                           </Typography>
                         </Box>
                       </Box>
@@ -552,7 +552,7 @@ const RouteAnalysisReport = () => {
                       </TableCell>
                       <TableCell align='right'>
                         <Typography variant='body2' color='success.main' fontWeight={500}>
-                          KES {Number(route.totalRevenue).toLocaleString()}
+                          GH₵ {Number(route.totalRevenue).toLocaleString()}
                         </Typography>
                       </TableCell>
                       <TableCell align='center'>

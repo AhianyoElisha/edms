@@ -214,7 +214,7 @@ const ExpenseReport = () => {
       min: 0,
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' },
-        formatter: (val) => val != null ? `KES ${(val / 1000).toFixed(0)}K` : 'KES 0K'
+        formatter: (val) => val != null ? `GH₵ ${(val / 1000).toFixed(0)}K` : 'GH₵ 0K'
       }
     },
     grid: {
@@ -224,7 +224,7 @@ const ExpenseReport = () => {
     tooltip: {
       theme: 'dark',
       y: {
-        formatter: (val) => val != null ? `KES ${val.toLocaleString()}` : 'KES 0'
+        formatter: (val) => val != null ? `GH₵ ${val.toLocaleString()}` : 'GH₵ 0'
       }
     },
     dataLabels: {
@@ -331,7 +331,7 @@ const ExpenseReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Total Expenses'
-          value={`KES ${reportData.summary.totalExpenses.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.totalExpenses.toLocaleString()}`}
           icon='ri-wallet-3-line'
           color='error'
           trend={reportData.comparison?.trend}
@@ -350,7 +350,7 @@ const ExpenseReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Paid'
-          value={`KES ${reportData.summary.paidExpenses.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.paidExpenses.toLocaleString()}`}
           icon='ri-checkbox-circle-line'
           color='success'
         />
@@ -358,7 +358,7 @@ const ExpenseReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Average Expense'
-          value={`KES ${Number(reportData.summary.avgExpense).toLocaleString()}`}
+          value={`GH₵ ${Number(reportData.summary.avgExpense).toLocaleString()}`}
           subtitle='Per transaction'
           icon='ri-calculator-line'
           color='info'
@@ -448,7 +448,7 @@ const ExpenseReport = () => {
                       </Box>
                       <Box className='text-right'>
                         <Typography variant='body2' fontWeight={600}>
-                          KES {category.amount.toLocaleString()}
+                          GH₵ {category.amount.toLocaleString()}
                         </Typography>
                         <Typography variant='caption' color='text.secondary'>
                           {category.percentage}%
@@ -480,7 +480,7 @@ const ExpenseReport = () => {
                 <Box className='flex justify-between items-center mb-2'>
                   <Typography variant='body2'>Current Month</Typography>
                   <Typography variant='h6' fontWeight={600} color='error.main'>
-                    KES {reportData.summary.totalExpenses.toLocaleString()}
+                    GH₵ {reportData.summary.totalExpenses.toLocaleString()}
                   </Typography>
                 </Box>
                 <Typography variant='caption' color='text.secondary'>
@@ -492,7 +492,7 @@ const ExpenseReport = () => {
                 <Box className='flex justify-between items-center mb-2'>
                   <Typography variant='body2'>Previous Month</Typography>
                   <Typography variant='h6' fontWeight={600}>
-                    KES {reportData.comparison.previousMonth.toLocaleString()}
+                    GH₵ {reportData.comparison.previousMonth.toLocaleString()}
                   </Typography>
                 </Box>
                 <Typography variant='caption' color='text.secondary'>
@@ -583,7 +583,7 @@ const ExpenseReport = () => {
                       </TableCell>
                       <TableCell align='right'>
                         <Typography variant='body2' fontWeight={600} color='error.main'>
-                          KES {(expense.amount || 0).toLocaleString()}
+                          GH₵ {(expense.amount || 0).toLocaleString()}
                         </Typography>
                       </TableCell>
                     </TableRow>

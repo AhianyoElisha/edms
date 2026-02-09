@@ -198,7 +198,7 @@ const RevenueReport = () => {
       min: 0,
       labels: {
         style: { colors: 'var(--mui-palette-text-secondary)' },
-        formatter: (val) => val != null ? `KES ${(val / 1000).toFixed(0)}K` : 'KES 0K'
+        formatter: (val) => val != null ? `GH₵ ${(val / 1000).toFixed(0)}K` : 'GH₵ 0K'
       }
     },
     grid: {
@@ -208,7 +208,7 @@ const RevenueReport = () => {
     tooltip: {
       theme: 'dark',
       y: {
-        formatter: (val) => val != null ? `KES ${val.toLocaleString()}` : 'KES 0'
+        formatter: (val) => val != null ? `GH₵ ${val.toLocaleString()}` : 'GH₵ 0'
       }
     },
     dataLabels: {
@@ -257,13 +257,13 @@ const RevenueReport = () => {
               show: true, 
               fontSize: '18px', 
               fontWeight: 600,
-              formatter: (val) => val != null ? `KES ${Number(val).toLocaleString()}` : 'KES 0'
+              formatter: (val) => val != null ? `GH₵ ${Number(val).toLocaleString()}` : 'GH₵ 0'
             },
             total: {
               show: true,
               label: 'Total Revenue',
               fontSize: '12px',
-              formatter: () => `KES ${totalRevenue.toLocaleString()}`
+              formatter: () => `GH₵ ${totalRevenue.toLocaleString()}`
             }
           }
         }
@@ -333,7 +333,7 @@ const RevenueReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Total Revenue'
-          value={`KES ${reportData.summary.totalRevenue.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.totalRevenue.toLocaleString()}`}
           icon='ri-money-dollar-circle-line'
           color='success'
           trend={reportData.comparison?.trend}
@@ -343,7 +343,7 @@ const RevenueReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Collected'
-          value={`KES ${reportData.summary.paidRevenue.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.paidRevenue.toLocaleString()}`}
           subtitle={`${reportData.summary.collectionRate}% collection rate`}
           icon='ri-checkbox-circle-line'
           color='primary'
@@ -352,7 +352,7 @@ const RevenueReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Pending Collection'
-          value={`KES ${reportData.summary.pendingRevenue.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.pendingRevenue.toLocaleString()}`}
           icon='ri-time-line'
           color='warning'
         />
@@ -360,7 +360,7 @@ const RevenueReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Avg per Trip'
-          value={`KES ${Number(reportData.summary.avgRevenuePerTrip).toLocaleString()}`}
+          value={`GH₵ ${Number(reportData.summary.avgRevenuePerTrip).toLocaleString()}`}
           subtitle={`${reportData.summary.totalTrips} completed trips`}
           icon='ri-bar-chart-line'
           color='info'
@@ -421,7 +421,7 @@ const RevenueReport = () => {
                 <Box className='flex justify-between items-center mb-2'>
                   <Typography variant='body2'>Current Month</Typography>
                   <Typography variant='h6' fontWeight={600} color='success.main'>
-                    KES {reportData.summary.totalRevenue.toLocaleString()}
+                    GH₵ {reportData.summary.totalRevenue.toLocaleString()}
                   </Typography>
                 </Box>
                 <Typography variant='caption' color='text.secondary'>
@@ -433,7 +433,7 @@ const RevenueReport = () => {
                 <Box className='flex justify-between items-center mb-2'>
                   <Typography variant='body2'>Previous Month</Typography>
                   <Typography variant='h6' fontWeight={600}>
-                    KES {reportData.comparison.previousMonth.toLocaleString()}
+                    GH₵ {reportData.comparison.previousMonth.toLocaleString()}
                   </Typography>
                 </Box>
                 <Typography variant='caption' color='text.secondary'>
@@ -505,7 +505,7 @@ const RevenueReport = () => {
                     <Typography variant='caption' color='text.secondary'>Per completed trip</Typography>
                   </Box>
                 </Box>
-                <Typography variant='h6' fontWeight={600}>KES {Number(reportData.summary.avgRevenuePerTrip).toLocaleString()}</Typography>
+                <Typography variant='h6' fontWeight={600}>GH₵ {Number(reportData.summary.avgRevenuePerTrip).toLocaleString()}</Typography>
               </Box>
 
               <Box className='flex justify-between items-center p-3 rounded' sx={{ bgcolor: 'action.hover' }}>

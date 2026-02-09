@@ -276,7 +276,7 @@ const DriverPerformanceReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Total Revenue'
-          value={`KES ${reportData.summary.totalRevenue.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.totalRevenue.toLocaleString()}`}
           icon='ri-money-dollar-circle-line'
           color='info'
         />
@@ -284,7 +284,7 @@ const DriverPerformanceReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Total Expenses'
-          value={`KES ${reportData.summary.totalExpenses.toLocaleString()}`}
+          value={`GH₵ ${reportData.summary.totalExpenses.toLocaleString()}`}
           icon='ri-wallet-3-line'
           color='warning'
         />
@@ -349,7 +349,7 @@ const DriverPerformanceReport = () => {
                   <Box className='text-right'>
                     <Typography variant='body2' fontWeight={600}>{driver.completedTrips} trips</Typography>
                     <Typography variant='caption' color='success.main'>
-                      KES {Number(driver.totalRevenue).toLocaleString()}
+                      GH₵ {Number(driver.totalRevenue).toLocaleString()}
                     </Typography>
                   </Box>
                   <Chip 
@@ -442,12 +442,12 @@ const DriverPerformanceReport = () => {
                       </TableCell>
                       <TableCell align='right'>
                         <Typography variant='body2' color='success.main' fontWeight={500}>
-                          KES {Number(driver.totalRevenue).toLocaleString()}
+                          GH₵ {Number(driver.totalRevenue).toLocaleString()}
                         </Typography>
                       </TableCell>
                       <TableCell align='right'>
                         <Typography variant='body2' color='error.main' fontWeight={500}>
-                          KES {Number(driver.totalExpenses).toLocaleString()}
+                          GH₵ {Number(driver.totalExpenses).toLocaleString()}
                         </Typography>
                       </TableCell>
                       <TableCell align='right'>
@@ -456,7 +456,7 @@ const DriverPerformanceReport = () => {
                           fontWeight={600}
                           color={driver.profit >= 0 ? 'success.main' : 'error.main'}
                         >
-                          KES {Number(driver.profit).toLocaleString()}
+                          GH₵ {Number(driver.profit).toLocaleString()}
                         </Typography>
                       </TableCell>
                     </TableRow>

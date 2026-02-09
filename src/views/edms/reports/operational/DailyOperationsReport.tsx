@@ -205,7 +205,7 @@ const DailyOperationsReport = () => {
       <Grid item xs={12} sm={6} md={3}>
         <StatCard
           title='Daily Expenses'
-          value={`KES ${reportData.expenses.total.toLocaleString()}`}
+          value={`GH₵ ${reportData.expenses.total.toLocaleString()}`}
           subtitle={`${reportData.expenses.count} transactions`}
           icon='ri-money-dollar-circle-line'
           color='warning'
@@ -345,7 +345,7 @@ const DailyOperationsReport = () => {
                       </TableCell>
                       <TableCell align='right'>
                         <Typography variant='body2' fontWeight={500}>
-                          KES {(trip.tripCost || trip.clientRate || 0).toLocaleString()}
+                          GH₵ {(trip.tripCost || trip.clientRate || 0).toLocaleString()}
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -410,7 +410,7 @@ const DailyOperationsReport = () => {
                       </TableCell>
                       <TableCell align='right'>
                         <Typography variant='body2' fontWeight={500}>
-                          KES {(expense.amount || 0).toLocaleString()}
+                          GH₵ {(expense.amount || 0).toLocaleString()}
                         </Typography>
                       </TableCell>
                     </TableRow>
