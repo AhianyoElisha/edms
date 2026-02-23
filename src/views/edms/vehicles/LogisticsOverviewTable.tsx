@@ -47,12 +47,13 @@ import OptionMenu from '@core/components/option-menu'
 // Style Imports
 import tableStyles from '@core/styles/table.module.css'
 import { Logistics } from '@/types/apps/ecommerceTypes'
-import { getLogisticsList } from '@/libs/actions/customer.action'
+import { getLogisticsList, deleteVehicleFromDB } from '@/libs/actions/customer.action'
 import { toast } from 'react-toastify'
 import LoaderDark from '@/components/layout/shared/LoaderDark'
 import AddLogisticsDrawer from './AddTruckorTricycleDrawer'
 import EditLogisticsDrawer from './EditTruckorTricycleDrawer'
-import { Button, CardContent, TextField, TextFieldProps } from '@mui/material'
+import { Button, CardContent, TextField, TextFieldProps, Dialog, DialogTitle, DialogContent, DialogActions, Box } from '@mui/material'
+import { useAuth } from '@/contexts/AppwriteProvider'
 
 declare module '@tanstack/table-core' {
   interface FilterFns {
@@ -132,8 +133,14 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
   const [data, setData] = useState<Logistics[]>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [vehicleToDelete, setVehicleToDelete] = useState<Logistics | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const router = useRouter()
+  const { user } = useAuth()
+  const isAdmin = user?.role?.name === 'admin'
 
   // Hooks
   const { lang: locale } = useParams()
@@ -235,52 +242,40 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
       }),
       columnHelper.accessor('driver', {
         header: 'Driver',
-        cell: ({ row }) => (
-          <Typography color='text.primary'>
-            {row.original.driver?.length ? (
-              <Chip
-                variant='tonal'
-                label='Assigned'
-                size='small'
-                color='primary'
-                icon={<i className='ri-user-line' />}
-              />
-            ) : (
-              <Chip
-                variant='tonal'
-                label='Unassigned'
-                size='small'
-                color='secondary'
-                icon={<i className='ri-user-unfollow-line' />}
-              />
-            )}
-          </Typography>
-        )
-      }),
-      columnHelper.accessor('assignedRoutes', {
-        header: 'Routes',
-        cell: ({ row }) => (
-          <div className='flex items-center gap-1'>
-            {row.original.assignedRoutes && row.original.assignedRoutes.length > 0 ? (
-              <>
+        cell: ({ row }) => {
+          const driver = row.original.driver as any
+          const driverName = typeof driver === 'object' && driver !== null ? driver.name : null
+          
+          return (
+            <Typography color='text.primary'>
+              {driverName ? (
                 <Chip
                   variant='tonal'
-                  label={`${row.original.assignedRoutes.length} Route${row.original.assignedRoutes.length > 1 ? 's' : ''}`}
+                  label={driverName}
                   size='small'
-                  color='info'
-                  icon={<i className='ri-route-line' />}
+                  color='primary'
+                  icon={<i className='ri-user-line' />}
                 />
-              </>
-            ) : (
-              <Chip
-                variant='tonal'
-                label='No Routes'
-                size='small'
-                color='secondary'
-              />
-            )}
-          </div>
-        )
+              ) : driver && typeof driver === 'string' ? (
+                <Chip
+                  variant='tonal'
+                  label='Assigned'
+                  size='small'
+                  color='primary'
+                  icon={<i className='ri-user-line' />}
+                />
+              ) : (
+                <Chip
+                  variant='tonal'
+                  label='Unassigned'
+                  size='small'
+                  color='secondary'
+                  icon={<i className='ri-user-unfollow-line' />}
+                />
+              )}
+            </Typography>
+          )
+        }
       }),
       columnHelper.accessor('status', {
         header: 'Status',
@@ -304,28 +299,47 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
       }),
       columnHelper.accessor('actions', {
         header: 'Actions',
-        cell: ({ row }) => (
-          <div className='flex items-center'>
-            <OptionMenu
-              iconButtonProps={{ size: 'medium' }}
-              iconClassName='text-textSecondary text-[22px]'
-              options={[
-                {
-                  text: 'Edit',
-                  icon: 'ri-edit-box-line',
-                  linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
-                  menuItemProps: { onClick: () => setEditLogisticsOpen({ open: true, data: row.original })}
-                },
-                { 
-                  text: 'Details', 
-                  icon: 'ri-stack-line',
-                  linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
-                  menuItemProps: { onClick: () => router.push(`/vehicles/${row.original.$id}`) }
-                },
-              ]}
-            />
-          </div>
-        ),
+        cell: ({ row }) => {
+          const actionOptions: any[] = [
+            {
+              text: 'Edit',
+              icon: 'ri-edit-box-line',
+              linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
+              menuItemProps: { onClick: () => setEditLogisticsOpen({ open: true, data: row.original })}
+            },
+            { 
+              text: 'Details', 
+              icon: 'ri-stack-line',
+              linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
+              menuItemProps: { onClick: () => router.push(`/vehicles/${row.original.$id}`) }
+            },
+          ]
+
+          if (isAdmin) {
+            actionOptions.push({
+              text: 'Delete',
+              icon: 'ri-delete-bin-line',
+              linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4 text-error' },
+              menuItemProps: { 
+                onClick: () => {
+                  setVehicleToDelete(row.original)
+                  setDeleteDialogOpen(true)
+                  setDeleteError(null)
+                }
+              }
+            })
+          }
+
+          return (
+            <div className='flex items-center'>
+              <OptionMenu
+                iconButtonProps={{ size: 'medium' }}
+                iconClassName='text-textSecondary text-[22px]'
+                options={actionOptions}
+              />
+            </div>
+          )
+        },
         enableSorting: false
       })
     ],
@@ -473,6 +487,69 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
         vehicleData={editLogisticsOpen.data!}
         onSuccess={fetchLogisticsData}
       />
+
+      {/* Delete Vehicle Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => { setDeleteDialogOpen(false); setDeleteError(null) }}
+        maxWidth='xs'
+        fullWidth
+      >
+        <DialogTitle>
+          <div className='flex items-center gap-2'>
+            <i className='ri-error-warning-line text-error text-2xl' />
+            Delete Vehicle
+          </div>
+        </DialogTitle>
+        <DialogContent>
+          <Typography className='mb-2'>
+            Are you sure you want to delete vehicle <strong>"{vehicleToDelete?.vehicleNumber}"</strong>?
+          </Typography>
+          <Typography variant='body2' color='text.secondary'>
+            This action cannot be undone. All data associated with this vehicle will be permanently removed.
+          </Typography>
+          {deleteError && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'error.lighter', borderRadius: 1, border: '1px solid', borderColor: 'error.main' }}>
+              <Typography color="error.main" variant="body2">
+                {deleteError}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => { setDeleteDialogOpen(false); setDeleteError(null) }}
+            variant='outlined'
+            color='secondary'
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={async () => {
+              if (!vehicleToDelete) return
+              try {
+                setIsDeleting(true)
+                setDeleteError(null)
+                await deleteVehicleFromDB(vehicleToDelete.$id)
+                toast.success(`Vehicle "${vehicleToDelete.vehicleNumber}" deleted successfully`)
+                setDeleteDialogOpen(false)
+                setVehicleToDelete(null)
+                await fetchLogisticsData()
+              } catch (error: any) {
+                console.error('Error deleting vehicle:', error)
+                setDeleteError(error?.message || 'Failed to delete vehicle')
+              } finally {
+                setIsDeleting(false)
+              }
+            }}
+            color="error"
+            variant="contained"
+            disabled={isDeleting}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete Vehicle'}
+          </Button>
+        </DialogActions>
+      </Dialog>
   </>
   )
 }

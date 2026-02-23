@@ -245,13 +245,55 @@ export async function updateDropoffLocation(locationData: UpdateDropoffLocationD
 // Delete dropoff location
 export async function deleteDropoffLocation(locationId: string): Promise<void> {
   try {
+    // First, check if this dropoff location is referenced by any routes (as endLocation)
+    try {
+      const routeRefs = await databases.listDocuments(
+        appwriteConfig.database,
+        appwriteConfig.routes,
+        [Query.equal('endLocation', locationId), Query.limit(1)]
+      )
+      if (routeRefs.documents.length > 0) {
+        throw new Error(
+          `Cannot delete: This location is used as the end location in route "${routeRefs.documents[0].routeName || routeRefs.documents[0].$id}". Remove the route reference first.`
+        )
+      }
+    } catch (refError: any) {
+      if (refError.message?.startsWith('Cannot delete:')) throw refError
+      // If the query itself fails (e.g. collection doesn't exist yet), continue
+    }
+
+    // Check if referenced by any manifests (as dropofflocation)
+    try {
+      const manifestRefs = await databases.listDocuments(
+        appwriteConfig.database,
+        appwriteConfig.manifests,
+        [Query.equal('dropofflocation', locationId), Query.limit(1)]
+      )
+      if (manifestRefs.documents.length > 0) {
+        throw new Error(
+          `Cannot delete: This location is referenced by manifest "${manifestRefs.documents[0].manifestNumber || manifestRefs.documents[0].$id}". Remove the manifest reference first.`
+        )
+      }
+    } catch (refError: any) {
+      if (refError.message?.startsWith('Cannot delete:')) throw refError
+      // If the query itself fails, continue
+    }
+
     await databases.deleteDocument(
       appwriteConfig.database,
       appwriteConfig.dropofflocations,
       locationId
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting dropoff location:', error)
+    if (error.message?.startsWith('Cannot delete:')) {
+      throw error
+    }
+    if (error?.code === 500 || error?.message?.includes('Server Error')) {
+      throw new Error(
+        'Cannot delete this dropoff location because it is referenced by other records (routes or manifests). Please remove those references first.'
+      )
+    }
     throw new Error('Failed to delete dropoff location')
   }
 }

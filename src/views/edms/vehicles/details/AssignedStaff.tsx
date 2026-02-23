@@ -43,7 +43,7 @@ const AssignedStaff = ({ vehicleData }: { vehicleData?: any }) => {
       <CardContent className='flex flex-col gap-6'>
         <Typography variant='h5'>Assigned Staff</Typography>
 
-        {staff.length > 0 ? (
+        {staff?.length > 0 ? (
           <>
             <div className='flex items-center gap-3'>
               {getAvatar({ avatar: staff.avatar, name: staff.name })}

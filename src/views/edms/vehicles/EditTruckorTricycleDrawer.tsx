@@ -40,7 +40,6 @@ const formSchema = z.object({
   ownership: z.enum(['owned', 'rented'], { message: "Ownership type is required" }),
   monthlyRentalCost: z.number().min(0).optional().or(z.literal('')),
   driver: z.string().optional(),
-  assignedRoutes: z.array(z.string()).optional(),
   status: z.enum(['active', 'maintenance', 'retired']).optional(),
 })
 
@@ -71,7 +70,6 @@ const EditLogisticsDrawer = (props: Props) => {
       ownership: vehicleData?.ownership || 'owned',
       monthlyRentalCost: vehicleData?.monthlyRentalCost || 0,
       driver: vehicleData?.driver || '',
-      assignedRoutes: vehicleData?.assignedRoutes || [],
       status: vehicleData?.status || 'active',
     }
   })
@@ -155,7 +153,6 @@ const EditLogisticsDrawer = (props: Props) => {
       ownership: vehicleData?.ownership || 'owned',
       monthlyRentalCost: vehicleData?.monthlyRentalCost || 0,
       driver: vehicleData?.driver || '',
-      assignedRoutes: vehicleData?.assignedRoutes || [],
       status: vehicleData?.status || 'active',
     })
     setError(null)
@@ -367,7 +364,7 @@ const EditLogisticsDrawer = (props: Props) => {
                   value={drivers.find((d) => d.$id === value) || null}
                   onChange={(_, newValue) => onChange(newValue?.$id || '')}
                   options={drivers}
-                  getOptionLabel={(option) => `${option.firstName || ''} ${option.lastName || ''} (${option.email || ''})`}
+                  getOptionLabel={(option) => `${option.name || 'Unnamed Driver'} `}
                   loading={loadingDrivers}
                   renderInput={(params) => (
                     <TextField
@@ -376,30 +373,6 @@ const EditLogisticsDrawer = (props: Props) => {
                       placeholder='Select a driver'
                       error={!!errors.driver}
                       helperText={errors.driver?.message || 'Assign a driver to this vehicle'}
-                    />
-                  )}
-                />
-              )}
-            />
-
-            <Controller
-              name='assignedRoutes'
-              control={control}
-              render={({ field: { onChange, value } }) => (
-                <Autocomplete
-                  multiple
-                  value={routes.filter((r) => value?.includes(r.$id)) || []}
-                  onChange={(_, newValue) => onChange(newValue.map((v) => v.$id))}
-                  options={routes}
-                  getOptionLabel={(option) => `${option.routeName || option.routeCode || ''}`}
-                  loading={loadingRoutes}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label='Assign Routes (Optional)'
-                      placeholder='Select routes'
-                      error={!!errors.assignedRoutes}
-                      helperText={errors.assignedRoutes?.message || 'Assign routes to this vehicle'}
                     />
                   )}
                 />

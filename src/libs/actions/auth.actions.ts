@@ -82,7 +82,7 @@ export async function getAllUsers(roleFilter?: string): Promise<any[]> {
     const queries = [Query.select(['*', 'role.*'])];
     
     if (roleFilter) {
-      queries.push(Query.equal('role', roleFilter));
+      queries.push(Query.equal('role.name', roleFilter));
     }
 
     const users = await tablesDB.listRows(

@@ -36,7 +36,7 @@ export const getAllManifests = async (filters?: ManifestFilters): Promise<Manife
     const response = await databases.listDocuments(
       DATABASE_ID,
       MANIFESTS_COLLECTION_ID,
-      [...queries, Query.select(['*', 'trip.*'])]
+      [...queries, Query.select(['*', 'trip.*']), Query.limit(1000)]
     )
     
     return response.documents as unknown as ManifestType[]
@@ -120,7 +120,8 @@ export const getManifestByIdWithRelations = async (manifestId: string) => {
           'trip.driver.*',
           'trip.route.*',
           'dropofflocation.*',
-        ])
+        ]),
+        Query.limit(1000)
       ]
     )
 

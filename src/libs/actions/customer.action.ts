@@ -49,7 +49,6 @@ export async function saveTruckOrTricycleToDB(vehicle: Logistics) {
           ownership: vehicle.ownership,
           monthlyRentalCost: vehicle.monthlyRentalCost || 0,
           driver: vehicle.driver || null,
-          assignedRoutes: vehicle.assignedRoutes || [],
           cbmVolume: vehicle.cbmVolume || null,
         }
     );
@@ -79,7 +78,6 @@ export async function updateTruckOrTricycleInDB(vehicle: Logistics & { id: strin
           ownership: vehicle.ownership,
           monthlyRentalCost: vehicle.monthlyRentalCost || 0,
           driver: vehicle.driver || null,
-          assignedRoutes: vehicle.assignedRoutes || [],
           cbmVolume: vehicle.cbmVolume || null,
       }
     );
@@ -87,6 +85,44 @@ export async function updateTruckOrTricycleInDB(vehicle: Logistics & { id: strin
   } catch (error) {
     console.error('Error updating vehicle:', error);
     throw error;
+  }
+}
+
+// Delete vehicle from database (Delivery Service)
+export async function deleteVehicleFromDB(vehicleId: string): Promise<void> {
+  try {
+    // Check if vehicle is referenced by any trips
+    try {
+      const tripRefs = await databases.listDocuments(
+        appwriteConfig.database,
+        appwriteConfig.trips,
+        [Query.equal('vehicle', vehicleId), Query.limit(1)]
+      )
+      if (tripRefs.documents.length > 0) {
+        throw new Error(
+          `Cannot delete: This vehicle is assigned to trip "${tripRefs.documents[0].tripNumber || tripRefs.documents[0].$id}". Remove the trip reference first.`
+        )
+      }
+    } catch (refError: any) {
+      if (refError.message?.startsWith('Cannot delete:')) throw refError
+    }
+
+    await databases.deleteDocument(
+      appwriteConfig.database,
+      appwriteConfig.vehicles,
+      vehicleId
+    )
+  } catch (error: any) {
+    console.error('Error deleting vehicle:', error)
+    if (error.message?.startsWith('Cannot delete:')) {
+      throw error
+    }
+    if (error?.code === 500 || error?.message?.includes('Server Error')) {
+      throw new Error(
+        'Cannot delete this vehicle because it is referenced by other records (trips or manifests). Please remove those references first.'
+      )
+    }
+    throw new Error('Failed to delete vehicle')
   }
 }
 
@@ -183,7 +219,7 @@ export async function getLogisticsList() {
     const inventoryList = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.vehicles,
-      [Query.orderDesc('$createdAt'), Query.select(['*', 'driver.*', 'assignedRoutes.*'])]
+      [Query.orderDesc('$createdAt'), Query.select(['*', 'driver.*'])]
     );
     if (!inventoryList) throw Error;
     return inventoryList;
@@ -223,7 +259,7 @@ export async function getVehicleDetailById(itemId: string) {
       itemId,
       [
         // Select all fields including relationships
-        Query.select(['*', 'driver.*', 'assignedRoutes.*']),
+        Query.select(['*', 'driver.*']),
       ]
     );
 

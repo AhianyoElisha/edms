@@ -81,6 +81,7 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
   const [addDrawerOpen, setAddDrawerOpen] = useState(false)
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
   const [locationToEdit, setLocationToEdit] = useState<DropoffLocationType | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Fetch locations
   const fetchLocations = async () => {
@@ -165,12 +166,14 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
   const handleConfirmDelete = async () => {
     if (locationToDelete) {
       try {
+        setDeleteError(null)
         await deleteDropoffLocation(locationToDelete.$id)
         setDeleteDialogOpen(false)
         setLocationToDelete(null)
         await fetchLocations() // Refresh data
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error deleting dropoff location:', error)
+        setDeleteError(error?.message || 'Failed to delete dropoff location')
       }
     }
   }
@@ -514,7 +517,7 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
       {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
+        onClose={() => { setDeleteDialogOpen(false); setDeleteError(null) }}
       >
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
@@ -522,9 +525,16 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
             Are you sure you want to delete the dropoff location "{locationToDelete?.locationName}"? 
             This action cannot be undone.
           </Typography>
+          {deleteError && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'error.lighter', borderRadius: 1, border: '1px solid', borderColor: 'error.main' }}>
+              <Typography color="error.main" variant="body2">
+                {deleteError}
+              </Typography>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>
+          <Button onClick={() => { setDeleteDialogOpen(false); setDeleteError(null) }}>
             Cancel
           </Button>
           <Button 

@@ -184,9 +184,66 @@ const StepTripDetails = ({ handleNext, wizardData, updateWizardData }: WizardSte
         <TextField
           select
           fullWidth
+          label='Select Vehicle'
+          value={vehicleId}
+          onChange={e => {
+            const selectedVehicleId = e.target.value
+            setVehicleId(selectedVehicleId)
+            
+            // Auto-populate driver if the vehicle has an assigned driver
+            const selectedVehicle = vehicles.find(v => v.$id === selectedVehicleId)
+            if (selectedVehicle?.driver) {
+              const driverField = selectedVehicle.driver as any
+              const vehicleDriverId = typeof driverField === 'object' 
+                ? driverField.$id 
+                : driverField
+              if (vehicleDriverId) {
+                // Check if this driver exists in our drivers list
+                const matchingDriver = drivers.find(d => d.$id === vehicleDriverId)
+                if (matchingDriver) {
+                  setDriverId(vehicleDriverId)
+                }
+              }
+            }
+          }}
+          required
+        >
+          {vehicles.length === 0 ? (
+            <MenuItem disabled>No active vehicles available</MenuItem>
+          ) : (
+            vehicles.map(vehicle => (
+              <MenuItem key={vehicle.$id} value={vehicle.$id}>
+                <div>
+                  <Typography variant='body1'>{vehicle.vehicleNumber}</Typography>
+                  <Typography variant='caption' color='text.secondary'>
+                    {vehicle.type} - {vehicle.brand} {vehicle.model}
+                  </Typography>
+                </div>
+              </MenuItem>
+            ))
+          )}
+        </TextField>
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          select
+          fullWidth
           label='Select Driver'
           value={driverId}
-          onChange={e => setDriverId(e.target.value)}
+          onChange={e => {
+            const selectedDriverId = e.target.value
+            setDriverId(selectedDriverId)
+            
+            // Auto-populate vehicle if this driver is assigned to one
+            const matchingVehicle = vehicles.find(v => {
+              const driverField = v.driver as any
+              const vehicleDriverId = typeof driverField === 'object' ? driverField?.$id : driverField
+              return vehicleDriverId === selectedDriverId
+            })
+            if (matchingVehicle) {
+              setVehicleId(matchingVehicle.$id)
+            }
+          }}
           required
         >
           {drivers.length === 0 ? (
@@ -206,31 +263,6 @@ const StepTripDetails = ({ handleNext, wizardData, updateWizardData }: WizardSte
         </TextField>
       </Grid>
 
-      <Grid item xs={12} sm={6}>
-        <TextField
-          select
-          fullWidth
-          label='Select Vehicle'
-          value={vehicleId}
-          onChange={e => setVehicleId(e.target.value)}
-          required
-        >
-          {vehicles.length === 0 ? (
-            <MenuItem disabled>No active vehicles available</MenuItem>
-          ) : (
-            vehicles.map(vehicle => (
-              <MenuItem key={vehicle.$id} value={vehicle.$id}>
-                <div>
-                  <Typography variant='body1'>{vehicle.vehicleNumber}</Typography>
-                  <Typography variant='caption' color='text.secondary'>
-                    {vehicle.type} - {vehicle.brand} {vehicle.model}
-                  </Typography>
-                </div>
-              </MenuItem>
-            ))
-          )}
-        </TextField>
-      </Grid>
 
       <Grid item xs={12}>
         <TextField

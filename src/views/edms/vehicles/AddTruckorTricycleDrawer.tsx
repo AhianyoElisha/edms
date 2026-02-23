@@ -44,7 +44,6 @@ const formSchema = z.object({
   ownership: z.enum(['owned', 'rented'], { message: "Ownership type is required" }),
   monthlyRentalCost: z.number().min(0).optional().or(z.literal('')),
   driver: z.string().optional(),
-  assignedRoutes: z.array(z.string()).optional(),
 })
 
 const AddLogisticsDrawer = (props: Props) => {
@@ -74,7 +73,6 @@ const AddLogisticsDrawer = (props: Props) => {
       ownership: 'owned',
       monthlyRentalCost: 0,
       driver: '',
-      assignedRoutes: [],
     }
   })
 
@@ -84,7 +82,6 @@ const AddLogisticsDrawer = (props: Props) => {
   useEffect(() => {
     if (open) {
       fetchDrivers()
-      fetchRoutes()
     }
   }, [open])
 
@@ -97,18 +94,6 @@ const AddLogisticsDrawer = (props: Props) => {
       console.error('Error fetching drivers:', error)
     } finally {
       setLoadingDrivers(false)
-    }
-  }
-
-  const fetchRoutes = async () => {
-    try {
-      setLoadingRoutes(true)
-      const response = await getAllRoutes()
-      setRoutes(response || [])
-    } catch (error) {
-      console.error('Error fetching routes:', error)
-    } finally {
-      setLoadingRoutes(false)
     }
   }
 
@@ -354,7 +339,7 @@ const AddLogisticsDrawer = (props: Props) => {
                   value={drivers.find((d) => d.$id === value) || null}
                   onChange={(_, newValue) => onChange(newValue?.$id || '')}
                   options={drivers}
-                  getOptionLabel={(option) => `${option.firstName || ''} ${option.lastName || ''} (${option.email || ''})`}
+                  getOptionLabel={(option) => `${option.name || ''}`}
                   loading={loadingDrivers}
                   renderInput={(params) => (
                     <TextField
@@ -369,29 +354,6 @@ const AddLogisticsDrawer = (props: Props) => {
               )}
             />
 
-            <Controller
-              name='assignedRoutes'
-              control={control}
-              render={({ field: { onChange, value } }) => (
-                <Autocomplete
-                  multiple
-                  value={routes.filter((r) => value?.includes(r.$id)) || []}
-                  onChange={(_, newValue) => onChange(newValue.map((v) => v.$id))}
-                  options={routes}
-                  getOptionLabel={(option) => `${option.routeName || option.routeCode || ''}`}
-                  loading={loadingRoutes}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label='Assign Routes (Optional)'
-                      placeholder='Select routes'
-                      error={!!errors.assignedRoutes}
-                      helperText={errors.assignedRoutes?.message || 'Assign routes to this vehicle'}
-                    />
-                  )}
-                />
-              )}
-            />
 
             <div className='flex items-center gap-4'>
               <Button
