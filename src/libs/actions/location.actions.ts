@@ -78,7 +78,7 @@ export async function createPickupLocation(locationData: CreatePickupLocationDat
 // Get all pickup locations
 export async function getAllPickupLocations(filters?: LocationFilters): Promise<PickupLocationType[]> {
   try {
-    const queries = [Query.orderDesc('$createdAt')]
+    const queries = [Query.orderDesc('$createdAt'), Query.limit(1000)]
     
     if (filters?.isActive !== undefined) {
       queries.push(Query.equal('isActive', filters.isActive))
@@ -176,7 +176,7 @@ export async function createDropoffLocation(locationData: CreateDropoffLocationD
 // Get all dropoff locations
 export async function getAllDropoffLocations(filters?: LocationFilters): Promise<DropoffLocationType[]> {
   try {
-    const queries = [Query.orderDesc('$createdAt')]
+    const queries = [Query.orderDesc('$createdAt'), Query.limit(1000)]
     
     if (filters?.isActive !== undefined) {
       queries.push(Query.equal('isActive', filters.isActive))
