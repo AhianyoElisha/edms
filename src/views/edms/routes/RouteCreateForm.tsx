@@ -208,7 +208,7 @@ const RouteCreateForm = () => {
                     value={routeName}
                     onChange={e => setRouteName(e.target.value)}
                     required
-                    placeholder='e.g., GH-Primary-Wa'
+                    placeholder='e.g., Downtown Express Route (Route A)'
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -218,7 +218,7 @@ const RouteCreateForm = () => {
                     value={routeCode}
                     onChange={e => setRouteCode(e.target.value)}
                     required
-                    placeholder='e.g., Route A'
+                    placeholder='e.g., RT-001'
                   />
                 </Grid>
                 <Grid item xs={12} sm={4}>
