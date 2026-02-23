@@ -11,7 +11,7 @@ import type { RouteType, RouteFilters, RouteStopType } from '@/types/apps/delive
  */
 export async function getAllRoutes(filters?: RouteFilters): Promise<RouteType[]> {
   try {
-    const queries: string[] = []
+    const queries: string[] = [Query.limit(200)]
 
     if (filters) {
       if (filters.search) {
