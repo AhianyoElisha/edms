@@ -79,7 +79,7 @@ export async function signOutAccount() {
 // ============================== GET ALL USERS
 export async function getAllUsers(roleFilter?: string): Promise<any[]> {
   try {
-    const queries = [Query.select(['*', 'role.*'])];
+    const queries = [Query.select(['*', 'role.*']), Query.limit(400)];
     
     if (roleFilter) {
       queries.push(Query.equal('role.name', roleFilter));
