@@ -38,6 +38,7 @@ const formSchema = z.object({
   model: z.string().optional(),
   year: z.number().min(1900).max(new Date().getFullYear() + 1).optional().or(z.literal('')),
   ownership: z.enum(['owned', 'rented'], { message: "Ownership type is required" }),
+  cbmVolume: z.number().min(0).optional().or(z.literal('')),
   monthlyRentalCost: z.number().min(0).optional().or(z.literal('')),
   driver: z.string().optional(),
   status: z.enum(['active', 'maintenance', 'retired']).optional(),
@@ -68,6 +69,7 @@ const EditLogisticsDrawer = (props: Props) => {
       model: vehicleData?.model || '',
       year: vehicleData?.year || undefined,
       ownership: vehicleData?.ownership || 'owned',
+      cbmVolume: vehicleData?.cbmVolume || undefined,
       monthlyRentalCost: vehicleData?.monthlyRentalCost || 0,
       driver: vehicleData?.driver || '',
       status: vehicleData?.status || 'active',
@@ -116,6 +118,7 @@ const EditLogisticsDrawer = (props: Props) => {
       const vehicleUpdateData = {
         ...data,
         year: data.year ? Number(data.year) : undefined,
+        cbmVolume: data.cbmVolume ? Number(data.cbmVolume) : undefined,
         monthlyRentalCost: data.ownership === 'rented' && data.monthlyRentalCost ? Number(data.monthlyRentalCost) : 0,
         status: data.status || 'active',
         id: vehicleData.$id
@@ -151,6 +154,7 @@ const EditLogisticsDrawer = (props: Props) => {
       model: vehicleData?.model || '',
       year: vehicleData?.year || undefined,
       ownership: vehicleData?.ownership || 'owned',
+      cbmVolume: vehicleData?.cbmVolume || undefined,
       monthlyRentalCost: vehicleData?.monthlyRentalCost || 0,
       driver: vehicleData?.driver || '',
       status: vehicleData?.status || 'active',
@@ -306,6 +310,27 @@ const EditLogisticsDrawer = (props: Props) => {
                 </FormControl>
               )}
             />
+
+
+            <Controller
+              name='cbmVolume'
+              control={control}
+              render={({ field: { onChange, value, ...field } }) => (
+                <TextField
+                  {...field}
+                  fullWidth
+                  type='number'
+                  label='CBM Volume (Capacity)'
+                  placeholder='e.g., 37, 50, 65'
+                  value={value || ''}
+                  onChange={(e) => onChange(e.target.value ? Number(e.target.value) : '')}
+                  error={!!errors.cbmVolume}
+                  helperText={errors.cbmVolume?.message || 'Cubic meter capacity of the vehicle'}
+                  inputProps={{ min: 0, step: 1 }}
+                />
+              )}
+            />
+
 
             <Divider />
             
