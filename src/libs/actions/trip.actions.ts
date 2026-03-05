@@ -261,7 +261,7 @@ export async function getAllTrips(filters?: {
     const response = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.trips,
-      [...queries, Query.select(['*', 'driver.*', 'vehicle.*', 'route.*', 'manifests.length'])]
+      [...queries, Query.select(['*', 'driver.*', 'vehicle.*', 'route.*', 'manifests.length']), Query.limit(1000)]
     )
 
     console.log('Fetched trips:', response)

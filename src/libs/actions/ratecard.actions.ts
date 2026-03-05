@@ -138,7 +138,8 @@ export async function getRateCardsByClient(clientCode: string): Promise<RateCard
     const queries = [
       Query.equal('clientCode', clientCode),
       Query.equal('isActive', true),
-      Query.orderAsc('routeCode')
+      Query.orderAsc('routeCode'),
+      Query.limit(500)
     ]
 
     const response = await databases.listDocuments(

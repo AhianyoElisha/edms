@@ -219,7 +219,7 @@ export async function getLogisticsList() {
     const inventoryList = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.vehicles,
-      [Query.orderDesc('$createdAt'), Query.select(['*', 'driver.*'])]
+      [Query.orderDesc('$createdAt'), Query.select(['*', 'driver.*']), Query.limit(400)]
     );
     if (!inventoryList) throw Error;
     return inventoryList;

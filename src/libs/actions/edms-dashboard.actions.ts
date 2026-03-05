@@ -241,7 +241,7 @@ export async function getDriverPerformance(month?: number, year?: number) {
       appwriteConfig.database,
       appwriteConfig.users,
       [
-        Query.limit(100)
+        Query.limit(200)
       ]
     )
 

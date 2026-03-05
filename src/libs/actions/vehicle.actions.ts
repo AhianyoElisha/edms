@@ -219,7 +219,8 @@ export async function getAvailableVehicles(): Promise<VehicleType[]> {
       [
         Query.equal('status', 'available'),
         Query.isNull('driverId'),
-        Query.orderDesc('$createdAt')
+        Query.orderDesc('$createdAt'),
+        Query.limit(500)
       ]
     )
     

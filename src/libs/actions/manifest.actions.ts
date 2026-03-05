@@ -322,7 +322,7 @@ export const getManifestStatistics = async (): Promise<ManifestStats> => {
     const totalResponse = await databases.listDocuments(
       DATABASE_ID,
       MANIFESTS_COLLECTION_ID,
-      [Query.limit(1)]
+      [Query.limit(1000)]
     )
     
     // Get counts by status

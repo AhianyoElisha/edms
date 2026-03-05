@@ -47,7 +47,7 @@ export async function getAllExpenses(filters?: ExpenseFilters): Promise<ExpenseT
     }
 
     queries.push(Query.orderDesc('expenseDate'))
-    queries.push(Query.limit(500))
+    queries.push(Query.limit(600))
 
     const response = await databases.listDocuments(
       appwriteConfig.database,
