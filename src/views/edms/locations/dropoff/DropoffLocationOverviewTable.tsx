@@ -49,6 +49,9 @@ import EditDropoffLocationDrawer from './EditDropoffLocationDrawer'
 import CustomAvatar from '@core/components/mui/Avatar'
 import OptionMenu from '@core/components/option-menu'
 
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 interface DropoffLocationOverviewTableProps {
   onEditLocation?: (location: DropoffLocationType) => void
   onAddLocation?: () => void
@@ -58,8 +61,12 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
   onEditLocation,
   onAddLocation
 }) => {
+  // Permissions
+  const { hasPermission } = usePermissions()
+
   // State management
   const [locations, setLocations] = useState<DropoffLocationType[]>([])
+
   const [filteredLocations, setFilteredLocations] = useState<DropoffLocationType[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
@@ -221,13 +228,15 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
         <CardHeader 
           title='Dropoff Locations Management' 
           action={
-            <Button
-              variant='contained'
-              startIcon={<i className='ri-add-line' />}
-              onClick={() => setAddDrawerOpen(true)}
-            >
-              Add Dropoff Location
-            </Button>
+            hasPermission('dropofflocations.create') ? (
+              <Button
+                variant='contained'
+                startIcon={<i className='ri-add-line' />}
+                onClick={() => setAddDrawerOpen(true)}
+              >
+                Add Dropoff Location
+              </Button>
+            ) : undefined
           }
         />
 
@@ -350,12 +359,12 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
                             linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
                             menuItemProps: { onClick: () => handleViewLocation(location) }
                           },
-                          {
+                          ...(hasPermission('dropofflocations.edit') ? [{
                             text: 'Edit',
                             icon: 'ri-edit-box-line',
                             linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
                             menuItemProps: { onClick: () => handleEditLocation(location) }
-                          },
+                          }] : []),
                           {
                             text: 'View on Map',
                             icon: 'ri-map-pin-line',
@@ -378,14 +387,14 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
                             linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
                             menuItemProps: { onClick: () => handleToggleStatus(location) }
                           },
-                          {
+                          ...(hasPermission('dropofflocations.delete') ? [{
                             text: 'Delete',
                             icon: 'ri-delete-bin-line',
                             linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4 text-error' },
                             menuItemProps: { 
                               onClick: () => handleDeleteClick(location)
                             }
-                          }
+                          }] : [])
                         ]}
                       />
                     </TableCell>

@@ -35,6 +35,9 @@ import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
 // Action Imports
 import { getReturnWaybillsByTrip } from '@/libs/actions/returnwaybill.actions'
 
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 // Timeline Imports
 import TimelineDot from '@mui/lab/TimelineDot'
 import TimelineItem from '@mui/lab/TimelineItem'
@@ -77,6 +80,8 @@ const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | '
       return 'primary'
     case 'pending':
     case 'planned':
+      return 'info'
+    case 'awaiting_manifests':
       return 'warning'
     case 'cancelled':
     case 'canceled':
@@ -92,6 +97,7 @@ const TripView = ({ tripData }: { tripData: any }) => {
   const [loadingReturns, setLoadingReturns] = useState(false)
   
   const router = useRouter()
+  const { hasPermission } = usePermissions()
 
   // Parse checkpoints
   const checkpoints = parseJSON(tripData.checkpoints)
@@ -159,11 +165,20 @@ const TripView = ({ tripData }: { tripData: any }) => {
                 Status:
               </Typography>
               <Chip
-                label={tripData.status?.charAt(0).toUpperCase() + tripData.status?.slice(1)}
+                label={tripData.status?.replace('_', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
                 variant='tonal'
                 color={getStatusColor(tripData.status)}
                 size='small'
               />
+              {tripData.status === 'awaiting_manifests' && (
+                <Chip
+                  label='Needs Manifests'
+                  variant='tonal'
+                  color='warning'
+                  size='small'
+                  icon={<i className='ri-alert-line' />}
+                />
+              )}
               {tripData.invoiceGenerated && (
                 <Chip
                   label='Invoice Generated'
@@ -174,15 +189,28 @@ const TripView = ({ tripData }: { tripData: any }) => {
               )}
             </div>
             <div className='flex flex-wrap gap-2'>
-              <Button
-                variant='outlined'
-                size='small'
-                color='warning'
-                startIcon={<i className='ri-arrow-go-back-line' />}
-                onClick={() => router.push(`/edms/returns/waybills/create?tripId=${tripData.$id}`)}
-              >
-                Create Return
-              </Button>
+              {tripData.status === 'awaiting_manifests' && hasPermission('manifests.create') && (
+                <Button
+                  variant='contained'
+                  size='small'
+                  color='warning'
+                  startIcon={<i className='ri-file-add-line' />}
+                  onClick={() => router.push(`/edms/trips/${tripData.$id}/add-manifests`)}
+                >
+                  Add Manifests
+                </Button>
+              )}
+              {hasPermission('deliveries.create') && (
+                <Button
+                  variant='outlined'
+                  size='small'
+                  color='warning'
+                  startIcon={<i className='ri-arrow-go-back-line' />}
+                  onClick={() => router.push(`/edms/returns/waybills/create?tripId=${tripData.$id}`)}
+                >
+                  Create Return
+                </Button>
+              )}
               <Button
                 variant='outlined'
                 size='small'
@@ -190,13 +218,15 @@ const TripView = ({ tripData }: { tripData: any }) => {
               >
                 Print
               </Button>
-              <Button
-                variant='contained'
-                size='small'
-                startIcon={<i className='ri-edit-line' />}
-              >
-                Edit
-              </Button>
+              {hasPermission('trips.edit') && (
+                <Button
+                  variant='contained'
+                  size='small'
+                  startIcon={<i className='ri-edit-line' />}
+                >
+                  Edit
+                </Button>
+              )}
             </div>
           </div>
 
@@ -822,13 +852,15 @@ const TripView = ({ tripData }: { tripData: any }) => {
                   <Typography variant='body2' color='text.secondary' className='mb-4'>
                     This trip doesn't have any return waybills yet
                   </Typography>
-                  <Button
-                    variant='contained'
-                    startIcon={<i className='ri-add-line' />}
-                    onClick={() => router.push(`/edms/returns/waybills/create?tripId=${tripData.$id}`)}
-                  >
-                    Create Return Waybill
-                  </Button>
+                  {hasPermission('deliveries.create') && (
+                    <Button
+                      variant='contained'
+                      startIcon={<i className='ri-add-line' />}
+                      onClick={() => router.push(`/edms/returns/waybills/create?tripId=${tripData.$id}`)}
+                    >
+                      Create Return Waybill
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

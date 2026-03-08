@@ -10,6 +10,7 @@ import Grid from '@mui/material/Grid'
 // Component Imports
 import LoaderDark from '@/components/layout/shared/LoaderDark'
 import TripView from '@/views/edms/trips/view'
+import PermissionGuard from '@/components/PermissionGuard'
 
 // Action Imports
 import { getTripById } from '@/libs/actions/trip.actions'
@@ -78,10 +79,12 @@ export default function TripViewPage() {
   }
 
   return (
-    <Grid container spacing={6}>
-      <Grid item xs={12}>
-        <TripView tripData={tripData} />
+    <PermissionGuard permissions={['trips.view', 'trips.manage']}>
+      <Grid container spacing={6}>
+        <Grid item xs={12}>
+          <TripView tripData={tripData} />
+        </Grid>
       </Grid>
-    </Grid>
+    </PermissionGuard>
   )
 }

@@ -2,6 +2,7 @@
 
 // React Imports
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 // MUI Imports
 import Grid from '@mui/material/Grid'
@@ -14,11 +15,11 @@ import FormControl from '@mui/material/FormControl'
 import InputLabel from '@mui/material/InputLabel'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
-import Divider from '@mui/material/Divider'
 import Chip from '@mui/material/Chip'
 import Alert from '@mui/material/Alert'
 import IconButton from '@mui/material/IconButton'
 import Box from '@mui/material/Box'
+import CircularProgress from '@mui/material/CircularProgress'
 import { TimePicker } from '@mui/x-date-pickers-pro'
 import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs'
 import { LocalizationProvider } from '@mui/x-date-pickers-pro'
@@ -26,6 +27,9 @@ import { LicenseInfo } from '@mui/x-license'
 import dayjs from 'dayjs'
 
 LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
+
+// Third-party Imports
+import { toast } from 'react-toastify'
 
 // Package size options
 const PACKAGE_SIZES = [
@@ -35,55 +39,46 @@ const PACKAGE_SIZES = [
 ] as const
 
 // Type Imports
-import type { WizardStepProps, ManifestData } from './types'
+import type { ManifestData } from './types'
 import type { RouteStopType } from '@/types/apps/deliveryTypes'
 
 // Actions
 import { getRouteDropoffLocations } from '@/libs/actions/route.actions'
+import { addManifestsToTrip } from '@/libs/actions/trip.actions'
 
-// Interface for manifest entry with unique ID
-interface ManifestEntry extends Partial<ManifestData> {
+interface ManifestEntry {
   id: string
   locationId: string
   locationName: string
   address: string
   sequence: number
+  manifestNumber?: string
+  packageSize?: string
+  packageCount?: number
+  estimatedArrival?: string
+  notes?: string
 }
 
-const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }: WizardStepProps) => {
-  // States
+interface AddManifestsViewProps {
+  tripData: any
+}
+
+const AddManifestsView = ({ tripData }: AddManifestsViewProps) => {
+  const router = useRouter()
   const [dropoffLocations, setDropoffLocations] = useState<RouteStopType[]>([])
   const [manifests, setManifests] = useState<ManifestEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
-  // Load dropoff locations from route
+  const routeId = typeof tripData.route === 'object' ? tripData.route.$id : tripData.route
+
   useEffect(() => {
     const loadDropoffs = async () => {
-      if (!wizardData.tripDetails.routeId) {
-        return
-      }
+      if (!routeId) return
 
       try {
-        const locations = await getRouteDropoffLocations(wizardData.tripDetails.routeId)
+        const locations = await getRouteDropoffLocations(routeId)
         setDropoffLocations(locations)
-
-        // Pre-populate if returning to this step
-        if (wizardData.manifests.length > 0) {
-          const existingManifests: ManifestEntry[] = wizardData.manifests.map((m, index) => ({
-            id: `manifest-${Date.now()}-${index}`,
-            locationId: m.dropoffLocationId,
-            locationName: m.dropoffLocationName,
-            address: m.dropoffAddress,
-            sequence: index + 1,
-            manifestNumber: m.manifestNumber,
-            packageSize: m.packageSize,
-            packageCount: m.packageCount,
-            departureTime: m.departureTime,
-            estimatedArrival: m.estimatedArrival,
-            notes: m.notes
-          }))
-          setManifests(existingManifests)
-        }
       } catch (error) {
         console.error('Error loading dropoff locations:', error)
       } finally {
@@ -92,7 +87,7 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
     }
 
     loadDropoffs()
-  }, [wizardData.tripDetails.routeId, wizardData.manifests])
+  }, [routeId])
 
   const generateManifestNumber = () => {
     const date = new Date()
@@ -123,7 +118,7 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
   }
 
   const updateManifest = (manifestId: string, field: string, value: string | number) => {
-    setManifests(manifests.map(m => 
+    setManifests(manifests.map(m =>
       m.id === manifestId ? { ...m, [field]: value } : m
     ))
   }
@@ -132,68 +127,62 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
     return manifests.filter(m => m.locationId === locationId)
   }
 
-  const handleSubmit = () => {
-    // Manifests are optional - user can skip and add them later
-    if (manifests.length > 0) {
-      // Validate all manifests that have been added
-      for (const manifest of manifests) {
-        if (!manifest.manifestNumber) {
-          alert('Please ensure all manifests have manifest numbers')
-          return
-        }
-        if (!manifest.packageSize) {
-          alert('Please select a package size for all manifests')
-          return
-        }
-        if (manifest.packageCount === undefined || manifest.packageCount < 1) {
-          alert('Please enter a valid package count (at least 1) for all manifests')
-          return
-        }
+  const handleSubmit = async () => {
+    if (manifests.length === 0) {
+      toast.error('Please add at least one manifest')
+      return
+    }
+
+    for (const manifest of manifests) {
+      if (!manifest.manifestNumber) {
+        toast.error('Please ensure all manifests have manifest numbers')
+        return
+      }
+      if (!manifest.packageSize) {
+        toast.error('Please select a package size for all manifests')
+        return
+      }
+      if (manifest.packageCount === undefined || manifest.packageCount < 1) {
+        toast.error('Please enter a valid package count (at least 1) for all manifests')
+        return
       }
     }
 
-    // Convert to array of ManifestData (empty array if no manifests)
-    const manifestData: ManifestData[] = manifests.map((m, index) => ({
-      tempId: m.id,
-      dropoffLocationId: m.locationId,
-      dropoffLocationName: m.locationName,
-      dropoffAddress: m.address,
-      manifestNumber: m.manifestNumber!,
-      packageSize: m.packageSize as 'small' | 'medium' | 'big',
-      packageCount: m.packageCount!,
-      departureTime: m.departureTime,
-      estimatedArrival: m.estimatedArrival,
-      notes: m.notes
-    }))
+    try {
+      setSubmitting(true)
 
-    updateWizardData({ manifests: manifestData })
-    handleNext()
+      const manifestData: ManifestData[] = manifests.map(m => ({
+        tempId: m.id,
+        dropoffLocationId: m.locationId,
+        dropoffLocationName: m.locationName,
+        dropoffAddress: m.address,
+        manifestNumber: m.manifestNumber!,
+        packageSize: m.packageSize as 'small' | 'medium' | 'big',
+        packageCount: m.packageCount!,
+        estimatedArrival: m.estimatedArrival,
+        notes: m.notes
+      }))
+
+      const result = await addManifestsToTrip(tripData.$id, manifestData)
+
+      if (result.success) {
+        toast.success(`${manifests.length} manifest(s) added to trip ${tripData.tripNumber}!`)
+        router.push(`/edms/trips/${tripData.$id}`)
+      } else {
+        throw new Error(result.error || 'Failed to add manifests')
+      }
+    } catch (err: any) {
+      console.error('Error adding manifests:', err)
+      toast.error(err.message || 'Failed to add manifests to trip')
+      setSubmitting(false)
+    }
   }
 
   if (loading) {
     return (
-      <Grid container spacing={5}>
-        <Grid item xs={12}>
-          <Typography>Loading dropoff locations...</Typography>
-        </Grid>
-      </Grid>
-    )
-  }
-
-  if (dropoffLocations.length === 0) {
-    return (
-      <Grid container spacing={5}>
-        <Grid item xs={12}>
-          <Alert severity="warning">
-            No dropoff locations found for the selected route. Please go back and select a different route.
-          </Alert>
-        </Grid>
-        <Grid item xs={12}>
-          <Button variant='outlined' onClick={handlePrev}>
-            Previous: Trip Details
-          </Button>
-        </Grid>
-      </Grid>
+      <div className='flex items-center justify-center p-8'>
+        <CircularProgress />
+      </div>
     )
   }
 
@@ -202,23 +191,12 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
       <Grid container spacing={5}>
         <Grid item xs={12}>
           <Typography variant='h5' className='mb-1'>
-            Create Manifests for Dropoff Locations
+            Add Manifests to Trip {tripData.tripNumber}
           </Typography>
-          <Typography variant='body2' className='mb-2'>
-            Add manifests to each dropoff location. You can add <strong>multiple manifests</strong> per location 
-            (e.g., one for small packages and one for medium packages).
-          </Typography>
-          <Alert severity='success' className='mt-2' icon={<i className='ri-lightbulb-line' />}>
-            <Typography variant='body2'>
-              <strong>Manifests are optional.</strong> You can skip this step and add manifests later. 
-              The trip will be created with an "Awaiting Manifests" status until manifests are added.
-            </Typography>
-          </Alert>
           <Typography variant='body2' color='text.secondary'>
-            Route: <strong>{wizardData.tripDetails.routeName}</strong> 
-          </Typography>
-          <Typography variant='body2' color='primary'>
-            {dropoffLocations.length} dropoff location{dropoffLocations.length !== 1 ? 's' : ''} available
+            Route: <strong>{typeof tripData.route === 'object' ? tripData.route.routeName : 'N/A'}</strong>
+            {' | '}Driver: <strong>{typeof tripData.driver === 'object' ? tripData.driver.name : 'N/A'}</strong>
+            {' | '}Vehicle: <strong>{typeof tripData.vehicle === 'object' ? tripData.vehicle.vehicleNumber : 'N/A'}</strong>
           </Typography>
         </Grid>
 
@@ -227,22 +205,21 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
             <Typography variant='body2' className='font-semibold mb-1'>How to use</Typography>
             <Typography variant='caption'>
               Click <strong>"Add Manifest"</strong> for each package size type you need to deliver to a location.
-              For example, if a location receives both small and big packages, add two manifests - one for each size.
+              Once submitted, the trip will move from "Awaiting Manifests" to "Planned" status.
             </Typography>
           </Alert>
         </Grid>
 
         {manifests.length > 0 && (
           <Grid item xs={12}>
-            <Chip 
-              label={`${manifests.length} manifest(s) created`} 
-              color='primary' 
+            <Chip
+              label={`${manifests.length} manifest(s) created`}
+              color='primary'
               variant='tonal'
             />
           </Grid>
         )}
 
-        {/* Dropoff Locations */}
         {dropoffLocations.map((location, index) => {
           const locationManifests = getManifestsForLocation(location.locationId)
 
@@ -250,7 +227,6 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
             <Grid item xs={12} key={location.locationId}>
               <Card variant='outlined' className={locationManifests.length > 0 ? 'border-primary' : ''}>
                 <CardContent>
-                  {/* Location Header */}
                   <Box className='flex items-start justify-between mb-4'>
                     <div>
                       <div className='flex items-center gap-2 mb-1'>
@@ -263,21 +239,12 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
                           <Chip label='Intermediate Stop' color='info' size='small' variant='tonal' />
                         )}
                         {locationManifests.length > 0 && (
-                          <Chip 
-                            label={`${locationManifests.length} manifest(s)`} 
-                            color='primary' 
-                            size='small' 
-                          />
+                          <Chip label={`${locationManifests.length} manifest(s)`} color='primary' size='small' />
                         )}
                       </div>
                       <Typography variant='body2' color='text.secondary'>
                         {location.address || 'No address provided'}
                       </Typography>
-                      {location.estimatedArrival && (
-                        <Typography variant='caption' color='text.secondary'>
-                          Est. Arrival: {location.estimatedArrival}
-                        </Typography>
-                      )}
                     </div>
                     <Button
                       variant='contained'
@@ -289,7 +256,6 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
                     </Button>
                   </Box>
 
-                  {/* Manifests for this location */}
                   {locationManifests.length > 0 && (
                     <Box className='space-y-4'>
                       {locationManifests.map((manifest, mIndex) => (
@@ -298,15 +264,11 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
                             <Typography variant='subtitle2' className='font-medium'>
                               Manifest #{mIndex + 1}
                             </Typography>
-                            <IconButton 
-                              size='small' 
-                              color='error'
-                              onClick={() => removeManifest(manifest.id)}
-                            >
+                            <IconButton size='small' color='error' onClick={() => removeManifest(manifest.id)}>
                               <i className='ri-delete-bin-line' />
                             </IconButton>
                           </Box>
-                          
+
                           <Grid container spacing={2}>
                             <Grid item xs={12} sm={6} md={3}>
                               <TextField
@@ -318,7 +280,6 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
                                 size='small'
                               />
                             </Grid>
-
                             <Grid item xs={12} sm={6} md={3}>
                               <FormControl fullWidth size='small' required>
                                 <InputLabel>Package Size</InputLabel>
@@ -328,14 +289,11 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
                                   onChange={(e) => updateManifest(manifest.id, 'packageSize', e.target.value)}
                                 >
                                   {PACKAGE_SIZES.map(size => (
-                                    <MenuItem key={size.value} value={size.value}>
-                                      {size.label}
-                                    </MenuItem>
+                                    <MenuItem key={size.value} value={size.value}>{size.label}</MenuItem>
                                   ))}
                                 </Select>
                               </FormControl>
                             </Grid>
-
                             <Grid item xs={12} sm={6} md={3}>
                               <TextField
                                 fullWidth
@@ -349,7 +307,6 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
                                 helperText='Total packages'
                               />
                             </Grid>
-
                             <Grid item xs={12} sm={6} md={3}>
                               <TimePicker
                                 label='Est. Arrival'
@@ -358,15 +315,9 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
                                   const timeString = time ? time.format('HH:mm') : ''
                                   updateManifest(manifest.id, 'estimatedArrival', timeString)
                                 }}
-                                slotProps={{
-                                  textField: {
-                                    fullWidth: true,
-                                    size: 'small'
-                                  }
-                                }}
+                                slotProps={{ textField: { fullWidth: true, size: 'small' } }}
                               />
                             </Grid>
-
                             <Grid item xs={12}>
                               <TextField
                                 fullWidth
@@ -385,7 +336,7 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
 
                   {locationManifests.length === 0 && (
                     <Typography variant='body2' color='text.secondary' className='text-center py-4'>
-                      No manifests added for this location. Click "Add Manifest" to create one.
+                      No manifests added for this location.
                     </Typography>
                   )}
                 </CardContent>
@@ -396,14 +347,16 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
 
         <Grid item xs={12}>
           <div className='flex items-center justify-between'>
-            <Button variant='outlined' onClick={handlePrev}>
-              Previous: Trip Details
+            <Button variant='outlined' onClick={() => router.push(`/edms/trips/${tripData.$id}`)}>
+              Cancel
             </Button>
-            <Button 
-              variant='contained' 
+            <Button
+              variant='contained'
               onClick={handleSubmit}
+              disabled={manifests.length === 0 || submitting}
+              startIcon={submitting ? <CircularProgress size={20} /> : <i className='ri-check-line' />}
             >
-              {manifests.length === 0 ? 'Skip Manifests & Review' : 'Next: Review & Create'}
+              {submitting ? 'Adding Manifests...' : `Add ${manifests.length} Manifest(s) to Trip`}
             </Button>
           </div>
         </Grid>
@@ -412,4 +365,4 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
   )
 }
 
-export default StepManifests
+export default AddManifestsView

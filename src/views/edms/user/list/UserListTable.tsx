@@ -59,6 +59,9 @@ import { getRolesList } from '@/libs/actions/roles.actions'
 // Style Imports
 import tableStyles from '@core/styles/table.module.css'
 import { getUserList } from '@/libs/actions/customer.action'
+
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
 import { toast } from 'react-toastify'
 import { Users } from '@/types/apps/ecommerceTypes'
 
@@ -139,6 +142,7 @@ const userStatusObj: UserStatusType = {
 const columnHelper = createColumnHelper<UsersTypeWithAction>()
 
 const UserListTable = ({ tableData, onRefresh }: { tableData?: UsersType[]; onRefresh?: () => void }) => {
+  const { hasPermission } = usePermissions()
   // States
   const [addUserOpen, setAddUserOpen] = useState(false)
   const [rowSelection, setRowSelection] = useState({})
@@ -265,14 +269,14 @@ const UserListTable = ({ tableData, onRefresh }: { tableData?: UsersType[]; onRe
                     className: 'flex items-center'
                   }
                 },
-                {
+                ...(hasPermission('users.delete') ? [{
                   text: 'Delete',
                   icon: 'ri-delete-bin-7-line',
                   menuItemProps: {
                     className: 'flex items-center',
                     onClick: () => setData(data?.filter(user => user.$id !== row.original.$id))
                   }
-                }
+                }] : [])
               ]}
             />
           </div>

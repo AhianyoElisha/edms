@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation'
 
 // Component Imports
 import RouteDetailView from '@/views/edms/routes/RouteDetailView'
+import PermissionGuard from '@/components/PermissionGuard'
 
 // Context Imports
 import { useAuth } from '@/contexts/AppwriteProvider'
@@ -75,7 +76,11 @@ const RouteDetailPage = () => {
     )
   }
 
-  return <RouteDetailView route={route} />
+  return (
+    <PermissionGuard permissions={['routes.view', 'routes.manage']}>
+      <RouteDetailView route={route} />
+    </PermissionGuard>
+  )
 }
 
 export default RouteDetailPage

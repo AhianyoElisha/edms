@@ -61,6 +61,9 @@ import { getRolesList } from '@/libs/actions/roles.actions'
 // Style Imports
 import tableStyles from '@core/styles/table.module.css'
 import { getUserList } from '@/libs/actions/customer.action'
+
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
 import { toast } from 'react-toastify'
 import { Users } from '@/types/apps/ecommerceTypes'
 
@@ -159,6 +162,7 @@ const userStatusObj: UserStatusType = {
 const columnHelper = createColumnHelper<UsersTypeWithAction>()
 
 const RolesTable = ({ setUsersData }: { setUsersData: React.Dispatch<React.SetStateAction<Users[]>> }) => {
+  const { hasPermission } = usePermissions()
   // States
   const [role, setRole] = useState<Users['role']>('')
   const [rowSelection, setRowSelection] = useState({})
@@ -260,14 +264,14 @@ const RolesTable = ({ setUsersData }: { setUsersData: React.Dispatch<React.SetSt
             <OptionMenu
               iconClassName='text-textSecondary'
               options={[
-                {
+                ...(hasPermission('roles.edit') ? [{
                   text: 'Edit Role',
                   icon: 'ri-edit-box-line',
                   menuItemProps: {
                     onClick: () => handleEditUserRole(row.original),
                     className: 'flex items-center'
                   }
-                },
+                }] : []),
                 {
                   text: 'Manage Permissions',
                   icon: 'ri-settings-4-line',

@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation'
 
 // Component Imports
 import RateCardDetailView from '@/views/edms/routes/rate-cards/RateCardDetailView'
+import PermissionGuard from '@/components/PermissionGuard'
 // Context Imports
 import { useAuth } from '@/contexts/AppwriteProvider'
 
@@ -74,7 +75,11 @@ const RateCardDetailPage = () => {
     )
   }
 
-  return <RateCardDetailView rateCard={rateCard} />
+  return (
+    <PermissionGuard permissions={['ratecards.view', 'ratecards.manage']}>
+      <RateCardDetailView rateCard={rateCard} />
+    </PermissionGuard>
+  )
 }
 
 export default RateCardDetailPage

@@ -185,7 +185,7 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
                   {manifests.length}
                 </Typography>
                 <Typography variant='caption' color='text.secondary'>
-                  Dropoff Locations
+                  {manifests.length === 0 ? 'Manifests will be added later' : 'Dropoff Locations'}
                 </Typography>
               </CardContent>
             </Card>
@@ -236,59 +236,71 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
               Manifests Overview
             </Typography>
 
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>#</TableCell>
-                    <TableCell>Manifest Number</TableCell>
-                    <TableCell>Dropoff Location</TableCell>
-                    <TableCell>Address</TableCell>
-                    <TableCell>Package Size</TableCell>
-                    <TableCell>Package Count</TableCell>
-                    <TableCell>Est. Arrival</TableCell>
-                    <TableCell>Notes</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {manifests.map((manifest, index) => (
-                    <TableRow key={manifest.tempId}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>
-                        <Typography variant='body2' className='font-semibold'>
-                          {manifest.manifestNumber}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{manifest.dropoffLocationName}</TableCell>
-                      <TableCell>
-                        <Typography variant='body2' color='text.secondary'>
-                          {manifest.dropoffAddress}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={manifest.packageSize.charAt(0).toUpperCase() + manifest.packageSize.slice(1)} 
-                          size='small' 
-                          color={
-                            manifest.packageSize === 'small' ? 'success' : 
-                            manifest.packageSize === 'medium' ? 'warning' : 
-                            'error'
-                          }
-                          variant='tonal'
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant='body1' className='font-semibold'>
-                          {manifest.packageCount}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{manifest.estimatedArrival || '-'}</TableCell>
-                      <TableCell>{manifest.notes || '-'}</TableCell>
+            {manifests.length === 0 ? (
+              <Alert severity='warning'>
+                <Typography variant='body2' className='font-semibold mb-1'>
+                  No Manifests Added
+                </Typography>
+                <Typography variant='body2'>
+                  This trip will be created with an <strong>"Awaiting Manifests"</strong> status. 
+                  You can add manifests later from the trip details page.
+                </Typography>
+              </Alert>
+            ) : (
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>#</TableCell>
+                      <TableCell>Manifest Number</TableCell>
+                      <TableCell>Dropoff Location</TableCell>
+                      <TableCell>Address</TableCell>
+                      <TableCell>Package Size</TableCell>
+                      <TableCell>Package Count</TableCell>
+                      <TableCell>Est. Arrival</TableCell>
+                      <TableCell>Notes</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {manifests.map((manifest, index) => (
+                      <TableRow key={manifest.tempId}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell>
+                          <Typography variant='body2' className='font-semibold'>
+                            {manifest.manifestNumber}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{manifest.dropoffLocationName}</TableCell>
+                        <TableCell>
+                          <Typography variant='body2' color='text.secondary'>
+                            {manifest.dropoffAddress}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={manifest.packageSize.charAt(0).toUpperCase() + manifest.packageSize.slice(1)} 
+                            size='small' 
+                            color={
+                              manifest.packageSize === 'small' ? 'success' : 
+                              manifest.packageSize === 'medium' ? 'warning' : 
+                              'error'
+                            }
+                            variant='tonal'
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant='body1' className='font-semibold'>
+                            {manifest.packageCount}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{manifest.estimatedArrival || '-'}</TableCell>
+                        <TableCell>{manifest.notes || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
           </CardContent>
         </Card>
       </Grid>
@@ -320,21 +332,40 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
           <Typography variant='body2' className='font-semibold mb-1'>
             What happens next?
           </Typography>
-          <Typography variant='body2'>
-            • Trip will be created with {manifests.length} manifest(s) containing {getTotalPackages()} total packages
-          </Typography>
-          <Typography variant='body2'>
-            • Each manifest tracks packages of a single size type (small, medium, or big)
-          </Typography>
-          <Typography variant='body2'>
-            • Driver will be able to track progress through each dropoff location
-          </Typography>
-          <Typography variant='body2'>
-            • GPS verification (200m radius) required at each dropoff
-          </Typography>
-          <Typography variant='body2'>
-            • Manifest proof of delivery with signatures required at each location
-          </Typography>
+          {manifests.length > 0 ? (
+            <>
+              <Typography variant='body2'>
+                • Trip will be created with {manifests.length} manifest(s) containing {getTotalPackages()} total packages
+              </Typography>
+              <Typography variant='body2'>
+                • Each manifest tracks packages of a single size type (small, medium, or big)
+              </Typography>
+              <Typography variant='body2'>
+                • Driver will be able to track progress through each dropoff location
+              </Typography>
+              <Typography variant='body2'>
+                • GPS verification (200m radius) required at each dropoff
+              </Typography>
+              <Typography variant='body2'>
+                • Manifest proof of delivery with signatures required at each location
+              </Typography>
+            </>
+          ) : (
+            <>
+              <Typography variant='body2'>
+                • Trip will be created with <strong>"Awaiting Manifests"</strong> status
+              </Typography>
+              <Typography variant='body2'>
+                • You can add manifests later from the trip details page
+              </Typography>
+              <Typography variant='body2'>
+                • Trip will automatically move to "Planned" status once manifests are added
+              </Typography>
+              <Typography variant='body2'>
+                • The trip overview will highlight trips awaiting manifests for easy identification
+              </Typography>
+            </>
+          )}
         </Alert>
       </Grid>
     </Grid>

@@ -1,5 +1,6 @@
 // View Imports
 import ExpenseDetailsView from '@/views/edms/expenses/ExpenseDetailsView'
+import PermissionGuard from '@/components/PermissionGuard'
 
 interface ExpenseDetailsPageProps {
   params: Promise<{
@@ -10,7 +11,11 @@ interface ExpenseDetailsPageProps {
 const ExpenseDetailsPage = async ({ params }: ExpenseDetailsPageProps) => {
   const { id } = await params
   
-  return <ExpenseDetailsView expenseId={id} />
+  return (
+    <PermissionGuard permissions={['expenses.view', 'expenses.manage']}>
+      <ExpenseDetailsView expenseId={id} />
+    </PermissionGuard>
+  )
 }
 
 export default ExpenseDetailsPage

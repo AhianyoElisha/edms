@@ -25,6 +25,9 @@ import { Users } from '@/types/apps/ecommerceTypes'
 // Actions
 import { getRolesList } from '@/libs/actions/roles.actions'
 
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 type CardDataType = {
   $id?: string
   title: string
@@ -35,6 +38,7 @@ type CardDataType = {
 }
 
 const RoleCards = ({ usersData }: { usersData: Users[] }) => {
+  const { hasPermission } = usePermissions()
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false)
   const [addRoleDialogOpen, setAddRoleDialogOpen] = useState(false)
   const [selectedRole, setSelectedRole] = useState<any>(null)
@@ -162,13 +166,15 @@ const RoleCards = ({ usersData }: { usersData: Users[] }) => {
               <Typography variant='body2' color='text.secondary' className='text-center'>
                 Create a new role for the delivery service system
               </Typography>
-              <Button
-                variant='contained'
-                startIcon={<i className='ri-add-line' />}
-                onClick={handleAddRole}
-              >
-                Add Role
-              </Button>
+              {hasPermission('roles.create') && (
+                <Button
+                  variant='contained'
+                  startIcon={<i className='ri-add-line' />}
+                  onClick={handleAddRole}
+                >
+                  Add Role
+                </Button>
+              )}
             </CardContent>
           </Card>
         </Grid>

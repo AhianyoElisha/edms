@@ -44,6 +44,9 @@ import OpenDialogOnElementClick from '@components/dialogs/OpenDialogOnElementCli
 import { getPermissionsList, deletePermission } from '@/libs/actions/permissions.actions'
 import { toast } from 'react-toastify'
 
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 // Style Imports
 import tableStyles from '@core/styles/table.module.css'
 
@@ -120,6 +123,9 @@ const DebouncedInput = ({
 const columnHelper = createColumnHelper<PermissionsTypeWithAction>()
 
 const Permissions = ({ permissions }: any) => {
+  // Permissions
+  const { hasPermission } = usePermissions()
+
   // States
   const [open, setOpen] = useState(false)
   const [rowSelection, setRowSelection] = useState({})
@@ -196,9 +202,11 @@ const Permissions = ({ permissions }: any) => {
         header: 'Actions',
         cell: ({ row }) => (
           <div className='flex items-center gap-0.5'>
-            <IconButton size='small' onClick={() => handleDeletePermission(row.original.$id)}>
-              <i className='ri-delete-bin-7-line text-textSecondary' />
-            </IconButton>
+            {hasPermission('permissions.delete') && (
+              <IconButton size='small' onClick={() => handleDeletePermission(row.original.$id)}>
+                <i className='ri-delete-bin-7-line text-textSecondary' />
+              </IconButton>
+            )}
           </div>
         ),
         enableSorting: false
@@ -236,7 +244,7 @@ const Permissions = ({ permissions }: any) => {
             placeholder='Search Permissions'
             className='max-sm:is-full'
           />
-          <Button {...buttonProps} />
+          {hasPermission('permissions.create') && <Button {...buttonProps} />}
         </CardContent>
         <div className='overflow-x-auto'>
           <table className={tableStyles.table}>

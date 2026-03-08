@@ -31,6 +31,9 @@ import type { RateCardType, VolumePrice } from '@/types/apps/deliveryTypes'
 
 // Actions Imports
 import { deleteRateCard, deactivateRateCard, updateRateCard } from '@/libs/actions/ratecard.actions'
+
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
 import { toast } from 'react-toastify'
 
 interface RateCardDetailViewProps {
@@ -55,6 +58,7 @@ const formatDate = (dateString: string) => {
 }
 
 const RateCardDetailView = ({ rateCard }: RateCardDetailViewProps) => {
+  const { hasPermission } = usePermissions()
   const router = useRouter()
 
   // Parse volume prices
@@ -115,15 +119,17 @@ const RateCardDetailView = ({ rateCard }: RateCardDetailViewProps) => {
           <StyledBreadcrumb label={`${rateCard.clientCode} - ${rateCard.routeCode}`} disabled />
         </Breadcrumbs>
         <div className='flex gap-2'>
-          <Button
-            variant='outlined'
-            color='secondary'
-            startIcon={<i className='ri-file-copy-line' />}
-            component={Link}
-            href={`/edms/routes/rate-cards/create?duplicate=${rateCard.$id}`}
-          >
-            Duplicate
-          </Button>
+          {hasPermission('ratecards.create') && (
+            <Button
+              variant='outlined'
+              color='secondary'
+              startIcon={<i className='ri-file-copy-line' />}
+              component={Link}
+              href={`/edms/routes/rate-cards/create?duplicate=${rateCard.$id}`}
+            >
+              Duplicate
+            </Button>
+          )}
           <Button
             variant='outlined'
             color={rateCard.isActive ? 'warning' : 'success'}
@@ -132,14 +138,16 @@ const RateCardDetailView = ({ rateCard }: RateCardDetailViewProps) => {
           >
             {rateCard.isActive ? 'Deactivate' : 'Activate'}
           </Button>
-          <Button
-            variant='contained'
-            startIcon={<i className='ri-edit-line' />}
-            component={Link}
-            href={`/edms/routes/rate-cards/${rateCard.$id}/edit`}
-          >
-            Edit
-          </Button>
+          {hasPermission('ratecards.edit') && (
+            <Button
+              variant='contained'
+              startIcon={<i className='ri-edit-line' />}
+              component={Link}
+              href={`/edms/routes/rate-cards/${rateCard.$id}/edit`}
+            >
+              Edit
+            </Button>
+          )}
         </div>
       </div>
 

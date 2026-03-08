@@ -55,6 +55,9 @@ import EditLogisticsDrawer from './EditTruckorTricycleDrawer'
 import { Button, CardContent, TextField, TextFieldProps, Dialog, DialogTitle, DialogContent, DialogActions, Box } from '@mui/material'
 import { useAuth } from '@/contexts/AppwriteProvider'
 
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 declare module '@tanstack/table-core' {
   interface FilterFns {
     fuzzy: FilterFn<unknown>
@@ -140,6 +143,7 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
 
   const router = useRouter()
   const { user } = useAuth()
+  const { hasPermission } = usePermissions()
   const isAdmin = user?.role?.name === 'admin'
 
   // Hooks
@@ -301,12 +305,12 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
         header: 'Actions',
         cell: ({ row }) => {
           const actionOptions: any[] = [
-            {
+            ...(hasPermission('vehicles.edit') ? [{
               text: 'Edit',
               icon: 'ri-edit-box-line',
               linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
               menuItemProps: { onClick: () => setEditLogisticsOpen({ open: true, data: row.original })}
-            },
+            }] : []),
             { 
               text: 'Details', 
               icon: 'ri-stack-line',
@@ -315,7 +319,7 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
             },
           ]
 
-          if (isAdmin) {
+          if (hasPermission('vehicles.delete')) {
             actionOptions.push({
               text: 'Delete',
               icon: 'ri-delete-bin-line',
@@ -396,15 +400,17 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
             >
               Export
             </Button>
-            <Button
-              variant='contained'
-              color='primary'
-              className='max-sm:is-full'
-              startIcon={<i className='ri-add-line' />}
-              onClick={() => setLogisticsOpen(!logisticsOpen)}
-            >
-              Add Vehicle
-            </Button>
+            {hasPermission('vehicles.create') && (
+              <Button
+                variant='contained'
+                color='primary'
+                className='max-sm:is-full'
+                startIcon={<i className='ri-add-line' />}
+                onClick={() => setLogisticsOpen(!logisticsOpen)}
+              >
+                Add Vehicle
+              </Button>
+            )}
           </div>
         </CardContent>
         <div className='overflow-x-auto'>

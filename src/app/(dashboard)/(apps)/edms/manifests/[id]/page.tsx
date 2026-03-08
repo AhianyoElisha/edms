@@ -13,6 +13,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 
 // Component Imports
 import ManifestView from '@/views/edms/manifests/view'
+import PermissionGuard from '@/components/PermissionGuard'
 import { getManifestByIdWithRelations } from '@/libs/actions/manifest.actions'
 
 const ManifestDetailsPage = () => {
@@ -96,7 +97,11 @@ const ManifestDetailsPage = () => {
     )
   }
 
-  return <ManifestView manifestData={manifestData} />
+  return (
+    <PermissionGuard permissions={['manifests.view', 'manifests.manage']}>
+      <ManifestView manifestData={manifestData} />
+    </PermissionGuard>
+  )
 }
 
 export default ManifestDetailsPage

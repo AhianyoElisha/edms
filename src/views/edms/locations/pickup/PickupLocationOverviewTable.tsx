@@ -47,6 +47,9 @@ import EditPickupLocationDrawer from './EditPickupLocationDrawer'
 import CustomAvatar from '@core/components/mui/Avatar'
 import OptionMenu from '@core/components/option-menu'
 
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 interface PickupLocationOverviewTableProps {
   onEditLocation?: (location: PickupLocationType) => void
   onAddLocation?: () => void
@@ -56,6 +59,9 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
   onEditLocation,
   onAddLocation
 }) => {
+  // Permissions
+  const { hasPermission } = usePermissions()
+
   // State management
   const [locations, setLocations] = useState<PickupLocationType[]>([])
   const [filteredLocations, setFilteredLocations] = useState<PickupLocationType[]>([])
@@ -218,13 +224,15 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
         <CardHeader 
           title='Pickup Locations Management' 
           action={
-            <Button
-              variant='contained'
-              startIcon={<i className='ri-add-line' />}
-              onClick={() => setAddDrawerOpen(true)}
-            >
-              Add Pickup Location
-            </Button>
+            hasPermission('pickuplocations.create') ? (
+              <Button
+                variant='contained'
+                startIcon={<i className='ri-add-line' />}
+                onClick={() => setAddDrawerOpen(true)}
+              >
+                Add Pickup Location
+              </Button>
+            ) : undefined
           }
         />
 
@@ -347,12 +355,12 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
                             linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
                             menuItemProps: { onClick: () => handleViewLocation(location) }
                           },
-                          {
+                          ...(hasPermission('pickuplocations.edit') ? [{
                             text: 'Edit',
                             icon: 'ri-edit-box-line',
                             linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
                             menuItemProps: { onClick: () => handleEditLocation(location) }
-                          },
+                          }] : []),
                           {
                             text: 'View on Map',
                             icon: 'ri-map-pin-line',
@@ -375,14 +383,14 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
                             linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
                             menuItemProps: { onClick: () => handleToggleStatus(location) }
                           },
-                          {
+                          ...(hasPermission('pickuplocations.delete') ? [{
                             text: 'Delete',
                             icon: 'ri-delete-bin-line',
                             linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4 text-error' },
                             menuItemProps: { 
                               onClick: () => handleDeleteClick(location)
                             }
-                          }
+                          }] : [])
                         ]}
                       />
                     </TableCell>

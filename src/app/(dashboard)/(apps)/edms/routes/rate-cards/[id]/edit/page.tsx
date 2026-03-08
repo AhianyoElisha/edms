@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation'
 
 // Component Imports
 import RateCardEditForm from '@/views/edms/routes/rate-cards/RateCardEditForm'
+import PermissionGuard from '@/components/PermissionGuard'
 // Context Imports
 import { useAuth } from '@/contexts/AppwriteProvider'
 
@@ -75,14 +76,16 @@ const EditRateCardPage = () => {
   }
 
   return (
-    <div className='flex flex-col gap-6'>
-      <div>
-        <h4 className='text-2xl font-semibold'>Edit Rate Card</h4>
-        <p className='text-textSecondary'>Update pricing for {rateCard.clientName} - {rateCard.routeCode}</p>
+    <PermissionGuard permissions={['ratecards.edit', 'ratecards.manage']}>
+      <div className='flex flex-col gap-6'>
+        <div>
+          <h4 className='text-2xl font-semibold'>Edit Rate Card</h4>
+          <p className='text-textSecondary'>Update pricing for {rateCard.clientName} - {rateCard.routeCode}</p>
+        </div>
+        
+        <RateCardEditForm rateCard={rateCard} userId={user?.$id || ''} />
       </div>
-      
-      <RateCardEditForm rateCard={rateCard} userId={user?.$id || ''} />
-    </div>
+    </PermissionGuard>
   )
 }
 

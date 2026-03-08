@@ -33,6 +33,9 @@ export async function createTripWithManifests(wizardData: TripWizardData): Promi
     // Calculate total packages across all manifests
     const totalPackages = manifests.reduce((sum, m) => sum + m.packageCount, 0)
 
+    // Determine initial status based on whether manifests are provided
+    const initialStatus = manifests.length === 0 ? 'awaiting_manifests' : 'planned'
+
     // Step 1: Create the trip document
     const tripData = {
       tripNumber,
@@ -41,15 +44,15 @@ export async function createTripWithManifests(wizardData: TripWizardData): Promi
       route: tripDetails.routeId,
       tripDate: new Date(tripDetails.startTime).toISOString(),
       startTime: new Date(tripDetails.startTime).toISOString(),
-      status: 'planned',
+      status: initialStatus,
       notes: tripDetails.notes || '',
       totalPackages: totalPackages,
       tonnage: tripDetails.tonnage || null,
       tripCost: tripDetails.tripCost || 0,
       creator: tripDetails.driverId, // TODO: Get from auth context
       
-      // Initialize checkpoints based on manifests
-      checkpoints: JSON.stringify(
+      // Initialize checkpoints based on manifests (empty if no manifests)
+      checkpoints: manifests.length > 0 ? JSON.stringify(
         manifests.map((manifest, index) => ({
           dropoffLocationId: manifest.dropoffLocationId,
           dropoffLocationName: manifest.dropoffLocationName,
@@ -64,7 +67,7 @@ export async function createTripWithManifests(wizardData: TripWizardData): Promi
           packagesDelivered: 0,
           packagesMissing: 0
         }))
-      ),
+      ) : JSON.stringify([]),
       
       invoiceGenerated: false,
       invoiceAmount: 0,
@@ -82,95 +85,93 @@ export async function createTripWithManifests(wizardData: TripWizardData): Promi
       tripData
     )
 
-    const manifestIds: string[] = []
-    const manifestMap = new Map<string, string>() // tempId -> real ID
+    // Step 2: Create manifest documents (only if manifests are provided)
+    if (manifests.length > 0) {
+      const manifestIds: string[] = []
+      const manifestMap = new Map<string, string>() // tempId -> real ID
 
-    // Step 2: Create all manifest documents
-    for (const manifestData of manifests) {
-      // Fetch dropoff location to get contact person and phone
-      let recipientName = null
-      let recipientPhone = null
-      
-      try {
-        const dropoffLocation = await databases.getDocument(
+      for (const manifestData of manifests) {
+        // Fetch dropoff location to get contact person and phone
+        let recipientName = null
+        let recipientPhone = null
+        
+        try {
+          const dropoffLocation = await databases.getDocument(
+            appwriteConfig.database,
+            appwriteConfig.dropofflocations,
+            manifestData.dropoffLocationId
+          )
+          
+          recipientName = dropoffLocation.contactPerson || null
+          recipientPhone = dropoffLocation.contactPhone || null
+        } catch (error) {
+          console.warn(`Could not fetch dropoff location details for ${manifestData.dropoffLocationId}`)
+        }
+        
+        const manifestDoc = {
+          manifestNumber: manifestData.manifestNumber,
+          trip: trip.$id,
+          dropofflocation: manifestData.dropoffLocationId,
+          dropoffSequence: manifests.indexOf(manifestData) + 1,
+          manifestDate: new Date(tripDetails.startTime).toISOString(),
+          
+          // Package information stored directly on manifest
+          packageSize: manifestData.packageSize,
+          packageCount: manifestData.packageCount,
+          deliveredCount: 0,
+          
+          status: 'pending',
+          notes: manifestData.notes || '',
+          
+          // Delivery tracking fields
+          arrivalTime: null,
+          deliveryTime: null,
+          estimatedArrival: manifestData.estimatedArrival || null,
+          manifestImage: null,
+          
+          // Proof of delivery fields
+          proofOfDeliveryImage: null,
+          deliveryGpsCoordinates: null,
+          deliveryGpsVerified: false,
+          gpsVerificationDistance: null,
+          deliveredPackages: 0,
+        }
+
+        const manifest = await databases.createDocument(
           appwriteConfig.database,
-          appwriteConfig.dropofflocations,
-          manifestData.dropoffLocationId
+          appwriteConfig.manifests,
+          ID.unique(),
+          manifestDoc
         )
-        
-        recipientName = dropoffLocation.contactPerson || null
-        recipientPhone = dropoffLocation.contactPhone || null
-      } catch (error) {
-        console.warn(`Could not fetch dropoff location details for ${manifestData.dropoffLocationId}`)
-      }
-      
-      const manifestDoc = {
-        manifestNumber: manifestData.manifestNumber,
-        trip: trip.$id,
-        dropofflocation: manifestData.dropoffLocationId,
-        dropoffSequence: manifests.indexOf(manifestData) + 1,
-        manifestDate: new Date(tripDetails.startTime).toISOString(),
-        
-        // Package information stored directly on manifest
-        packageSize: manifestData.packageSize, // 'small', 'medium', or 'big'
-        packageCount: manifestData.packageCount, // Head count of packages
-        deliveredCount: 0, // Start with 0 delivered
-        
-        status: 'pending',
-        notes: manifestData.notes || '',
-        
-        // Delivery tracking fields (initialized as null)
-        arrivalTime: null,
-        deliveryTime: null,
-        estimatedArrival: manifestData.estimatedArrival || null,
-        manifestImage: null,
-        
-        // Proof of delivery fields (to be filled during delivery)
-        proofOfDeliveryImage: null,
-        deliveryGpsCoordinates: null,
-        deliveryGpsVerified: false,
-        gpsVerificationDistance: null,
-        deliveredPackages: 0,
-        
-        // // Auto-populate recipient details from dropoff location
-        // recipientName,
-        // recipientPhone
+
+        manifestIds.push(manifest.$id)
+        manifestMap.set(manifestData.tempId, manifest.$id)
       }
 
-      const manifest = await databases.createDocument(
+      // Step 3: Update trip checkpoints with manifest numbers and IDs
+      const checkpointsData = JSON.parse(trip.checkpoints)
+      const updatedCheckpoints = checkpointsData.map((checkpoint: any, index: number) => {
+        const manifestData = manifests[index]
+        const createdManifestId = manifestMap.get(manifestData.tempId)
+        
+        return {
+          ...checkpoint,
+          manifestId: createdManifestId || '',
+          manifestNumber: manifestData.manifestNumber,
+          packageSize: manifestData.packageSize,
+        }
+      })
+      
+      // Update trip with checkpoints containing manifest IDs
+      await databases.updateDocument(
         appwriteConfig.database,
-        appwriteConfig.manifests,
-        ID.unique(),
-        manifestDoc
+        appwriteConfig.trips,
+        trip.$id,
+        {
+          checkpoints: JSON.stringify(updatedCheckpoints)
+        }
       )
-
-      manifestIds.push(manifest.$id)
-      manifestMap.set(manifestData.tempId, manifest.$id)
     }
-
-    // Step 3: Update trip checkpoints with manifest numbers and IDs
-    const checkpointsData = JSON.parse(trip.checkpoints)
-    const updatedCheckpoints = checkpointsData.map((checkpoint: any, index: number) => {
-      const manifestData = manifests[index]
-      const createdManifestId = manifestMap.get(manifestData.tempId)
-      
-      return {
-        ...checkpoint,
-        manifestId: createdManifestId || '',
-        manifestNumber: manifestData.manifestNumber,
-        packageSize: manifestData.packageSize,
-      }
-    })
-    
-    // Update trip with checkpoints containing manifest IDs
-    await databases.updateDocument(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      trip.$id,
-      {
-        checkpoints: JSON.stringify(updatedCheckpoints)
-      }
-    )
 
     return {
       success: true,
@@ -187,6 +188,102 @@ export async function createTripWithManifests(wizardData: TripWizardData): Promi
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to create trip'
+    }
+  }
+}
+
+/**
+ * Add manifests to an existing trip (for trips created without manifests)
+ * This updates the trip from 'awaiting_manifests' to 'planned' status
+ */
+export async function addManifestsToTrip(tripId: string, manifests: TripWizardData['manifests']): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    // Get current trip
+    const trip = await databases.getDocument(
+      appwriteConfig.database,
+      appwriteConfig.trips,
+      tripId
+    )
+
+    const manifestIds: string[] = []
+    const manifestMap = new Map<string, string>()
+
+    // Calculate total packages
+    const totalPackages = manifests.reduce((sum, m) => sum + m.packageCount, 0)
+
+    // Create manifest documents
+    for (const manifestData of manifests) {
+      const manifestDoc = {
+        manifestNumber: manifestData.manifestNumber,
+        trip: tripId,
+        dropofflocation: manifestData.dropoffLocationId,
+        dropoffSequence: manifests.indexOf(manifestData) + 1,
+        manifestDate: trip.tripDate || new Date().toISOString(),
+        packageSize: manifestData.packageSize,
+        packageCount: manifestData.packageCount,
+        deliveredCount: 0,
+        status: 'pending',
+        notes: manifestData.notes || '',
+        arrivalTime: null,
+        deliveryTime: null,
+        estimatedArrival: manifestData.estimatedArrival || null,
+        manifestImage: null,
+        proofOfDeliveryImage: null,
+        deliveryGpsCoordinates: null,
+        deliveryGpsVerified: false,
+        gpsVerificationDistance: null,
+        deliveredPackages: 0,
+      }
+
+      const manifest = await databases.createDocument(
+        appwriteConfig.database,
+        appwriteConfig.manifests,
+        ID.unique(),
+        manifestDoc
+      )
+
+      manifestIds.push(manifest.$id)
+      manifestMap.set(manifestData.tempId, manifest.$id)
+    }
+
+    // Build checkpoints
+    const checkpoints = manifests.map((manifest, index) => ({
+      dropoffLocationId: manifest.dropoffLocationId,
+      dropoffLocationName: manifest.dropoffLocationName,
+      manifestId: manifestMap.get(manifest.tempId) || '',
+      manifestNumber: manifest.manifestNumber,
+      packageSize: manifest.packageSize,
+      sequence: index + 1,
+      status: 'pending',
+      arrivalTime: null,
+      completionTime: null,
+      gpsCoordinates: null,
+      gpsVerified: false,
+      packagesDelivered: 0,
+      packagesMissing: 0
+    }))
+
+    // Update trip with manifests info and change status to 'planned'
+    await databases.updateDocument(
+      appwriteConfig.database,
+      appwriteConfig.trips,
+      tripId,
+      {
+        status: 'planned',
+        totalPackages,
+        checkpoints: JSON.stringify(checkpoints)
+      }
+    )
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error adding manifests to trip:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to add manifests to trip'
     }
   }
 }
@@ -344,7 +441,8 @@ export async function updateTripStatus(tripId: string, status: string): Promise<
 /**
  * Check and update trip status based on manifest progress
  * Status flow:
- * - planned: Trip created, no manifests started
+ * - awaiting_manifests: Trip created without manifests
+ * - planned: Trip created with manifests, no manifests started
  * - in_progress: At least one manifest has been loaded/started
  * - completed: All manifests delivered AND all return waybills delivered (if any)
  */

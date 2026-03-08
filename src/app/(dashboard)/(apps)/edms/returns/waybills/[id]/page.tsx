@@ -13,6 +13,7 @@ import Box from '@mui/material/Box'
 
 // Component Imports
 import ReturnWaybillView from '@/views/edms/returns/waybills/view'
+import PermissionGuard from '@/components/PermissionGuard'
 import { getReturnWaybillById } from '@/libs/actions/returnwaybill.actions'
 
 const ReturnWaybillDetailsPage = () => {
@@ -90,7 +91,11 @@ const ReturnWaybillDetailsPage = () => {
     )
   }
 
-  return <ReturnWaybillView waybillData={waybillData} onRefetch={handleRefetch} />
+  return (
+    <PermissionGuard permissions={['deliveries.view', 'deliveries.manage']}>
+      <ReturnWaybillView waybillData={waybillData} onRefetch={handleRefetch} />
+    </PermissionGuard>
+  )
 }
 
 export default ReturnWaybillDetailsPage

@@ -42,6 +42,9 @@ import dayjs, { Dayjs } from 'dayjs'
 import { getAllExpenses } from '@/libs/actions/expense.actions'
 import { getAllVehicles } from '@/libs/actions/vehicle.actions'
 
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 // Type Imports
 import type { 
   ExpenseType, 
@@ -106,6 +109,7 @@ const headCells: HeadCell[] = [
 ]
 
 const ExpenseListView = () => {
+  const { hasPermission } = usePermissions()
   const router = useRouter()
 
   // Data State
@@ -275,13 +279,15 @@ const ExpenseListView = () => {
                 Manage and track all expenses
               </Typography>
             </Box>
-            <Button
-              variant="contained"
-              startIcon={<i className="ri-add-line" />}
-              onClick={() => router.push('/edms/expenses/create')}
-            >
-              Add Expense
-            </Button>
+            {hasPermission('expenses.create') && (
+              <Button
+                variant="contained"
+                startIcon={<i className="ri-add-line" />}
+                onClick={() => router.push('/edms/expenses/create')}
+              >
+                Add Expense
+              </Button>
+            )}
           </Box>
         </Grid>
 
@@ -606,17 +612,19 @@ const ExpenseListView = () => {
                                 <i className="ri-eye-line" />
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title="Edit">
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/edms/expenses/${expense.$id}/edit`)
-                                }}
-                              >
-                                <i className="ri-pencil-line" />
-                              </IconButton>
-                            </Tooltip>
+                            {hasPermission('expenses.edit') && (
+                              <Tooltip title="Edit">
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    router.push(`/edms/expenses/${expense.$id}/edit`)
+                                  }}
+                                >
+                                  <i className="ri-pencil-line" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </Box>
                         </TableCell>
                       </TableRow>

@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 
 // Component Imports
 import DeliveredPackagesTable from '@/views/edms/packages/delivered/DeliveredPackagesTable'
+import PermissionGuard from '@/components/PermissionGuard'
 
 export const metadata: Metadata = {
   title: 'Delivered Packages - Delivery Management',
@@ -10,7 +11,11 @@ export const metadata: Metadata = {
 }
 
 const DeliveredPackagesPage = () => {
-  return <DeliveredPackagesTable />
+  return (
+    <PermissionGuard permissions={['packages.view', 'packages.manage']}>
+      <DeliveredPackagesTable />
+    </PermissionGuard>
+  )
 }
 
 export default DeliveredPackagesPage

@@ -41,6 +41,9 @@ import tableStyles from '@core/styles/table.module.css'
 // Actions Imports
 import { getAllTrips, updateTripStatus } from '@/libs/actions/trip.actions'
 
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
   const itemRank = rankItem(row.getValue(columnId), value)
   addMeta({ itemRank })
@@ -48,6 +51,7 @@ const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
 }
 
 const statusColors: Record<string, 'default' | 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info'> = {
+  awaiting_manifests: 'warning',
   planned: 'info',
   in_progress: 'primary',
   at_pickup: 'warning',
@@ -64,6 +68,9 @@ const TripsOverviewTable = () => {
   const [loading, setLoading] = useState(true)
   const [globalFilter, setGlobalFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+
+  // Permissions
+  const { hasPermission } = usePermissions()
 
   // Load trips
   useEffect(() => {
@@ -144,11 +151,14 @@ const TripsOverviewTable = () => {
       }),
       columnHelper.accessor('manifests', {
         header: 'Manifests',
-        cell: ({ row }) => (
-          <Typography color='text.primary'>
-            {Array.isArray(row.original.manifests) ? row.original.manifests.length : 0}
-          </Typography>
-        )
+        cell: ({ row }) => {
+          const count = Array.isArray(row.original.manifests) ? row.original.manifests.length : 0
+          return count === 0 && row.original.status === 'awaiting_manifests' ? (
+            <Chip label='Awaiting' color='warning' size='small' variant='tonal' />
+          ) : (
+            <Typography color='text.primary'>{count}</Typography>
+          )
+        }
       }),
       columnHelper.accessor('status', {
         header: 'Status',
@@ -176,12 +186,18 @@ const TripsOverviewTable = () => {
                   href: `/edms/trips/${row.original.$id}`,
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' }
                 },
-                {
+                ...(row.original.status === 'awaiting_manifests' && hasPermission('manifests.create') ? [{
+                  text: 'Add Manifests',
+                  icon: 'ri-file-add-line',
+                  href: `/edms/trips/${row.original.$id}/add-manifests`,
+                  linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' }
+                }] : []),
+                ...(hasPermission('trips.edit') ? [{
                   text: 'Edit',
                   icon: 'ri-edit-box-line',
                   href: `/edms/trips/${row.original.$id}/edit`,
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' }
-                }
+                }] : [])
               ]}
             />
           </div>
@@ -220,6 +236,7 @@ const TripsOverviewTable = () => {
             size='small'
           >
             <MenuItem value='all'>All Trips</MenuItem>
+            <MenuItem value='awaiting_manifests'>Awaiting Manifests</MenuItem>
             <MenuItem value='planned'>Planned</MenuItem>
             <MenuItem value='in_progress'>In Progress</MenuItem>
             <MenuItem value='completed'>Completed</MenuItem>
@@ -233,14 +250,16 @@ const TripsOverviewTable = () => {
             className='min-w-[200px]'
           />
         </div>
-        <Button
-          variant='contained'
-          component={Link}
-          href='/edms/trips/create'
-          startIcon={<i className='ri-add-line' />}
-        >
-          Create Trip
-        </Button>
+        {hasPermission('trips.create') && (
+          <Button
+            variant='contained'
+            component={Link}
+            href='/edms/trips/create'
+            startIcon={<i className='ri-add-line' />}
+          >
+            Create Trip
+          </Button>
+        )}
       </CardContent>
 
       <div className='overflow-x-auto'>

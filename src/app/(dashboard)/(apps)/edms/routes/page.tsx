@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 
 // Component Imports
 import RouteOverviewTable from '@/views/edms/routes/RouteOverviewTable'
+import PermissionGuard from '@/components/PermissionGuard'
 
 export const metadata: Metadata = {
   title: 'Routes - Delivery Management',
@@ -11,14 +12,16 @@ export const metadata: Metadata = {
 
 const RoutesPage = () => {
   return (
-    <div className='flex flex-col gap-6'>
-      <div>
-        <h4 className='text-2xl font-semibold'>Delivery Routes</h4>
-        <p className='text-textSecondary'>Manage routes from pickup locations to dropoff destinations</p>
+    <PermissionGuard permissions={['routes.view', 'routes.manage']}>
+      <div className='flex flex-col gap-6'>
+        <div>
+          <h4 className='text-2xl font-semibold'>Delivery Routes</h4>
+          <p className='text-textSecondary'>Manage routes from pickup locations to dropoff destinations</p>
+        </div>
+        
+        <RouteOverviewTable />
       </div>
-      
-      <RouteOverviewTable />
-    </div>
+    </PermissionGuard>
   )
 }
 

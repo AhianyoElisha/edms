@@ -55,6 +55,9 @@ import {
   markReturnWaybillProcessed
 } from '@/libs/actions/returnwaybill.actions'
 
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 type ReturnWaybillWithActions = ReturnWaybillType
 
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
@@ -98,6 +101,7 @@ const getReasonLabel = (reason: ReturnReasonType) => {
 }
 
 const ReturnWaybillOverviewTable = () => {
+  const { hasPermission } = usePermissions()
   // Hooks
   const router = useRouter()
   
@@ -349,19 +353,19 @@ const ReturnWaybillOverviewTable = () => {
                 iconButtonProps={{ size: 'medium' }}
                 iconClassName='text-textSecondary text-[22px]'
                 options={[
-                  {
+                  ...(hasPermission('deliveries.edit') ? [{
                     text: 'Edit',
                     icon: 'ri-edit-box-line',
                     href: `/edms/returns/waybills/${row.original.$id}/edit`,
                     linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' }
-                  },
+                  }] : []),
                   ...statusActions,
-                  {
+                  ...(hasPermission('deliveries.delete') ? [{
                     text: 'Delete',
                     icon: 'ri-delete-bin-7-line',
                     linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4 text-error' },
                     menuItemProps: { onClick: () => handleDeleteWaybill(row.original.$id) }
-                  }
+                  }] : [])
                 ]}
               />
             </div>
@@ -430,14 +434,16 @@ const ReturnWaybillOverviewTable = () => {
               className='min-w-[200px]'
             />
           </div>
-          <Button
-            variant='contained'
-            component={Link}
-            href='/edms/returns/waybills/create'
-            startIcon={<i className='ri-add-line' />}
-          >
-            Create Return Waybill
-          </Button>
+          {hasPermission('deliveries.create') && (
+            <Button
+              variant='contained'
+              component={Link}
+              href='/edms/returns/waybills/create'
+              startIcon={<i className='ri-add-line' />}
+            >
+              Create Return Waybill
+            </Button>
+          )}
         </CardContent>
 
         <div className='overflow-x-auto'>

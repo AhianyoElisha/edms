@@ -6,7 +6,6 @@ import { useTheme } from '@mui/material/styles'
 
 // Third-party Imports
 import PerfectScrollbar from 'react-perfect-scrollbar'
-import { useEffect, useState } from 'react'
 
 // Type Imports
 import type { getDictionary } from '@/utils/getDictionary'
@@ -17,7 +16,7 @@ import { Menu, SubMenu, MenuItem, MenuSection } from '@menu/vertical-menu'
 
 // Hook Imports
 import useVerticalNav from '@menu/hooks/useVerticalNav'
-import { getUserPermissions } from '@/libs/actions/permissions.actions'
+import { usePermissions } from '@/hooks/usePermissions'
 
 // Styled Component Imports
 import StyledVerticalNavExpandIcon from '@menu/styles/vertical/StyledVerticalNavExpandIcon'
@@ -50,117 +49,16 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
-
-  const [userPermissions, setUserPermissions] = useState<string[]>([])
-  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true)
-
-  useEffect(() => {
-    // Fetch user permissions dynamically
-    const fetchUserPermissions = async () => {
-      if (user?.$id) {
-        try {
-          setIsLoadingPermissions(true)
-          
-          // Try to fetch permissions from API
-          const permissions = await getUserPermissions(user.$id)
-          const permissionNames = permissions.map((p: any) => `${p.module}.${p.action}`)
-          setUserPermissions(permissionNames)
-        } catch (error) {
-          console.error('Error fetching user permissions:', error)
-          // Fallback: Use role-based permissions
-          const fallbackPermissions = getFallbackPermissions(user.role?.name || 'user')
-          setUserPermissions(fallbackPermissions)
-        } finally {
-          setIsLoadingPermissions(false)
-        }
-      } else {
-        // No user, set empty permissions
-        setUserPermissions([])
-        setIsLoadingPermissions(false)
-      }
-    }
-
-    fetchUserPermissions()
-  }, [user])
+  const { hasPermission: hookHasPermission, hasAnyPermission: hookHasAnyPermission, isAdmin, isLoading: isLoadingPermissions } = usePermissions()
 
   // Navigation helper function
   const handleNavigation = (path: string) => {
     router.push(path)
   }
 
-  // Helper function to check permissions
-  const hasPermission = (permission: string): boolean => {
-    if (!user) return false
-    
-    // Admin has all permissions
-    if (user.role?.name === 'admin') return true
-    
-    // Check if user has the specific permission
-    return userPermissions.includes(permission)
-  }
-
-  // Helper function to check if user has any of the given permissions
-  const hasAnyPermission = (permissions: string[]): boolean => {
-    if (!user) return false
-    
-    // Admin has all permissions
-    if (user.role?.name === 'admin') return true
-    
-    // Check if user has any of the permissions
-    return permissions.some(permission => userPermissions.includes(permission))
-  }
-
-  // Fallback permissions based on role (in case API fails)
-  const getFallbackPermissions = (roleName: string): string[] => {
-    switch (roleName?.toLowerCase()) {
-      case 'admin':
-        return [
-          'dashboard.view', 'packages.view', 'packages.create', 'packages.manage',
-          'manifests.view', 'manifests.create', 'manifests.manage',
-          'routes.view', 'routes.create', 'routes.manage', 'vehicles.view', 'vehicles.create',
-          'trips.view', 'trips.create', 'deliveries.view', 
-          'pickuplocations.view', 'dropofflocations.view',
-          'expenses.view', 'expenses.create', 'ratecards.view', 'ratecards.manage',
-          'users.view', 'users.create', 'users.edit', 'roles.view', 'roles.manage',
-          'permissions.view', 'permissions.manage', 'reports.view', 'notifications.view'
-        ]
-      case 'operations manager':
-      case 'operationsmanager':
-        return [
-          'dashboard.view', 'packages.view', 'packages.create', 'manifests.view', 
-          'manifests.create', 'routes.view', 'vehicles.view', 'users.view',
-          'trips.view', 'deliveries.view', 'expenses.view'
-        ]
-      case 'route manager':
-      case 'routemanager':
-        return [
-          'dashboard.view', 'routes.view', 'routes.create', 'vehicles.view',
-          'users.view', 'trips.view', 'manifests.view', 'expenses.view'
-        ]
-      case 'driver':
-        return [
-          'dashboard.view', 'packages.view', 'manifests.view', 'deliveries.view',
-          'trips.view', 'expenses.create'
-        ]
-      case 'pickup agent':
-      case 'pickupagent':
-        return [
-          'dashboard.view', 'packages.view', 'packages.create', 'manifests.view',
-          'pickuplocations.view'
-        ]
-      case 'delivery agent':
-      case 'deliveryagent':
-        return [
-          'dashboard.view', 'packages.view', 'deliveries.view', 'dropofflocations.view'
-        ]
-
-      default:
-        return ['dashboard.view']
-    }
-  }
-  
-  // Get user role for admin checks
-  const isAdmin = user?.role?.name === 'admin'
+  // Use permissions from the centralized hook
+  const hasPermission = hookHasPermission
+  const hasAnyPermission = hookHasAnyPermission
 
   // Vars
   const { isBreakpointReached, transitionDuration } = verticalNavOptions
@@ -196,12 +94,6 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
       </ScrollWrapper>
     )
   }
-
-  // Debug: Log current user info and permissions
-  // console.log('Current User:', user)
-  // console.log('User Role:', user?.role?.name)
-  // console.log('User Permissions:', userPermissions)
-  // console.log('Is Admin:', isAdmin)
 
   return (
     <ScrollWrapper
@@ -409,18 +301,6 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
           </MenuSection>
         )}
 
-        {/* Debug Section - Show current role and permissions count */}
-        {/* <MenuSection label="User Info">
-          <MenuItem icon={<i className='ri-user-line' />}>
-            Role: {user?.role?.name || 'None'}
-          </MenuItem>
-          <MenuItem icon={<i className='ri-shield-line' />}>
-            Permissions: {userPermissions.length}
-          </MenuItem>
-          <MenuItem icon={<i className='ri-list-check' />}>
-            {userPermissions.join(', ')}
-          </MenuItem>
-        </MenuSection> */}
       </Menu>
     </ScrollWrapper>
   )

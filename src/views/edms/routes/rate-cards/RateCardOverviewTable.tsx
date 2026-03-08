@@ -48,6 +48,9 @@ import {
   getUniqueClients 
 } from '@/libs/actions/ratecard.actions'
 
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 type RateCardWithActions = RateCardType
 
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
@@ -116,6 +119,9 @@ const RateCardOverviewTable = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [clientFilter, setClientFilter] = useState<string>('all')
   const [clients, setClients] = useState<{ code: string; name: string }[]>([])
+
+  // Permissions
+  const { hasPermission } = usePermissions()
 
   // Load clients for filter
   useEffect(() => {
@@ -269,30 +275,30 @@ const RateCardOverviewTable = () => {
                   href: `/edms/routes/rate-cards/${row.original.$id}`,
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' }
                 },
-                {
+                ...(hasPermission('ratecards.edit') ? [{
                   text: 'Edit',
                   icon: 'ri-edit-box-line',
                   href: `/edms/routes/rate-cards/${row.original.$id}/edit`,
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' }
-                },
-                {
+                }] : []),
+                ...(hasPermission('ratecards.create') ? [{
                   text: 'Duplicate',
                   icon: 'ri-file-copy-line',
                   href: `/edms/routes/rate-cards/create?duplicate=${row.original.$id}`,
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' }
-                },
+                }] : []),
                 {
                   text: row.original.isActive ? 'Deactivate' : 'Activate',
                   icon: row.original.isActive ? 'ri-close-circle-line' : 'ri-checkbox-circle-line',
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
                   menuItemProps: { onClick: () => handleToggleStatus(row.original.$id, row.original.isActive) }
                 },
-                {
+                ...(hasPermission('ratecards.delete') ? [{
                   text: 'Delete',
                   icon: 'ri-delete-bin-7-line',
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4 text-error' },
                   menuItemProps: { onClick: () => handleDeleteRateCard(row.original.$id) }
-                }
+                }] : [])
               ]}
             />
           </div>
@@ -356,14 +362,16 @@ const RateCardOverviewTable = () => {
             className='min-w-[200px]'
           />
         </div>
-        <Button
-          variant='contained'
-          component={Link}
-          href='/edms/routes/rate-cards/create'
-          startIcon={<i className='ri-add-line' />}
-        >
-          Add Rate Card
-        </Button>
+        {hasPermission('ratecards.create') && (
+          <Button
+            variant='contained'
+            component={Link}
+            href='/edms/routes/rate-cards/create'
+            startIcon={<i className='ri-add-line' />}
+          >
+            Add Rate Card
+          </Button>
+        )}
       </CardContent>
 
       <div className='overflow-x-auto'>

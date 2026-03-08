@@ -28,6 +28,9 @@ import ListItemText from '@mui/material/ListItemText'
 import { getExpenseById, deleteExpense } from '@/libs/actions/expense.actions'
 import { getVehicleById } from '@/libs/actions/vehicle.actions'
 import { getTripById } from '@/libs/actions/trip.actions'
+
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
 import { storage, appwriteConfig } from '@/libs/appwrite.config'
 
 // Type Imports
@@ -80,6 +83,7 @@ interface ExpenseDetailsViewProps {
 }
 
 const ExpenseDetailsView = ({ expenseId }: ExpenseDetailsViewProps) => {
+  const { hasPermission } = usePermissions()
   const router = useRouter()
 
   // Data State
@@ -221,21 +225,25 @@ const ExpenseDetailsView = ({ expenseId }: ExpenseDetailsViewProps) => {
             </Box>
           </Box>
           <Box display="flex" gap={2}>
-            <Button
-              variant="outlined"
-              startIcon={<i className="ri-pencil-line" />}
-              onClick={() => router.push(`/edms/expenses/${expenseId}/edit`)}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<i className="ri-delete-bin-line" />}
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              Delete
-            </Button>
+            {hasPermission('expenses.edit') && (
+              <Button
+                variant="outlined"
+                startIcon={<i className="ri-pencil-line" />}
+                onClick={() => router.push(`/edms/expenses/${expenseId}/edit`)}
+              >
+                Edit
+              </Button>
+            )}
+            {hasPermission('expenses.delete') && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<i className="ri-delete-bin-line" />}
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                Delete
+              </Button>
+            )}
           </Box>
         </Box>
       </Grid>

@@ -39,11 +39,15 @@ import {
 import CustomAvatar from '@core/components/mui/Avatar'
 import OptionMenu from '@core/components/option-menu'
 
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 interface ManifestOverviewTableProps {
   onEditManifest?: (manifest: ManifestType) => void
 }
 
 const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) => {
+  const { hasPermission } = usePermissions()
   const [manifests, setManifests] = useState<ManifestType[]>([])
   const [filteredManifests, setFilteredManifests] = useState<ManifestType[]>([])
   const [loading, setLoading] = useState(true)
@@ -190,12 +194,12 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
         linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
         menuItemProps: { onClick: () => handleViewManifest(manifest) }
       },
-      {
+      ...(hasPermission('manifests.edit') ? [{
         text: 'Edit',
         icon: 'ri-edit-box-line',
         linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
         menuItemProps: { onClick: () => handleEditManifest(manifest) }
-      }
+      }] : [])
     ]
 
     // Add status-specific actions
@@ -235,14 +239,16 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
     }
 
     // Add delete option at the end
-    options.push({
-      text: 'Delete',
-      icon: 'ri-delete-bin-line',
-      linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4 text-error' },
-      menuItemProps: { 
-        onClick: () => handleDeleteClick(manifest)
-      }
-    })
+    if (hasPermission('manifests.delete')) {
+      options.push({
+        text: 'Delete',
+        icon: 'ri-delete-bin-line',
+        linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4 text-error' },
+        menuItemProps: { 
+          onClick: () => handleDeleteClick(manifest)
+        }
+      })
+    }
 
     return options
   }

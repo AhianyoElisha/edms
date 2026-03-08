@@ -42,6 +42,9 @@ import tableStyles from '@core/styles/table.module.css'
 // Actions Imports
 import { getAllRoutes, toggleRouteStatus, deleteRoute } from '@/libs/actions/route.actions'
 
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 type RouteWithActions = RouteType
 
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
@@ -53,6 +56,8 @@ const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
 const columnHelper = createColumnHelper<RouteWithActions>()
 
 const RouteOverviewTable = () => {
+  // Permissions
+  const { hasPermission } = usePermissions()
   // States
   const [routeData, setRouteData] = useState<RouteWithActions[]>([])
   const [loading, setLoading] = useState(true)
@@ -194,24 +199,24 @@ const RouteOverviewTable = () => {
                   href: `/edms/routes/${row.original.$id}`,
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' }
                 },
-                {
+                ...(hasPermission('routes.edit') ? [{
                   text: 'Edit',
                   icon: 'ri-edit-box-line',
                   href: `/edms/routes/${row.original.$id}/edit`,
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' }
-                },
+                }] : []),
                 {
                   text: row.original.isActive ? 'Deactivate' : 'Activate',
                   icon: row.original.isActive ? 'ri-close-circle-line' : 'ri-checkbox-circle-line',
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
                   menuItemProps: { onClick: () => handleToggleStatus(row.original.$id) }
                 },
-                {
+                ...(hasPermission('routes.delete') ? [{
                   text: 'Delete',
                   icon: 'ri-delete-bin-7-line',
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4 text-error' },
                   menuItemProps: { onClick: () => handleDeleteRoute(row.original.$id) }
-                }
+                }] : [])
               ]}
             />
           </div>
@@ -261,14 +266,16 @@ const RouteOverviewTable = () => {
             className='min-w-[200px]'
           />
         </div>
-        <Button
-          variant='contained'
-          component={Link}
-          href='/edms/routes/create'
-          startIcon={<i className='ri-add-line' />}
-        >
-          Create Route
-        </Button>
+        {hasPermission('routes.create') && (
+          <Button
+            variant='contained'
+            component={Link}
+            href='/edms/routes/create'
+            startIcon={<i className='ri-add-line' />}
+          >
+            Create Route
+          </Button>
+        )}
       </CardContent>
 
       <div className='overflow-x-auto'>
