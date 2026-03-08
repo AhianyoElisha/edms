@@ -147,37 +147,6 @@ const VehicleTracking = ({
           </div>
         </div>
       </AccordionSummary>
-      <AccordionDetails>
-        <Timeline className='pbs-4'>
-          <TimelineItem>
-            <TimelineSeparator>
-              <TimelineDot variant='outlined' className='mlb-0'>
-                <i className='ri-map-pin-line text-xl text-primary' />
-              </TimelineDot>
-              <TimelineConnector />
-            </TimelineSeparator>
-            <TimelineContent className='flex flex-col gap-0.5 pbs-0 pis-4 pbe-5'>
-              <Typography variant='caption' className='uppercase !text-success'>
-                Starting Location
-              </Typography>
-            </TimelineContent>
-          </TimelineItem>
-        </Timeline>
-        <Timeline>
-          <TimelineItem>
-            <TimelineSeparator>
-              <TimelineDot variant='outlined' className='mlb-0'>
-                <i className='ri-checkbox-circle-line text-xl text-success' />
-              </TimelineDot>
-            </TimelineSeparator>
-            <TimelineContent className='flex flex-col gap-0.5 pbs-0 pis-4 pbe-5'>
-              <Typography variant='caption' className='uppercase !text-primary'>
-                Final Destination
-              </Typography>
-            </TimelineContent>
-          </TimelineItem>
-        </Timeline>
-      </AccordionDetails>
     </Accordion>
   )
 }

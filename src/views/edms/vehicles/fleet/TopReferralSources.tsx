@@ -51,7 +51,7 @@ const RenderVehicleStaffTable = ({
   data,
   logisticsId,
   onStaffUpdate
-}: { data: Users[]; logisticsId: string; onStaffUpdate?: () => Promise<void> }) => {
+}: { data: Users; logisticsId: string; onStaffUpdate?: () => Promise<void> }) => {
   const buttonProps: ButtonProps = {
     variant: 'contained',
     children: 'Assign Staff',
@@ -87,22 +87,20 @@ const RenderVehicleStaffTable = ({
             </tr>
           </thead>
           <tbody>
-            {data.map((row: Users) => (
-              <tr key={row.$id}>
-                <td>{row.name}</td>
-                <td>{row.role}</td>
-                <td>{row.email}</td>
-                <td>{row.phone}</td>
+              <tr key={data.$id}>
+                <td>{data.name}</td>
+                <td>{data.role}</td>
+                <td>{data.email}</td>
+                <td>{data.phone}</td>
                 <td className='text-end'>
                   <Chip 
-                    label={row.status} 
-                    color={row.status.toLowerCase() === 'active' ? 'success' : 'warning'} 
+                    label={data.status} 
+                    color={data.status.toLowerCase() === 'active' ? 'success' : 'warning'} 
                     size='small' 
                     variant='tonal' 
                   />
                 </td>
               </tr>
-            ))}
           </tbody>
         </table>
       </div>
@@ -208,7 +206,7 @@ const TopReferralSources = ({ selectedLogistics, onStaffUpdate }: Props) => {
         <TabPanel sx={{ p: 0 }} value='vehicle staff'>
           {selectedLogistics?.driver ? (
           <RenderVehicleStaffTable 
-            data={selectedLogistics.driver as unknown as Users[]} 
+            data={selectedLogistics.driver as unknown as Users} 
               logisticsId={selectedLogistics.$id} 
               onStaffUpdate={onStaffUpdate}
             />

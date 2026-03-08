@@ -465,12 +465,12 @@ export async function getAllMonthsLogisticsToExpenseEstimate(vehicleId: any) {
     const endDate = endOfYear.toISOString();
     
     // Query for sales with specific vehicleId
-    const salesEstimateList = await databases.listDocuments(
+    const tripCostEstimate = await databases.listDocuments(
       appwriteConfig.database,
-      appwriteConfig.orders,
+      appwriteConfig.trips,
       [
-        Query.greaterThanEqual('salesDate', startDate),
-        Query.lessThanEqual('salesDate', endDate),
+        Query.greaterThanEqual('tripDate', startDate),
+        Query.lessThanEqual('tripDate', endDate),
         Query.equal('vehicle', vehicleId),
         Query.limit(500)
       ]
@@ -479,11 +479,11 @@ export async function getAllMonthsLogisticsToExpenseEstimate(vehicleId: any) {
     // Query for expenses with specific vehicleId
     const expensesList = await databases.listDocuments(
       appwriteConfig.database,
-      appwriteConfig.expenses, // Assuming this is your expenses collection
+      appwriteConfig.expenses,
       [
-        Query.greaterThanEqual('expenseDate', startDate), // Assuming expense date field
+        Query.greaterThanEqual('expenseDate', startDate),
         Query.lessThanEqual('expenseDate', endDate),
-        Query.equal('vehicle', vehicleId),
+        Query.equal('vehicleId', vehicleId),
         Query.limit(500)
       ]
     );
@@ -496,22 +496,22 @@ export async function getAllMonthsLogisticsToExpenseEstimate(vehicleId: any) {
     );
     
     // Wait for all queries to complete
-    const [salesResult, expensesResult, vehicleResult] = await Promise.allSettled([
-      salesEstimateList,
+    const [tripResult, expensesResult, vehicleResult] = await Promise.allSettled([
+      tripCostEstimate,
       expensesList,
       vehiclePromise
     ]);
     
     // Handle results with error checking
-    if (salesResult.status === 'rejected' || expensesResult.status === 'rejected') {
-      throw new Error('Failed to fetch sales or expenses data');
+    if (tripResult.status === 'rejected' || expensesResult.status === 'rejected') {
+      throw new Error('Failed to fetch trip or expenses data');
     }
     
-    const salesData = salesResult.value;
+    const tripData = tripResult.value;
     const expensesData = expensesResult.value;
     const vehicleData = vehicleResult.status === 'fulfilled' ? vehicleResult.value : null;
     
-    if (!salesData || !expensesData) throw Error;
+    if (!tripData || !expensesData) throw Error;
 
     // Initialize monthly data structure
     const monthNames = [
@@ -526,26 +526,25 @@ export async function getAllMonthsLogisticsToExpenseEstimate(vehicleId: any) {
       monthlyData.set(index, {
         monthIndex: index,
         monthName,
-        salesDocuments: [],
+        tripDocuments: [],
         expenseDocuments: [],
-        salesTotal: 0,
+        tripCostTotal: 0,
         expenseTotal: 0,
-        salesPackages: 0,
-        salesCount: 0,
+        deliveredPackages: 0,
+        tripCount: 0,
         expenseCount: 0
       });
     });
     
-    // Process sales data and group by month
-    salesData.documents.forEach((item) => {
-      const salesDate = new Date(item.salesDate);
-      const monthIndex = salesDate.getMonth(); // 0-11
+    // Process trip data and group by month
+    tripData.documents.forEach((item) => {
+      const tripDate = new Date(item.tripDate);
+      const monthIndex = tripDate.getMonth(); // 0-11
       
       const monthInfo = monthlyData.get(monthIndex);
-      monthInfo.salesDocuments.push(item);
-      monthInfo.salesTotal += item.totalPrice || 0;
-      monthInfo.salesPackages += item.packageQuantity || item.quantity || 0;
-      monthInfo.salesCount += 1;
+      monthInfo.tripDocuments.push(item);
+      monthInfo.tripCostTotal += item.tripCost || 0;
+      monthInfo.tripCount += 1;
     });
     
     // Process expenses data and group by month
@@ -575,11 +574,11 @@ export async function getAllMonthsLogisticsToExpenseEstimate(vehicleId: any) {
       }
       
       // Aggregate sales by day for this month
-      month.salesDocuments.forEach((item: any) => {
-        const createdDate = new Date(item.salesDate);
+      month.tripDocuments.forEach((item: any) => {
+        const createdDate = new Date(item.tripDate);
         const day = createdDate.getDate();
         const currentTotal = dailySalesMap.get(day) || 0;
-        dailySalesMap.set(day, currentTotal + (item.totalPrice || 0));
+        dailySalesMap.set(day, currentTotal + (item.tripCost || 0));
       });
       
       // Aggregate expenses by day for this month
@@ -596,7 +595,7 @@ export async function getAllMonthsLogisticsToExpenseEstimate(vehicleId: any) {
       const dayLabels = Array.from(dailySalesMap.keys());
       
       // Calculate sales to expense ratio for this month
-      const salesTotal = month.salesTotal;
+      const salesTotal = month.tripCostTotal;
       const expenseTotal = month.expenseTotal;
       const salesToExpenseRatio = expenseTotal > 0 ? (salesTotal / expenseTotal) : (salesTotal > 0 ? Infinity : 0);
       const formattedRatio = salesToExpenseRatio === Infinity ? '∞' : salesToExpenseRatio.toFixed(2);
@@ -635,10 +634,10 @@ export async function getAllMonthsLogisticsToExpenseEstimate(vehicleId: any) {
       return {
         monthIndex: month.monthIndex,
         monthName: month.monthName,
-        salesTotal: month.salesTotal,
+        salesTotal: month.tripCostTotal,
         expenseTotal: month.expenseTotal,
-        salesPackages: month.salesPackages,
-        salesCount: month.salesCount,
+        salesPackages: month.deliveredPackages,
+        salesCount: month.tripCount,
         expenseCount: month.expenseCount,
         salesToExpenseRatio: formattedRatio,
         profitLoss,
@@ -648,16 +647,16 @@ export async function getAllMonthsLogisticsToExpenseEstimate(vehicleId: any) {
         dayLabels: dayLabels, // Day numbers array
         weeklyBreakdown: weeklyBreakdown, // Weekly breakdown for the month
         // Chart-friendly data
-        hasData: month.salesCount > 0 || month.expenseCount > 0
+        hasData: month.tripCount > 0 || month.expenseCount > 0
       };
     });
     
     // Calculate overall totals across all months
-    const overallSalesTotal = Array.from(monthlyData.values()).reduce((total, month) => total + month.salesTotal, 0);
-    const overallExpenseTotal = Array.from(monthlyData.values()).reduce((total, month) => total + month.expenseTotal, 0);
-    const overallSalesPackages = Array.from(monthlyData.values()).reduce((total, month) => total + month.salesPackages, 0);
-    const overallSalesCount = Array.from(monthlyData.values()).reduce((total, month) => total + month.salesCount, 0);
-    const overallExpenseCount = Array.from(monthlyData.values()).reduce((total, month) => total + month.expenseCount, 0);
+    const overallSalesTotal = processedMonths.reduce((total, month) => total + month.salesTotal, 0);
+    const overallExpenseTotal = processedMonths.reduce((total, month) => total + month.expenseTotal, 0);
+    const overallTripPackages = processedMonths.reduce((total, month) => total + month.salesPackages, 0);
+    const overallTripCount = processedMonths.reduce((total, month) => total + month.salesCount, 0);
+    const overallExpenseCount = processedMonths.reduce((total, month) => total + month.expenseCount, 0);
     const overallSalesToExpenseRatio = overallExpenseTotal > 0 ? (overallSalesTotal / overallExpenseTotal).toFixed(2) : (overallSalesTotal > 0 ? '∞' : '0.00');
     const overallProfitLoss = overallSalesTotal - overallExpenseTotal;
     
@@ -671,7 +670,7 @@ export async function getAllMonthsLogisticsToExpenseEstimate(vehicleId: any) {
     
     // Extract vehicle information from the fetched vehicle document
     const vehicleName = vehicleData ? 
-      `${vehicleData.name || vehicleData.vehicleName || 'Vehicle'} ${vehicleData.vehicleNumber || vehicleData.plateNumber || vehicleId}` :
+      `${vehicleData.brand ? vehicleData.brand + ' ' : ''}${vehicleData.model ? vehicleData.model + ' - ' : ''}${vehicleData.vehicleNumber || vehicleId}` :
       `Vehicle ${vehicleId}`;
     
     return { 
@@ -681,8 +680,8 @@ export async function getAllMonthsLogisticsToExpenseEstimate(vehicleId: any) {
       months: processedMonths, // Array of monthly data (12 months)
       overallSalesTotal,
       overallExpenseTotal,
-      overallSalesPackages,
-      overallSalesCount,
+      overallTripPackages,
+      overallTripCount,
       overallExpenseCount,
       overallSalesToExpenseRatio,
       overallProfitLoss,

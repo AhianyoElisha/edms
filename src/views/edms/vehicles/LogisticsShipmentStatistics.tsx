@@ -263,7 +263,7 @@ const LogisticsShipmentStatistics = ({
       // Monthly view - show all 12 months
       const series = [
         {
-          name: 'Sales',
+          name: 'Revenue',
           type: 'column',
           data: vehicleAnalyticsData.monthlySalesChart
         },
@@ -278,7 +278,7 @@ const LogisticsShipmentStatistics = ({
         series,
         categories: vehicleAnalyticsData.monthLabels.map((month: any) => month.slice(0, 3)), // Short month names
         title: `${vehicleAnalyticsData.vehicleName} - ${vehicleAnalyticsData.year}`,
-        subtitle: `Total Sales: ${vehicleAnalyticsData.overallSalesTotal.toLocaleString()} | Total Expenses: ${vehicleAnalyticsData.overallExpenseTotal.toLocaleString()} | Profit: ${vehicleAnalyticsData.overallProfitLoss.toLocaleString()}`
+        subtitle: `Total Revenue: GH₵${vehicleAnalyticsData.overallSalesTotal.toLocaleString()} | Total Expenses: GH₵${vehicleAnalyticsData.overallExpenseTotal.toLocaleString()} | Profit: GH₵${vehicleAnalyticsData.overallProfitLoss.toLocaleString()}`
       }
     } else {
       // Daily view - show selected week's daily data
@@ -313,7 +313,7 @@ const LogisticsShipmentStatistics = ({
 
       const series = [
         {
-          name: 'Sales',
+          name: 'Revenue',
           type: 'column',
           data: selectedWeek.salesData
         },
@@ -331,7 +331,7 @@ const LogisticsShipmentStatistics = ({
         series,
         categories,
         title: `${vehicleAnalyticsData.vehicleName} - ${selectedMonth.monthName} ${vehicleAnalyticsData.year} (Week ${selectedWeek.weekNumber})`,
-        subtitle: `Sales: ${selectedWeek.salesTotal.toLocaleString()} | Expenses: ${selectedWeek.expenseTotal.toLocaleString()} | Profit: ${selectedWeek.profitLoss.toLocaleString()}`
+        subtitle: `Revenue: GH₵${selectedWeek.salesTotal.toLocaleString()} | Expenses: GH₵${selectedWeek.expenseTotal.toLocaleString()} | Profit: GH₵${selectedWeek.profitLoss.toLocaleString()}`
       }
     }
   }, [vehicleAnalyticsData, selectedMonthIndex, selectedWeekIndex, viewMode])
@@ -445,7 +445,7 @@ const LogisticsShipmentStatistics = ({
       intersect: false,
       y: {
         formatter: (value, { seriesIndex }) => {
-          const prefix = seriesIndex === 0 ? 'Sales: ' : 'Expenses: '
+          const prefix = seriesIndex === 0 ? 'Revenue: GH₵' : 'Expenses: GH₵'
           return prefix + value.toLocaleString()
         }
       }
@@ -482,7 +482,7 @@ const LogisticsShipmentStatistics = ({
   if (!selectedLogistics) {
     return (
       <Card>
-        <CardHeader title='Shipment Statistics' subheader='Select a vehicle to view analytics' />
+        <CardHeader title='Vehicle Revenue vs Expenses' subheader='Select a vehicle to view analytics' />
         <CardContent>
           <Box 
             display="flex" 
@@ -561,7 +561,7 @@ const LogisticsShipmentStatistics = ({
               No Data Available
             </Typography>
             <Typography variant="body2" color="textSecondary" textAlign="center">
-              This vehicle has no sales or expense data for the selected period
+              This vehicle has no revenue or expense data for the selected period
             </Typography>
           </Box>
         )}

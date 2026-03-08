@@ -51,8 +51,8 @@ export type VehicleAnalyticsData = {
   }>
   overallSalesTotal: number
   overallExpenseTotal: number
-  overallSalesPackages: number
-  overallSalesCount: number
+  overallTripPackages: number
+  overallTripCount: number
   overallExpenseCount: number
   overallSalesToExpenseRatio: string
   overallProfitLoss: number
