@@ -542,8 +542,9 @@ const ExpenseEditForm = ({ expenseId }: ExpenseEditFormProps) => {
                           <MenuItem value="">None</MenuItem>
                           {vehicles.map((vehicle) => (
                             <MenuItem key={vehicle.$id} value={vehicle.$id}>
-                              {vehicle.licensePlate}
+                              {vehicle.vehicleNumber}
                               {vehicle.brand && ` - ${vehicle.brand}`}
+                              {vehicle.model && ` ${vehicle.model}`}
                             </MenuItem>
                           ))}
                         </Select>

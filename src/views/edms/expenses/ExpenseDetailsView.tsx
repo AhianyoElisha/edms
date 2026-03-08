@@ -569,10 +569,10 @@ const ExpenseDetailsView = ({ expenseId }: ExpenseDetailsViewProps) => {
                     </Box>
                     <Box>
                       <Typography variant="subtitle1" fontWeight={600}>
-                        {vehicle.licensePlate}
+                        {vehicle.vehicleNumber}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {[vehicle.brand, vehicle.model].filter(Boolean).join(' ') || 'No details'}
+                        {[vehicle.vehicleType, vehicle.model].filter(Boolean).join(' ') || 'No details'}
                       </Typography>
                     </Box>
                   </Box>

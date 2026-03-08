@@ -493,7 +493,7 @@ const ExpenseCreateForm = () => {
                           <MenuItem value="">None</MenuItem>
                           {vehicles.map((vehicle) => (
                             <MenuItem key={vehicle.$id} value={vehicle.$id}>
-                              {vehicle.vehicleNumber || vehicle.licensePlate}
+                              {vehicle.vehicleNumber}
                               {vehicle.brand && ` - ${vehicle.brand}`}
                               {vehicle.model && ` ${vehicle.model}`}
                             </MenuItem>
