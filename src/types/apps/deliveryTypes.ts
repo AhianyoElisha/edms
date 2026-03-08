@@ -128,7 +128,7 @@ export interface TripType {
   driverRate?: number
   profit?: number
   manifests: string[] // array of manifest IDs (One-to-many)
-  status: 'planned' | 'in_progress' | 'at_pickup' | 'on_route' | 'completed' | 'cancelled'
+  status: 'planned' | 'in_progress' | 'at_pickup' | 'on_route' | 'completed' | 'cancelled' | 'awaiting_manifests'
   notes?: string
   creator: string // creator ID (Many-to-one)
   

@@ -28,7 +28,7 @@ import OptionMenu from '@core/components/option-menu'
 // Type Imports
 import type { TripType } from '@/types/apps/deliveryTypes'
 
-type TripStatusType = 'planned' | 'in_progress' | 'at_pickup' | 'on_route' | 'completed' | 'cancelled'
+type TripStatusType = 'planned' | 'in_progress' | 'at_pickup' | 'on_route' | 'completed' | 'cancelled' | 'awaiting_manifests'
 
 const TripSummary = ({ 
   tripData, 
