@@ -105,16 +105,39 @@ export async function updateRoute(
   updateData: Partial<Omit<RouteType, '$id' | '$createdAt' | '$updatedAt'>>
 ): Promise<RouteType> {
   try {
-    const dataToUpdate: any = { ...updateData }
-    
-    // Many-to-one relationships (startLocation, endLocation): keep as strings
-    // They are already strings, no conversion needed
-    
+    const dataToUpdate: Record<string, any> = {}
+
+    // Only include fields that are actual database attributes
+    if (updateData.routeName !== undefined) dataToUpdate.routeName = updateData.routeName
+    if (updateData.routeCode !== undefined) dataToUpdate.routeCode = updateData.routeCode
+    if (updateData.distance !== undefined) dataToUpdate.distance = updateData.distance || 0
+    if (updateData.estimatedDuration !== undefined) dataToUpdate.estimatedDuration = updateData.estimatedDuration || 0
+    if (updateData.baseRate !== undefined) dataToUpdate.baseRate = updateData.baseRate
+    if (updateData.isActive !== undefined) dataToUpdate.isActive = updateData.isActive
+
+    // Denormalized display name fields
+    if (updateData.startLocationName !== undefined) dataToUpdate.startLocationName = updateData.startLocationName
+    if (updateData.endLocationName !== undefined) dataToUpdate.endLocationName = updateData.endLocationName
+
+    // Many-to-one relationships (startLocation, endLocation): pass as single string ID
+    if (updateData.startLocation !== undefined) {
+      dataToUpdate.startLocation = typeof updateData.startLocation === 'object'
+        ? (updateData.startLocation as any).$id
+        : updateData.startLocation
+    }
+    if (updateData.endLocation !== undefined) {
+      dataToUpdate.endLocation = typeof updateData.endLocation === 'object'
+        ? (updateData.endLocation as any).$id
+        : updateData.endLocation
+    }
+
     // Many-to-many relationship (intermediateStops): convert to array of IDs
-    if (dataToUpdate.intermediateStops && Array.isArray(dataToUpdate.intermediateStops)) {
-      dataToUpdate.intermediateStops = dataToUpdate.intermediateStops.map((stop: any) => 
-        typeof stop === 'string' ? stop : stop.locationId
-      )
+    if (updateData.intermediateStops !== undefined) {
+      dataToUpdate.intermediateStops = Array.isArray(updateData.intermediateStops)
+        ? updateData.intermediateStops.map((stop: any) =>
+            typeof stop === 'string' ? stop : stop.locationId || stop.$id
+          )
+        : []
     }
 
     const route = await databases.updateDocument(
