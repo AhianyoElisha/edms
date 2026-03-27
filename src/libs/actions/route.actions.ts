@@ -210,14 +210,14 @@ export async function getRouteDropoffLocations(routeId: string): Promise<RouteSt
     if (typeof endLoc === 'object' && endLoc.$id) {
       stops.push({
         locationId: endLoc.$id,
-        locationName: endLoc.locationName || route.endLocationName || '',
+        locationName: endLoc.locationName || route.endLocation || '',
         address: endLoc.address || '',
         sequence: stops.length + 1
       })
     } else {
       stops.push({
         locationId: typeof endLoc === 'string' ? endLoc : (endLoc?.$id || ''),
-        locationName: route.endLocationName || '',
+        locationName: route.endLocation || '',
         address: '',
         sequence: stops.length + 1
       })
