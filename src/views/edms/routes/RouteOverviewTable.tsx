@@ -127,25 +127,23 @@ const RouteOverviewTable = () => {
           </div>
         )
       }),
-      columnHelper.accessor('startLocationName', {
+      columnHelper.accessor('startLocation', {
         header: 'Start Location',
         cell: ({ row }) => (
           <Typography color='text.primary'>
-            {
-              // @ts-ignore
-            row.original.startLocation?.locationName || 'N/A'
-            }
+            {typeof (row.original.startLocation as any) === 'object'
+              ? (row.original.startLocation as any).locationName
+              : 'N/A'}
           </Typography>
         )
       }),
-      columnHelper.accessor('endLocationName', {
+      columnHelper.accessor('endLocation', {
         header: 'End Location',
         cell: ({ row }) => (
           <Typography color='text.primary'>
-            {
-              // @ts-ignore
-            row.original.endLocation?.locationName || 'N/A'
-            }
+            {typeof (row.original.endLocation as any) === 'object'
+              ? (row.original.endLocation as any).locationName
+              : 'N/A'}
           </Typography>
         )
       }),
