@@ -115,10 +115,6 @@ export async function updateRoute(
     if (updateData.baseRate !== undefined) dataToUpdate.baseRate = updateData.baseRate
     if (updateData.isActive !== undefined) dataToUpdate.isActive = updateData.isActive
 
-    // Denormalized display name fields
-    if (updateData.startLocationName !== undefined) dataToUpdate.startLocationName = updateData.startLocationName
-    if (updateData.endLocationName !== undefined) dataToUpdate.endLocationName = updateData.endLocationName
-
     // Many-to-one relationships (startLocation, endLocation): pass as single string ID
     if (updateData.startLocation !== undefined) {
       dataToUpdate.startLocation = typeof updateData.startLocation === 'object'
