@@ -346,8 +346,7 @@ const RouteDetailView = ({ route: initialRoute }: RouteDetailViewProps) => {
     try {
       setIsChangingEnd(true)
       await updateRoute(route.$id, {
-        endLocation: newEndLocation.$id,
-        endLocationName: newEndLocation.locationName
+        endLocation: newEndLocation.$id
       })
       toast.success(`End location changed to "${newEndLocation.locationName}"`)
       setChangeEndDialogOpen(false)
