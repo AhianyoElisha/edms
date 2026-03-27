@@ -83,8 +83,8 @@ export async function createRoute(
         intermediateStops: routeData.intermediateStops && routeData.intermediateStops.length > 0 
           ? routeData.intermediateStops.map(stop => stop.locationId)
           : [],
-        distance: routeData.distance || 0,
-        estimatedDuration: routeData.estimatedDuration || 0,
+        ...(routeData.distance !== undefined && { distance: routeData.distance }),
+        ...(routeData.estimatedDuration !== undefined && { estimatedDuration: routeData.estimatedDuration }),
         baseRate: routeData.baseRate,
         isActive: routeData.isActive !== undefined ? routeData.isActive : true
       }
@@ -110,8 +110,8 @@ export async function updateRoute(
     // Only include fields that are actual database attributes
     if (updateData.routeName !== undefined) dataToUpdate.routeName = updateData.routeName
     if (updateData.routeCode !== undefined) dataToUpdate.routeCode = updateData.routeCode
-    if (updateData.distance !== undefined) dataToUpdate.distance = updateData.distance || 0
-    if (updateData.estimatedDuration !== undefined) dataToUpdate.estimatedDuration = updateData.estimatedDuration || 0
+    if (updateData.distance !== undefined) dataToUpdate.distance = updateData.distance ?? null
+    if (updateData.estimatedDuration !== undefined) dataToUpdate.estimatedDuration = updateData.estimatedDuration ?? null
     if (updateData.baseRate !== undefined) dataToUpdate.baseRate = updateData.baseRate
     if (updateData.isActive !== undefined) dataToUpdate.isActive = updateData.isActive
 
