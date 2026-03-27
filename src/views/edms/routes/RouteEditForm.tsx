@@ -322,7 +322,7 @@ const RouteEditForm = ({ route: initialRoute }: RouteEditFormProps) => {
     return typeof raw === 'object' ? raw.locationName : 'Pickup Location'
   })()
 
-  const endLocationName = (() => {
+  const endLocation = (() => {
     const found = dropoffLocations.find(l => l.$id === endLocationId)
     if (found) return found.locationName
     const raw = initialRoute.endLocation as any
@@ -685,7 +685,7 @@ const RouteEditForm = ({ route: initialRoute }: RouteEditFormProps) => {
                           Final Destination
                         </Typography>
                         <Typography variant='subtitle2'>
-                          {endLocationName}
+                          {endLocation}
                         </Typography>
                       </Box>
                       <Chip label='END' size='small' variant='outlined' color='error' />
