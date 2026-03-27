@@ -402,10 +402,8 @@ export interface RouteType {
   $id: string
   routeName: string
   routeCode: string
-  startLocation: string // pickup location ID
-  startLocationName?: string
-  endLocation: string // final dropoff location ID
-  endLocationName?: string
+  startLocation: string // pickup location ID (populated as object when queried with select)
+  endLocation: string // final dropoff location ID (populated as object when queried with select)
   intermediateStops: RouteStopType[] // array of intermediate dropoff locations
   distance?: number // in kilometers
   estimatedDuration?: number // in minutes
