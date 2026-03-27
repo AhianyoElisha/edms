@@ -319,14 +319,14 @@ const RouteEditForm = ({ route: initialRoute }: RouteEditFormProps) => {
     const found = pickupLocations.find(l => l.$id === startLocationId)
     if (found) return found.locationName
     const raw = initialRoute.startLocation as any
-    return typeof raw === 'object' ? raw.locationName : initialRoute.startLocationName || 'Pickup Location'
+    return typeof raw === 'object' ? raw.locationName : 'Pickup Location'
   })()
 
   const endLocationName = (() => {
     const found = dropoffLocations.find(l => l.$id === endLocationId)
     if (found) return found.locationName
     const raw = initialRoute.endLocation as any
-    return typeof raw === 'object' ? raw.locationName : initialRoute.endLocationName || 'Final Destination'
+    return typeof raw === 'object' ? raw.locationName : 'Final Destination'
   })()
 
   // ==========================================

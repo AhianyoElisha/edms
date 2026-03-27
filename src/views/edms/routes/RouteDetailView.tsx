@@ -491,7 +491,7 @@ const RouteDetailView = ({ route: initialRoute }: RouteDetailViewProps) => {
                       <Box>
                         <Chip label='START — Pickup Location' color='success' size='small' sx={{ mb: 1 }} />
                         <Typography variant='subtitle1' fontWeight='bold'>
-                          {typeof startLocation === 'object' ? startLocation.locationName : route.startLocationName || 'Pickup Location'}
+                          {typeof startLocation === 'object' ? startLocation.locationName : 'Pickup Location'}
                         </Typography>
                         {typeof startLocation === 'object' && startLocation.address && (
                           <Typography variant='body2' color='text.secondary'>
@@ -623,7 +623,7 @@ const RouteDetailView = ({ route: initialRoute }: RouteDetailViewProps) => {
                         <Box>
                           <Chip label='END — Final Destination' color='error' size='small' sx={{ mb: 1 }} />
                           <Typography variant='subtitle1' fontWeight='bold'>
-                            {typeof endLocation === 'object' ? endLocation.locationName : route.endLocationName || 'End Location'}
+                            {typeof endLocation === 'object' ? endLocation.locationName : 'End Location'}
                           </Typography>
                           {typeof endLocation === 'object' && endLocation.address && (
                             <Typography variant='body2' color='text.secondary'>
@@ -832,7 +832,7 @@ const RouteDetailView = ({ route: initialRoute }: RouteDetailViewProps) => {
                     <Box>
                       <Typography variant='caption' color='text.secondary'>Start Location</Typography>
                       <Typography variant='subtitle1' fontWeight='bold'>
-                        {typeof startLocation === 'object' ? startLocation.locationName : route.startLocationName || 'N/A'}
+                        {typeof startLocation === 'object' ? startLocation.locationName : 'N/A'}
                       </Typography>
                     </Box>
                   </Box>
@@ -873,7 +873,7 @@ const RouteDetailView = ({ route: initialRoute }: RouteDetailViewProps) => {
                     <Box>
                       <Typography variant='caption' color='text.secondary'>End Location</Typography>
                       <Typography variant='subtitle1' fontWeight='bold'>
-                        {typeof endLocation === 'object' ? endLocation.locationName : route.endLocationName || 'N/A'}
+                        {typeof endLocation === 'object' ? endLocation.locationName : 'N/A'}
                       </Typography>
                     </Box>
                   </Box>
@@ -1007,7 +1007,7 @@ const RouteDetailView = ({ route: initialRoute }: RouteDetailViewProps) => {
         <DialogContent>
           <Typography className='mb-4'>
             Select a new final destination for this route.
-            The current end location is <strong>"{typeof endLocation === 'object' ? endLocation.locationName : route.endLocationName || 'Unknown'}"</strong>.
+            The current end location is <strong>"{typeof endLocation === 'object' ? endLocation.locationName : 'Unknown'}"</strong>.
           </Typography>
           <Autocomplete
             options={availableDropoffs}
