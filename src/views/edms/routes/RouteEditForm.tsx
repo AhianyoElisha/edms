@@ -315,7 +315,7 @@ const RouteEditForm = ({ route: initialRoute }: RouteEditFormProps) => {
   })
 
   // Resolve start/end location display names
-  const startLocationName = (() => {
+  const startLocation = (() => {
     const found = pickupLocations.find(l => l.$id === startLocationId)
     if (found) return found.locationName
     const raw = initialRoute.startLocation as any
@@ -583,7 +583,7 @@ const RouteEditForm = ({ route: initialRoute }: RouteEditFormProps) => {
                           Pickup
                         </Typography>
                         <Typography variant='subtitle2'>
-                          {startLocationName}
+                          {startLocation}
                         </Typography>
                       </Box>
                       <Chip label='START' size='small' variant='outlined' color='success' />

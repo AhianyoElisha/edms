@@ -281,7 +281,7 @@ const StepTripDetails = ({ handleNext, wizardData, updateWizardData }: WizardSte
                 <div>
                   <Typography variant='body1'>{route.routeName}</Typography>
                   <Typography variant='caption' color='text.secondary'>
-                    {route.routeCode} - {route.startLocationName} → {route.endLocationName}
+                    {route.routeCode} - {route.startLocation} → {route.endLocation}
                     {route.intermediateStops.length > 0 && ` (${route.intermediateStops.length} stops)`}
                   </Typography>
                 </div>
