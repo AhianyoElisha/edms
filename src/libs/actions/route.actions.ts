@@ -1,10 +1,28 @@
 // Appwrite Imports
-import { databases, tablesDB } from '@/libs/appwrite.config'
+import { tablesDB } from '@/libs/appwrite.config'
 import { appwriteConfig } from '@/libs/appwrite.config'
 import { ID, Query } from 'appwrite'
 
 // Type Imports
 import type { RouteType, RouteFilters, RouteStopType } from '@/types/apps/deliveryTypes'
+
+type IntermediateStopInput =
+  | string
+  | {
+      $id?: string
+      locationId?: string
+    }
+
+const mapIntermediateStopsToIds = (stops?: IntermediateStopInput[]) => {
+  if (!Array.isArray(stops)) return []
+
+  return stops
+    .map(stop => {
+      if (typeof stop === 'string') return stop
+      return stop.locationId || stop.$id || ''
+    })
+    .filter(Boolean)
+}
 
 /**
  * Get all routes with optional filtering
@@ -69,7 +87,7 @@ export async function createRoute(
   routeData: Omit<RouteType, '$id' | '$createdAt' | '$updatedAt'>
 ): Promise<RouteType> {
   try {
-    const route = await databases.createDocument(
+    const route = await tablesDB.createRow(
       appwriteConfig.database,
       appwriteConfig.routes,
       ID.unique(),
@@ -80,9 +98,7 @@ export async function createRoute(
         startLocation: routeData.startLocation,
         endLocation: routeData.endLocation,
         // Many-to-many relationship: pass array of location IDs
-        intermediateStops: routeData.intermediateStops && routeData.intermediateStops.length > 0 
-          ? routeData.intermediateStops.map(stop => stop.locationId)
-          : [],
+        intermediateStops: mapIntermediateStopsToIds(routeData.intermediateStops as IntermediateStopInput[]),
         ...(routeData.distance !== undefined && { distance: routeData.distance }),
         ...(routeData.estimatedDuration !== undefined && { estimatedDuration: routeData.estimatedDuration }),
         baseRate: routeData.baseRate,
@@ -129,14 +145,12 @@ export async function updateRoute(
 
     // Many-to-many relationship (intermediateStops): convert to array of IDs
     if (updateData.intermediateStops !== undefined) {
-      dataToUpdate.intermediateStops = Array.isArray(updateData.intermediateStops)
-        ? updateData.intermediateStops.map((stop: any) =>
-            typeof stop === 'string' ? stop : stop.locationId || stop.$id
-          )
-        : []
+      dataToUpdate.intermediateStops = mapIntermediateStopsToIds(
+        updateData.intermediateStops as IntermediateStopInput[]
+      )
     }
 
-    const route = await databases.updateDocument(
+    const route = await tablesDB.updateRow(
       appwriteConfig.database,
       appwriteConfig.routes,
       routeId,
@@ -155,7 +169,7 @@ export async function updateRoute(
  */
 export async function deleteRoute(routeId: string): Promise<void> {
   try {
-    await databases.deleteDocument(
+    await tablesDB.deleteRow(
       appwriteConfig.database,
       appwriteConfig.routes,
       routeId
