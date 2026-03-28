@@ -143,11 +143,35 @@ export async function updateRoute(
         : updateData.endLocation
     }
 
-    // Many-to-many relationship (intermediateStops): convert to array of IDs
+    // Many-to-many relationship (intermediateStops): convert to ordered array of IDs.
+    // Appwrite M2M junctions don't preserve order, so we clear first, then re-set
+    // so fresh junction records are created in the exact submitted sequence.
+    let reorderedStopIds: string[] | null = null
+
     if (updateData.intermediateStops !== undefined) {
-      dataToUpdate.intermediateStops = mapIntermediateStopsToIds(
+      reorderedStopIds = mapIntermediateStopsToIds(
         updateData.intermediateStops as IntermediateStopInput[]
       )
+    }
+
+    if (reorderedStopIds !== null) {
+      // Step 1: update all other fields AND clear intermediateStops
+      await tablesDB.updateRow(
+        appwriteConfig.database,
+        appwriteConfig.routes,
+        routeId,
+        { ...dataToUpdate, intermediateStops: [] }
+      )
+
+      // Step 2: re-set intermediateStops in the new order (fresh junction records)
+      const route = await tablesDB.updateRow(
+        appwriteConfig.database,
+        appwriteConfig.routes,
+        routeId,
+        { intermediateStops: reorderedStopIds }
+      )
+
+      return route as unknown as RouteType
     }
 
     const route = await tablesDB.updateRow(
