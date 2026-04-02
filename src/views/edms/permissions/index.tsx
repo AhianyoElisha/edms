@@ -298,7 +298,7 @@ const Permissions = ({ permissions }: any) => {
           </table>
         </div>
         <TablePagination
-          rowsPerPageOptions={[5, 7, 10]}
+          rowsPerPageOptions={[5, 10, 25, 40, 50, 100]}
           component='div'
           className='border-bs'
           count={table.getFilteredRowModel().rows.length}

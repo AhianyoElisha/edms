@@ -416,7 +416,7 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
           onPageChange={handleChangePage}
           rowsPerPage={rowsPerPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          rowsPerPageOptions={[5, 10, 25, 50]}
+          rowsPerPageOptions={[5, 10, 25, 40, 50, 100]}
         />
       </Card>
 

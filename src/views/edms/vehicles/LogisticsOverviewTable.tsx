@@ -469,7 +469,7 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
         </table>
       </div>
       <TablePagination
-        rowsPerPageOptions={[5, 10, 25]}
+        rowsPerPageOptions={[5, 10, 25, 40, 50, 100]}
         component='div'
         className='border-bs'
         count={table.getExpandedRowModel().rows.length}

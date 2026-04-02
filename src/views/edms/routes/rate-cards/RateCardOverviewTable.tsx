@@ -431,7 +431,7 @@ const RateCardOverviewTable = () => {
         </table>
       </div>
       <TablePagination
-        rowsPerPageOptions={[10, 25, 50]}
+        rowsPerPageOptions={[5, 10, 25, 40, 50, 100]}
         component='div'
         className='border-bs'
         count={table.getFilteredRowModel().rows.length}
