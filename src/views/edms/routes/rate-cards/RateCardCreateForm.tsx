@@ -66,7 +66,8 @@ const BIG_TRUCK_VOLUMES = [
   { volume: 50, revisedVolume: 50, tonnage: 10 },
   { volume: 55, revisedVolume: 55, tonnage: 12 },
   { volume: 60, revisedVolume: 60, tonnage: 15 },
-  { volume: 65, revisedVolume: 65, tonnage: 18 }
+  { volume: 65, revisedVolume: 65, tonnage: 18 },
+  { volume: 70, revisedVolume: 70, tonnage: 23 }
 ]
 
 const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCreateFormProps) => {
@@ -101,7 +102,8 @@ const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCre
     50: 0,
     55: 0,
     60: 0,
-    65: 0
+    65: 0,
+    70: 0
   })
 
   // Load routes on mount
