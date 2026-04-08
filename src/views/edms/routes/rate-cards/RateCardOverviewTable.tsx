@@ -1,7 +1,10 @@
 'use client'
 
 // React Imports
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+
+// Next Imports
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 
 // MUI Imports
 import Card from '@mui/material/Card'
@@ -14,6 +17,11 @@ import Chip from '@mui/material/Chip'
 import MenuItem from '@mui/material/MenuItem'
 import Tooltip from '@mui/material/Tooltip'
 import Box from '@mui/material/Box'
+import { DatePicker } from '@mui/x-date-pickers-pro'
+import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs'
+import { LocalizationProvider } from '@mui/x-date-pickers-pro'
+import { LicenseInfo } from '@mui/x-license'
+import dayjs, { Dayjs } from 'dayjs'
 
 // Third-party Imports
 import classnames from 'classnames'
@@ -50,6 +58,13 @@ import {
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
+
+// Dialog Imports
+import OpenDialogOnElementClick from '@/components/dialogs/OpenDialogOnElementClick'
+import GenericTableExportDialog from '@/components/dialogs/generic-table-export-dialog'
+import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-table-export-dialog'
+
+LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz03MTc0MCxFPTE3MjI1MzA1NTIwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
 
 type RateCardWithActions = RateCardType
 
@@ -115,10 +130,36 @@ const RateCardOverviewTable = () => {
   // States
   const [rateCardData, setRateCardData] = useState<RateCardWithActions[]>([])
   const [loading, setLoading] = useState(true)
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
-  const [clientFilter, setClientFilter] = useState<string>('all')
   const [clients, setClients] = useState<{ code: string; name: string }[]>([])
+
+  // Routing
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // Read filters from URL params
+  const globalFilter = searchParams.get('search') || ''
+  const statusFilter = (searchParams.get('status') || 'all') as 'all' | 'active' | 'inactive'
+  const clientFilter = searchParams.get('client') || 'all'
+  const dateFrom = searchParams.get('dateFrom') ? dayjs(searchParams.get('dateFrom')) : null
+  const dateTo = searchParams.get('dateTo') ? dayjs(searchParams.get('dateTo')) : null
+
+  // URL param helper
+  const updateParam = useCallback((key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value) {
+      params.set(key, value)
+    } else {
+      params.delete(key)
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, pathname, router])
+
+  const setGlobalFilter = useCallback((value: string) => updateParam('search', value), [updateParam])
+  const setStatusFilter = useCallback((value: 'all' | 'active' | 'inactive') => updateParam('status', value === 'all' ? '' : value), [updateParam])
+  const setClientFilter = useCallback((value: string) => updateParam('client', value === 'all' ? '' : value), [updateParam])
+  const setDateFrom = useCallback((value: Dayjs | null) => updateParam('dateFrom', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
+  const setDateTo = useCallback((value: Dayjs | null) => updateParam('dateTo', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
 
   // Permissions
   const { hasPermission } = usePermissions()
@@ -161,6 +202,34 @@ const RateCardOverviewTable = () => {
 
     loadRateCards()
   }, [statusFilter, clientFilter])
+
+  // Client-side date filtering on effectiveFrom
+  const filteredRateCardData = useMemo(() => {
+    let filtered = rateCardData
+    if (dateFrom) {
+      filtered = filtered.filter(rc => dayjs(rc.effectiveFrom).isAfter(dateFrom.startOf('day').subtract(1, 'ms')))
+    }
+    if (dateTo) {
+      filtered = filtered.filter(rc => dayjs(rc.effectiveFrom).isBefore(dateTo.endOf('day').add(1, 'ms')))
+    }
+    return filtered
+  }, [rateCardData, dateFrom, dateTo])
+
+  // Export configuration
+  const exportColumns: ExportColumn[] = useMemo(() => [
+    { header: 'Client Code', accessor: (row: RateCardType) => row.clientCode, width: 20, excelWidth: 14 },
+    { header: 'Client Name', accessor: (row: RateCardType) => row.clientName, width: 28, excelWidth: 20 },
+    { header: 'Route', accessor: (row: RateCardType) => `${row.routeCode} - ${row.routeDescription}`, width: 35, excelWidth: 28 },
+    { header: 'Effective From', accessor: (row: RateCardType) => new Date(row.effectiveFrom).toLocaleDateString(), width: 22, excelWidth: 14 },
+    { header: 'Effective To', accessor: (row: RateCardType) => row.effectiveTo ? new Date(row.effectiveTo).toLocaleDateString() : 'No End Date', width: 22, excelWidth: 14 },
+    { header: 'Status', accessor: (row: RateCardType) => row.isActive ? 'Active' : 'Inactive', width: 15, excelWidth: 10 }
+  ], [])
+
+  const exportSummary: ExportSummary[] = useMemo(() => [
+    { label: 'Total Rate Cards', value: String(filteredRateCardData.length) },
+    { label: 'Active', value: String(filteredRateCardData.filter(rc => rc.isActive).length) },
+    { label: 'Inactive', value: String(filteredRateCardData.filter(rc => !rc.isActive).length) }
+  ], [filteredRateCardData])
 
   const handleToggleStatus = async (rateCardId: string, isActive: boolean) => {
     try {
@@ -309,7 +378,7 @@ const RateCardOverviewTable = () => {
   )
 
   const table = useReactTable({
-    data: rateCardData,
+    data: filteredRateCardData,
     columns,
     filterFns: {
       fuzzy: fuzzyFilter
@@ -326,52 +395,93 @@ const RateCardOverviewTable = () => {
   })
 
   return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
     <Card>
-      <CardContent className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
-        <div className='flex flex-wrap items-center gap-2'>
-          <TextField
-            select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-            className='min-w-[130px]'
-            size='small'
-          >
-            <MenuItem value='all'>All Status</MenuItem>
-            <MenuItem value='active'>Active</MenuItem>
-            <MenuItem value='inactive'>Inactive</MenuItem>
-          </TextField>
-          <TextField
-            select
-            value={clientFilter}
-            onChange={e => setClientFilter(e.target.value)}
-            className='min-w-[150px]'
-            size='small'
-          >
-            <MenuItem value='all'>All Clients</MenuItem>
-            {clients.map(client => (
-              <MenuItem key={client.code} value={client.code}>
-                {client.code} - {client.name}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            value={globalFilter ?? ''}
-            onChange={e => setGlobalFilter(e.target.value)}
-            placeholder='Search Rate Cards...'
-            size='small'
-            className='min-w-[200px]'
-          />
+      <CardContent className='flex flex-col gap-4'>
+        <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+          <div className='flex flex-wrap items-center gap-2'>
+            <TextField
+              select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+              className='min-w-[130px]'
+              size='small'
+            >
+              <MenuItem value='all'>All Status</MenuItem>
+              <MenuItem value='active'>Active</MenuItem>
+              <MenuItem value='inactive'>Inactive</MenuItem>
+            </TextField>
+            <TextField
+              select
+              value={clientFilter}
+              onChange={e => setClientFilter(e.target.value)}
+              className='min-w-[150px]'
+              size='small'
+            >
+              <MenuItem value='all'>All Clients</MenuItem>
+              {clients.map(client => (
+                <MenuItem key={client.code} value={client.code}>
+                  {client.code} - {client.name}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              value={globalFilter ?? ''}
+              onChange={e => setGlobalFilter(e.target.value)}
+              placeholder='Search Rate Cards...'
+              size='small'
+              className='min-w-[200px]'
+            />
+          </div>
+          <div className='flex items-center gap-2'>
+            <OpenDialogOnElementClick
+              element={Button}
+              elementProps={{
+                variant: 'outlined',
+                startIcon: <i className='ri-download-line' />,
+                children: 'Export',
+                disabled: filteredRateCardData.length === 0
+              }}
+              dialog={GenericTableExportDialog}
+              dialogProps={{
+                title: 'Rate Card Report',
+                data: filteredRateCardData,
+                columns: exportColumns,
+                summaryItems: exportSummary,
+                fileName: 'rate-card-report'
+              }}
+            />
+            {hasPermission('ratecards.create') && (
+              <Button
+                variant='contained'
+                component={Link}
+                href='/edms/routes/rate-cards/create'
+                startIcon={<i className='ri-add-line' />}
+              >
+                Add Rate Card
+              </Button>
+            )}
+          </div>
         </div>
-        {hasPermission('ratecards.create') && (
-          <Button
-            variant='contained'
-            component={Link}
-            href='/edms/routes/rate-cards/create'
-            startIcon={<i className='ri-add-line' />}
-          >
-            Add Rate Card
-          </Button>
-        )}
+        <div className='flex flex-wrap items-center gap-2'>
+          <DatePicker
+            label='Effective From (Start)'
+            value={dateFrom}
+            onChange={(val) => setDateFrom(val)}
+            slotProps={{ textField: { size: 'small', sx: { minWidth: 180 } } }}
+          />
+          <DatePicker
+            label='Effective From (End)'
+            value={dateTo}
+            onChange={(val) => setDateTo(val)}
+            slotProps={{ textField: { size: 'small', sx: { minWidth: 180 } } }}
+          />
+          {(dateFrom || dateTo) && (
+            <Button size='small' variant='text' onClick={() => { setDateFrom(null); setDateTo(null) }}>
+              Clear Dates
+            </Button>
+          )}
+        </div>
       </CardContent>
 
       <div className='overflow-x-auto'>
@@ -443,6 +553,7 @@ const RateCardOverviewTable = () => {
         onRowsPerPageChange={e => table.setPageSize(Number(e.target.value))}
       />
     </Card>
+    </LocalizationProvider>
   )
 }
 

@@ -1,7 +1,10 @@
 'use client'
 
 // React Imports
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+
+// Next Imports
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 
 // MUI Imports
 import Card from '@mui/material/Card'
@@ -13,6 +16,12 @@ import TablePagination from '@mui/material/TablePagination'
 import IconButton from '@mui/material/IconButton'
 import Chip from '@mui/material/Chip'
 import MenuItem from '@mui/material/MenuItem'
+import Grid from '@mui/material/Grid'
+import { DatePicker } from '@mui/x-date-pickers-pro'
+import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs'
+import { LocalizationProvider } from '@mui/x-date-pickers-pro'
+import { LicenseInfo } from '@mui/x-license'
+import dayjs, { Dayjs } from 'dayjs'
 
 // Third-party Imports
 import classnames from 'classnames'
@@ -44,6 +53,13 @@ import { getAllTrips, updateTripStatus } from '@/libs/actions/trip.actions'
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
 
+// Dialog Imports
+import OpenDialogOnElementClick from '@/components/dialogs/OpenDialogOnElementClick'
+import GenericTableExportDialog from '@/components/dialogs/generic-table-export-dialog'
+import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-table-export-dialog'
+
+LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz03MTc0MCxFPTE3MjI1MzA1NTIwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
+
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
   const itemRank = rankItem(row.getValue(columnId), value)
   addMeta({ itemRank })
@@ -66,8 +82,33 @@ const TripsOverviewTable = () => {
   // States
   const [tripData, setTripData] = useState<TripType[]>([])
   const [loading, setLoading] = useState(true)
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+
+  // Routing
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // Read filters from URL params
+  const globalFilter = searchParams.get('search') || ''
+  const statusFilter = searchParams.get('status') || 'all'
+  const dateFrom = searchParams.get('dateFrom') ? dayjs(searchParams.get('dateFrom')) : null
+  const dateTo = searchParams.get('dateTo') ? dayjs(searchParams.get('dateTo')) : null
+
+  // URL param helper
+  const updateParam = useCallback((key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value) {
+      params.set(key, value)
+    } else {
+      params.delete(key)
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, pathname, router])
+
+  const setGlobalFilter = useCallback((value: string) => updateParam('search', value), [updateParam])
+  const setStatusFilter = useCallback((value: string) => updateParam('status', value === 'all' ? '' : value), [updateParam])
+  const setDateFrom = useCallback((value: Dayjs | null) => updateParam('dateFrom', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
+  const setDateTo = useCallback((value: Dayjs | null) => updateParam('dateTo', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
 
   // Permissions
   const { hasPermission } = usePermissions()
@@ -89,6 +130,35 @@ const TripsOverviewTable = () => {
 
     loadTrips()
   }, [statusFilter])
+
+  // Client-side date filtering
+  const filteredTripData = useMemo(() => {
+    let filtered = tripData
+    if (dateFrom) {
+      filtered = filtered.filter(trip => dayjs(trip.tripDate).isAfter(dateFrom.startOf('day').subtract(1, 'ms')))
+    }
+    if (dateTo) {
+      filtered = filtered.filter(trip => dayjs(trip.tripDate).isBefore(dateTo.endOf('day').add(1, 'ms')))
+    }
+    return filtered
+  }, [tripData, dateFrom, dateTo])
+
+  // Export configuration
+  const exportColumns: ExportColumn[] = useMemo(() => [
+    { header: 'Trip Number', accessor: (row: TripType) => row.tripNumber, width: 25, excelWidth: 15 },
+    { header: 'Date', accessor: (row: TripType) => new Date(row.tripDate).toLocaleDateString(), width: 22, excelWidth: 14 },
+    { header: 'Driver', accessor: (row: TripType) => row.driver?.name || 'N/A', width: 28, excelWidth: 20 },
+    { header: 'Vehicle', accessor: (row: TripType) => row.vehicle?.vehicleNumber || 'N/A', width: 22, excelWidth: 15 },
+    { header: 'Route', accessor: (row: TripType) => row.route?.routeName || 'N/A', width: 30, excelWidth: 20 },
+    { header: 'Tonnage', accessor: (row: TripType) => row.tonnage ? `${row.tonnage} tons` : '-', align: 'right', width: 18, excelWidth: 12 },
+    { header: 'Price (GH₵)', accessor: (row: TripType) => row.tripCost ? `GH₵ ${Number(row.tripCost).toFixed(2)}` : '-', align: 'right', width: 22, excelWidth: 15 },
+    { header: 'Status', accessor: (row: TripType) => row.status?.replace('_', ' ') || '', width: 20, excelWidth: 15 }
+  ], [])
+
+  const exportSummary: ExportSummary[] = useMemo(() => [
+    { label: 'Total Trips', value: String(filteredTripData.length) },
+    { label: 'Total Revenue', value: `GH₵ ${filteredTripData.reduce((sum, t) => sum + (Number(t.tripCost) || 0), 0).toFixed(2)}` }
+  ], [filteredTripData])
 
 
   const columns = useMemo<ColumnDef<TripType, any>[]>(
@@ -208,7 +278,7 @@ const TripsOverviewTable = () => {
   )
 
   const table = useReactTable({
-    data: tripData,
+    data: filteredTripData,
     columns,
     filterFns: {
       fuzzy: fuzzyFilter
@@ -225,41 +295,82 @@ const TripsOverviewTable = () => {
   })
 
   return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
     <Card>
-      <CardContent className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
-        <div className='flex items-center gap-2'>
-          <TextField
-            select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className='min-w-[150px]'
-            size='small'
-          >
-            <MenuItem value='all'>All Trips</MenuItem>
-            <MenuItem value='awaiting_manifests'>Awaiting Manifests</MenuItem>
-            <MenuItem value='planned'>Planned</MenuItem>
-            <MenuItem value='in_progress'>In Progress</MenuItem>
-            <MenuItem value='completed'>Completed</MenuItem>
-            <MenuItem value='cancelled'>Cancelled</MenuItem>
-          </TextField>
-          <TextField
-            value={globalFilter ?? ''}
-            onChange={e => setGlobalFilter(e.target.value)}
-            placeholder='Search Trips...'
-            size='small'
-            className='min-w-[200px]'
-          />
+      <CardContent className='flex flex-col gap-4'>
+        <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+          <div className='flex flex-wrap items-center gap-2'>
+            <TextField
+              select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className='min-w-[150px]'
+              size='small'
+            >
+              <MenuItem value='all'>All Trips</MenuItem>
+              <MenuItem value='awaiting_manifests'>Awaiting Manifests</MenuItem>
+              <MenuItem value='planned'>Planned</MenuItem>
+              <MenuItem value='in_progress'>In Progress</MenuItem>
+              <MenuItem value='completed'>Completed</MenuItem>
+              <MenuItem value='cancelled'>Cancelled</MenuItem>
+            </TextField>
+            <TextField
+              value={globalFilter ?? ''}
+              onChange={e => setGlobalFilter(e.target.value)}
+              placeholder='Search Trips...'
+              size='small'
+              className='min-w-[200px]'
+            />
+          </div>
+          <div className='flex items-center gap-2'>
+            <OpenDialogOnElementClick
+              element={Button}
+              elementProps={{
+                variant: 'outlined',
+                startIcon: <i className='ri-download-line' />,
+                children: 'Export',
+                disabled: filteredTripData.length === 0
+              }}
+              dialog={GenericTableExportDialog}
+              dialogProps={{
+                title: 'Trip Report',
+                data: filteredTripData,
+                columns: exportColumns,
+                summaryItems: exportSummary,
+                fileName: 'trip-report'
+              }}
+            />
+            {hasPermission('trips.create') && (
+              <Button
+                variant='contained'
+                component={Link}
+                href='/edms/trips/create'
+                startIcon={<i className='ri-add-line' />}
+              >
+                Create Trip
+              </Button>
+            )}
+          </div>
         </div>
-        {hasPermission('trips.create') && (
-          <Button
-            variant='contained'
-            component={Link}
-            href='/edms/trips/create'
-            startIcon={<i className='ri-add-line' />}
-          >
-            Create Trip
-          </Button>
-        )}
+        <div className='flex flex-wrap items-center gap-2'>
+          <DatePicker
+            label='From Date'
+            value={dateFrom}
+            onChange={(val) => setDateFrom(val)}
+            slotProps={{ textField: { size: 'small', sx: { minWidth: 160 } } }}
+          />
+          <DatePicker
+            label='To Date'
+            value={dateTo}
+            onChange={(val) => setDateTo(val)}
+            slotProps={{ textField: { size: 'small', sx: { minWidth: 160 } } }}
+          />
+          {(dateFrom || dateTo) && (
+            <Button size='small' variant='text' onClick={() => { setDateFrom(null); setDateTo(null) }}>
+              Clear Dates
+            </Button>
+          )}
+        </div>
       </CardContent>
 
       <div className='overflow-x-auto'>
@@ -332,6 +443,7 @@ const TripsOverviewTable = () => {
         onRowsPerPageChange={e => table.setPageSize(Number(e.target.value))}
       />
     </Card>
+    </LocalizationProvider>
   )
 }
 

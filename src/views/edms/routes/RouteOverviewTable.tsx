@@ -1,7 +1,10 @@
 'use client'
 
 // React Imports
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+
+// Next Imports
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 
 // MUI Imports
 import Card from '@mui/material/Card'
@@ -45,6 +48,11 @@ import { getAllRoutes, toggleRouteStatus, deleteRoute } from '@/libs/actions/rou
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
 
+// Dialog Imports
+import OpenDialogOnElementClick from '@/components/dialogs/OpenDialogOnElementClick'
+import GenericTableExportDialog from '@/components/dialogs/generic-table-export-dialog'
+import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-table-export-dialog'
+
 type RouteWithActions = RouteType
 
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
@@ -58,11 +66,33 @@ const columnHelper = createColumnHelper<RouteWithActions>()
 const RouteOverviewTable = () => {
   // Permissions
   const { hasPermission } = usePermissions()
+
+  // Routing
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   // States
   const [routeData, setRouteData] = useState<RouteWithActions[]>([])
   const [loading, setLoading] = useState(true)
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+
+  // Read filters from URL params
+  const globalFilter = searchParams.get('search') || ''
+  const statusFilter = (searchParams.get('status') || 'all') as 'all' | 'active' | 'inactive'
+
+  // URL param helper
+  const updateParam = useCallback((key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value) {
+      params.set(key, value)
+    } else {
+      params.delete(key)
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, pathname, router])
+
+  const setGlobalFilter = useCallback((value: string) => updateParam('search', value), [updateParam])
+  const setStatusFilter = useCallback((value: string) => updateParam('status', value === 'all' ? '' : value), [updateParam])
 
   // Load routes
   useEffect(() => {
@@ -81,6 +111,24 @@ const RouteOverviewTable = () => {
 
     loadRoutes()
   }, [statusFilter])
+
+  // Export configuration
+  const exportColumns: ExportColumn[] = useMemo(() => [
+    { header: 'Route Code', accessor: (row: RouteType) => row.routeCode, width: 20, excelWidth: 14 },
+    { header: 'Route Name', accessor: (row: RouteType) => row.routeName, width: 30, excelWidth: 22 },
+    { header: 'Start Location', accessor: (row: RouteType) => typeof (row.startLocation as any) === 'object' ? (row.startLocation as any).locationName : 'N/A', width: 28, excelWidth: 20 },
+    { header: 'End Location', accessor: (row: RouteType) => typeof (row.endLocation as any) === 'object' ? (row.endLocation as any).locationName : 'N/A', width: 28, excelWidth: 20 },
+    { header: 'Stops', accessor: (row: RouteType) => `${row.intermediateStops.length + 2} locations`, align: 'center', width: 18, excelWidth: 14 },
+    { header: 'Distance (km)', accessor: (row: RouteType) => row.distance ? `${row.distance}` : '-', align: 'right', width: 20, excelWidth: 14 },
+    { header: 'Duration (min)', accessor: (row: RouteType) => row.estimatedDuration ? `${row.estimatedDuration}` : '-', align: 'right', width: 20, excelWidth: 14 },
+    { header: 'Status', accessor: (row: RouteType) => row.isActive ? 'Active' : 'Inactive', width: 15, excelWidth: 10 }
+  ], [])
+
+  const exportSummary: ExportSummary[] = useMemo(() => [
+    { label: 'Total Routes', value: String(routeData.length) },
+    { label: 'Active', value: String(routeData.filter(r => r.isActive).length) },
+    { label: 'Inactive', value: String(routeData.filter(r => !r.isActive).length) }
+  ], [routeData])
 
   const handleToggleStatus = async (routeId: string) => {
     try {
@@ -264,16 +312,35 @@ const RouteOverviewTable = () => {
             className='min-w-[200px]'
           />
         </div>
-        {hasPermission('routes.create') && (
-          <Button
-            variant='contained'
-            component={Link}
-            href='/edms/routes/create'
-            startIcon={<i className='ri-add-line' />}
-          >
-            Create Route
-          </Button>
-        )}
+        <div className='flex items-center gap-2'>
+          <OpenDialogOnElementClick
+            element={Button}
+            elementProps={{
+              variant: 'outlined',
+              startIcon: <i className='ri-download-line' />,
+              children: 'Export',
+              disabled: routeData.length === 0
+            }}
+            dialog={GenericTableExportDialog}
+            dialogProps={{
+              title: 'Route Report',
+              data: routeData,
+              columns: exportColumns,
+              summaryItems: exportSummary,
+              fileName: 'route-report'
+            }}
+          />
+          {hasPermission('routes.create') && (
+            <Button
+              variant='contained'
+              component={Link}
+              href='/edms/routes/create'
+              startIcon={<i className='ri-add-line' />}
+            >
+              Create Route
+            </Button>
+          )}
+        </div>
       </CardContent>
 
       <div className='overflow-x-auto'>

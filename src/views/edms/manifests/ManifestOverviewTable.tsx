@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
   Card,
   CardHeader,
@@ -20,8 +21,14 @@ import {
   DialogContent,
   DialogActions,
   Grid,
-  LinearProgress
+  LinearProgress,
+  TextField
 } from '@mui/material'
+import { DatePicker } from '@mui/x-date-pickers-pro'
+import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs'
+import { LocalizationProvider } from '@mui/x-date-pickers-pro'
+import { LicenseInfo } from '@mui/x-license'
+import dayjs, { Dayjs } from 'dayjs'
 import { 
   Assignment,
   Schedule,
@@ -42,12 +49,23 @@ import OptionMenu from '@core/components/option-menu'
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
 
+// Dialog Imports
+import OpenDialogOnElementClick from '@/components/dialogs/OpenDialogOnElementClick'
+import GenericTableExportDialog from '@/components/dialogs/generic-table-export-dialog'
+import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-table-export-dialog'
+
+LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz03MTc0MCxFPTE3MjI1MzA1NTIwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
+
 interface ManifestOverviewTableProps {
   onEditManifest?: (manifest: ManifestType) => void
 }
 
 const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) => {
   const { hasPermission } = usePermissions()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [manifests, setManifests] = useState<ManifestType[]>([])
   const [filteredManifests, setFilteredManifests] = useState<ManifestType[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,6 +73,17 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
   const [viewDialogOpen, setViewDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [manifestToDelete, setManifestToDelete] = useState<ManifestType | null>(null)
+
+  // URL param helper
+  const updateParam = useCallback((key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value) {
+      params.set(key, value)
+    } else {
+      params.delete(key)
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, pathname, router])
   
   // Helper function to get package size display label
   const getPackageSizeLabel = (packageSize: string) => {
@@ -70,11 +99,20 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
 
-  // Basic filters for now
-  const [filters, setFilters] = useState<ManifestFilters>({
-    search: '',
+  // Read filters from URL params
+  const searchValue = searchParams.get('search') || ''
+  const dateFrom = searchParams.get('dateFrom') ? dayjs(searchParams.get('dateFrom')) : null
+  const dateTo = searchParams.get('dateTo') ? dayjs(searchParams.get('dateTo')) : null
+
+  const setSearchValue = useCallback((value: string) => updateParam('search', value), [updateParam])
+  const setDateFrom = useCallback((value: Dayjs | null) => updateParam('dateFrom', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
+  const setDateTo = useCallback((value: Dayjs | null) => updateParam('dateTo', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
+
+  // Filters object for API call
+  const filters: ManifestFilters = useMemo(() => ({
+    search: searchValue,
     status: undefined
-  })
+  }), [searchValue])
 
   // Fetch manifests
   const fetchManifests = async () => {
@@ -104,8 +142,38 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
       )
     }
 
+    // Date range filter
+    if (dateFrom) {
+      filtered = filtered.filter(manifest => dayjs(manifest.manifestDate).isAfter(dateFrom.startOf('day').subtract(1, 'ms')))
+    }
+    if (dateTo) {
+      filtered = filtered.filter(manifest => dayjs(manifest.manifestDate).isBefore(dateTo.endOf('day').add(1, 'ms')))
+    }
+
     return filtered
-  }, [manifests, filters])
+  }, [manifests, filters, dateFrom, dateTo])
+
+  // Export configuration
+  const exportColumns: ExportColumn[] = useMemo(() => [
+    { header: 'Manifest Number', accessor: (row: ManifestType) => row.manifestNumber, width: 28, excelWidth: 18 },
+    { header: 'Trip', accessor: (row: ManifestType) => typeof row.trip === 'object' && row.trip !== null ? (row.trip as any).tripNumber || (row.trip as any).$id : row.trip || 'N/A', width: 22, excelWidth: 15 },
+    { header: 'Sequence', accessor: (row: ManifestType) => row.dropoffSequence, align: 'center', width: 18, excelWidth: 10 },
+    { header: 'Package Size', accessor: (row: ManifestType) => row.packageSize || 'small', width: 20, excelWidth: 14 },
+    { header: 'Package Count', accessor: (row: ManifestType) => row.packageCount || 0, align: 'right', width: 20, excelWidth: 14 },
+    { header: 'Delivered', accessor: (row: ManifestType) => row.deliveredCount || 0, align: 'right', width: 18, excelWidth: 12 },
+    { header: 'Status', accessor: (row: ManifestType) => row.status, width: 18, excelWidth: 12 },
+    { header: 'Date', accessor: (row: ManifestType) => new Date(row.manifestDate).toLocaleDateString(), width: 22, excelWidth: 14 }
+  ], [])
+
+  const exportSummary: ExportSummary[] = useMemo(() => {
+    const totalPackages = filteredManifests.reduce((sum, m) => sum + (m.packageCount || 0), 0)
+    const totalDelivered = filteredManifests.reduce((sum, m) => sum + (m.deliveredCount || 0), 0)
+    return [
+      { label: 'Total Manifests', value: String(filteredManifests.length) },
+      { label: 'Total Packages', value: String(totalPackages) },
+      { label: 'Total Delivered', value: String(totalDelivered) }
+    ]
+  }, [filteredManifests])
 
   useEffect(() => {
     setFilteredManifests(applyFilters)
@@ -263,11 +331,59 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
   }
 
   return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
     <Card>
       <CardHeader
         title="Manifest Overview"
         subheader={`${filteredManifests.length} manifests found. Manifests are created via trip wizard.`}
+        action={
+          <OpenDialogOnElementClick
+            element={Button}
+            elementProps={{
+              variant: 'outlined',
+              startIcon: <i className='ri-download-line' />,
+              children: 'Export',
+              size: 'small',
+              disabled: filteredManifests.length === 0
+            }}
+            dialog={GenericTableExportDialog}
+            dialogProps={{
+              title: 'Manifest Report',
+              data: filteredManifests,
+              columns: exportColumns,
+              summaryItems: exportSummary,
+              fileName: 'manifest-report'
+            }}
+          />
+        }
       />
+
+      <Box sx={{ px: 3, pb: 2, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+        <TextField
+          value={searchValue}
+          onChange={e => setSearchValue(e.target.value)}
+          placeholder='Search Manifests...'
+          size='small'
+          sx={{ minWidth: 200 }}
+        />
+        <DatePicker
+          label='From Date'
+          value={dateFrom}
+          onChange={(val) => setDateFrom(val)}
+          slotProps={{ textField: { size: 'small', sx: { minWidth: 160 } } }}
+        />
+        <DatePicker
+          label='To Date'
+          value={dateTo}
+          onChange={(val) => setDateTo(val)}
+          slotProps={{ textField: { size: 'small', sx: { minWidth: 160 } } }}
+        />
+        {(dateFrom || dateTo) && (
+          <Button size='small' variant='text' onClick={() => { setDateFrom(null); setDateTo(null) }}>
+            Clear Dates
+          </Button>
+        )}
+      </Box>
       
       <TableContainer>
         <Table>
@@ -475,6 +591,7 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
         </DialogActions>
       </Dialog>
     </Card>
+    </LocalizationProvider>
   )
 }
 
