@@ -139,13 +139,11 @@ const ExpenseDetailsView = ({ expenseId }: ExpenseDetailsViewProps) => {
     loadExpense()
   }, [expenseId])
 
-  // Get image URL from file ID (for thumbnails)
+  // Get image URL from file ID (for thumbnails — uses same reliable method as preview)
   const getImageUrl = (fileId: string): string => {
-    return storage.getFilePreview(
+    return storage.getFileView(
       appwriteConfig.bucket,
-      fileId,
-      800, // width
-      800  // height
+      fileId
     ).toString()
   }
 

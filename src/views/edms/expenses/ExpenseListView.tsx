@@ -143,8 +143,11 @@ const ExpenseListView = () => {
   const filterStatus = (searchParams.get('status') || '') as PaymentStatusType | ''
   const filterVehicle = searchParams.get('vehicle') || ''
   const filterDriver = searchParams.get('driver') || ''
-  const dateFrom = searchParams.get('dateFrom') ? dayjs(searchParams.get('dateFrom')) : null
-  const dateTo = searchParams.get('dateTo') ? dayjs(searchParams.get('dateTo')) : null
+  // Use stable strings in dependency arrays to avoid infinite re-render loops
+  const dateFromStr = searchParams.get('dateFrom') || ''
+  const dateToStr = searchParams.get('dateTo') || ''
+  const dateFrom = dateFromStr ? dayjs(dateFromStr) : null
+  const dateTo = dateToStr ? dayjs(dateToStr) : null
 
   // Filter UI State
   const [showFilters, setShowFilters] = useState<boolean>(true)
@@ -186,10 +189,10 @@ const ExpenseListView = () => {
         if (filterType) filters.expenseType = filterType
         if (filterStatus) filters.paymentStatus = filterStatus
         if (filterVehicle) filters.vehicleId = filterVehicle
-        if (dateFrom || dateTo) {
+        if (dateFromStr || dateToStr) {
           filters.dateRange = {
-            start: dateFrom ? dateFrom.startOf('day').toISOString() : '',
-            end: dateTo ? dateTo.endOf('day').toISOString() : ''
+            start: dateFromStr ? dayjs(dateFromStr).startOf('day').toISOString() : '',
+            end: dateToStr ? dayjs(dateToStr).endOf('day').toISOString() : ''
           }
         }
 
@@ -210,7 +213,7 @@ const ExpenseListView = () => {
     }
 
     loadData()
-  }, [filterType, filterStatus, filterVehicle, dateFrom, dateTo])
+  }, [filterType, filterStatus, filterVehicle, dateFromStr, dateToStr])
 
   // Get vehicle name by ID
   const getVehicleName = (vehicleId: string | undefined): string => {
@@ -739,6 +742,7 @@ const ExpenseListView = () => {
                         <TableCell align="center">
                           <Chip
                             size="small"
+                            variant="outlined"
                             label={PAYMENT_STATUS_CONFIG[expense.paymentStatus]?.label || expense.paymentStatus}
                             color={PAYMENT_STATUS_CONFIG[expense.paymentStatus]?.color || 'default'}
                           />
