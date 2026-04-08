@@ -461,16 +461,16 @@ export type TruckCategoryType = 'small' | 'big'
 
 // Volume tiers in CBM (Cubic Meters) based on truck category
 // Small truck volumes: 10, 14, 18 CBM
-// Big truck volumes: 37, 41, 50, 55, 60 CBM
+// Big truck volumes: 37, 41, 50, 55, 60, 65, 70 CBM
 export type SmallTruckVolumeType = 10 | 14 | 18
-export type BigTruckVolumeType = 37 | 41 | 50 | 55 | 60
+export type BigTruckVolumeType = 37 | 41 | 50 | 55 | 60 | 65 | 70
 export type TruckVolumeType = SmallTruckVolumeType | BigTruckVolumeType
 
 // Tonnage corresponding to volume tiers
 // Small truck: 3, 3.5, 5 tons
-// Big truck: 7, 8, 10, 12, 15 tons
+// Big truck: 7, 8, 10, 12, 15, 18, 23 tons
 export type SmallTruckTonnageType = 3 | 3.5 | 5
-export type BigTruckTonnageType = 7 | 8 | 10 | 12 | 15
+export type BigTruckTonnageType = 7 | 8 | 10 | 12 | 15 | 18 | 23
 export type TruckTonnageType = SmallTruckTonnageType | BigTruckTonnageType
 
 // Volume tier configuration for display purposes
@@ -494,11 +494,12 @@ export const VOLUME_TIERS: VolumeTierConfig[] = [
   { volume: 55, revisedVolume: 55, tonnage: 12, truckCategory: 'big' },
   { volume: 60, revisedVolume: 60, tonnage: 15, truckCategory: 'big' },
   { volume: 65, revisedVolume: 65, tonnage: 18, truckCategory: 'big' },
+  { volume: 70, revisedVolume: 70, tonnage: 23, truckCategory: 'big' },
 ]
 
 // Price entry for a specific volume tier
 export interface VolumePrice {
-  volume: number // CBM (10, 14, 18, 37, 41, 50, 55, 60)
+  volume: number // CBM (10, 14, 18, 37, 41, 50, 55, 60, 65, 70)
   tonnage: number // Corresponding tonnage
   rate: number // Price in local currency (GH₵)
 }
