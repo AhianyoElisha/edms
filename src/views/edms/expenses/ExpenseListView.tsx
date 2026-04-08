@@ -593,7 +593,7 @@ const ExpenseListView = () => {
                     </FormControl>
                   </Grid>
 
-                  {/* Driver Filter */}
+                  {/* Driver Filter
                   <Grid item xs={12} sm={6} md={2}>
                     <FormControl fullWidth size="small">
                       <InputLabel>Driver</InputLabel>
@@ -610,7 +610,7 @@ const ExpenseListView = () => {
                         ))}
                       </Select>
                     </FormControl>
-                  </Grid>
+                  </Grid> */}
 
                   {/* Date From */}
                   <Grid item xs={12} sm={6} md={1.5}>
