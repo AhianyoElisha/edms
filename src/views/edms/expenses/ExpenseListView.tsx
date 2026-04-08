@@ -379,7 +379,7 @@ const ExpenseListView = () => {
       <Grid container spacing={6}>
         {/* Page Header */}
         <Grid item xs={12}>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Box display="flex" flexWrap={'wrap'} justifyContent="space-between" alignItems="center">
             <Box>
               <Typography variant="h4">
                 <i className="ri-receipt-line mie-2" />
@@ -389,7 +389,7 @@ const ExpenseListView = () => {
                 Manage and track all expenses
               </Typography>
             </Box>
-            <Box display="flex" gap={2}>
+            <Box display="flex" flexWrap={'wrap'} gap={2}>
               <OpenDialogOnElementClick
                 element={Button}
                 elementProps={{
