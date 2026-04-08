@@ -67,7 +67,7 @@ const BIG_TRUCK_VOLUMES = [
   { volume: 55, revisedVolume: 55, tonnage: 12 },
   { volume: 60, revisedVolume: 60, tonnage: 15 },
   { volume: 65, revisedVolume: 65, tonnage: 18 },
-  { volume: 70, revisedVolume: 70, tonnage: 23 }
+  { volume: 75, revisedVolume: 75, tonnage: 23 }
 ]
 
 const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCreateFormProps) => {
