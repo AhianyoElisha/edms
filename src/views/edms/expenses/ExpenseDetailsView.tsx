@@ -97,6 +97,7 @@ const ExpenseDetailsView = ({ expenseId }: ExpenseDetailsViewProps) => {
 
   // Image preview dialog
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [imageError, setImageError] = useState<boolean>(false)
 
   // Load expense data
   useEffect(() => {
@@ -138,13 +139,21 @@ const ExpenseDetailsView = ({ expenseId }: ExpenseDetailsViewProps) => {
     loadExpense()
   }, [expenseId])
 
-  // Get image URL from file ID
+  // Get image URL from file ID (for thumbnails)
   const getImageUrl = (fileId: string): string => {
     return storage.getFilePreview(
       appwriteConfig.bucket,
       fileId,
       800, // width
       800  // height
+    ).toString()
+  }
+
+  // Get full image URL (for preview dialog - more reliable than getFilePreview)
+  const getFullImageUrl = (fileId: string): string => {
+    return storage.getFileView(
+      appwriteConfig.bucket,
+      fileId
     ).toString()
   }
 
@@ -392,12 +401,13 @@ const ExpenseDetailsView = ({ expenseId }: ExpenseDetailsViewProps) => {
                               '& .overlay': { opacity: 1 }
                             }
                           }}
-                          onClick={() => setPreviewImage(getImageUrl(expense.receiptImage!))}
+                          onClick={() => { setImageError(false); setPreviewImage(getFullImageUrl(expense.receiptImage!)) }}
                         >
                           <Box
                             component="img"
                             src={getImageUrl(expense.receiptImage)}
                             alt="Receipt"
+                            onError={(e: any) => { e.target.style.display = 'none' }}
                             sx={{
                               position: 'absolute',
                               top: 0,
@@ -452,12 +462,13 @@ const ExpenseDetailsView = ({ expenseId }: ExpenseDetailsViewProps) => {
                               '& .overlay': { opacity: 1 }
                             }
                           }}
-                          onClick={() => setPreviewImage(getImageUrl(fileId))}
+                          onClick={() => { setImageError(false); setPreviewImage(getFullImageUrl(fileId)) }}
                         >
                           <Box
                             component="img"
                             src={getImageUrl(fileId)}
                             alt={`Document ${index + 1}`}
+                            onError={(e: any) => { e.target.style.display = 'none' }}
                             sx={{
                               position: 'absolute',
                               top: 0,
@@ -661,17 +672,39 @@ const ExpenseDetailsView = ({ expenseId }: ExpenseDetailsViewProps) => {
           >
             <i className="ri-close-line" />
           </IconButton>
-          {previewImage && (
+          {previewImage && !imageError && (
             <Box
               component="img"
               src={previewImage}
               alt="Preview"
+              onError={() => setImageError(true)}
               sx={{
                 maxWidth: '90vw',
                 maxHeight: '90vh',
                 display: 'block'
               }}
             />
+          )}
+          {imageError && (
+            <Box textAlign="center" p={6}>
+              <i className="ri-image-line" style={{ fontSize: 48, color: 'var(--mui-palette-text-secondary)' }} />
+              <Typography variant="body1" color="text.secondary" mt={2}>
+                Unable to load image preview
+              </Typography>
+              {previewImage && (
+                <Button
+                  sx={{ mt: 2 }}
+                  variant="outlined"
+                  startIcon={<i className="ri-download-line" />}
+                  component="a"
+                  href={previewImage}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open in new tab
+                </Button>
+              )}
+            </Box>
           )}
         </DialogContent>
       </Dialog>
