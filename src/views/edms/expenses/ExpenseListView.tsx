@@ -1,8 +1,8 @@
 'use client'
 
 // React Imports
-import { useState, useEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
 // MUI Imports
 import Card from '@mui/material/Card'
@@ -32,6 +32,8 @@ import TableSortLabel from '@mui/material/TableSortLabel'
 import Paper from '@mui/material/Paper'
 import Tooltip from '@mui/material/Tooltip'
 import Collapse from '@mui/material/Collapse'
+import Snackbar from '@mui/material/Snackbar'
+import Alert from '@mui/material/Alert'
 
 // Date Picker Imports
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers-pro'
@@ -39,11 +41,16 @@ import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs'
 import dayjs, { Dayjs } from 'dayjs'
 
 // Action Imports
-import { getAllExpenses } from '@/libs/actions/expense.actions'
+import { getAllExpenses, markExpenseAsPaid } from '@/libs/actions/expense.actions'
 import { getAllVehicles } from '@/libs/actions/vehicle.actions'
+import { getAllTrips } from '@/libs/actions/trip.actions'
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
+
+// Dialog Imports
+import OpenDialogOnElementClick from '@/components/dialogs/OpenDialogOnElementClick'
+import ExpenseExportDialog from '@/components/dialogs/expense-export-dialog'
 
 // Type Imports
 import type { 
@@ -51,6 +58,7 @@ import type {
   ExpenseTypeCategory, 
   PaymentStatusType,
   VehicleType,
+  TripType,
   ExpenseFilters
 } from '@/types/apps/deliveryTypes'
 
@@ -58,12 +66,14 @@ import type {
 const EXPENSE_CATEGORIES: { value: ExpenseTypeCategory | ''; label: string; icon: string }[] = [
   { value: '', label: 'All Types', icon: 'ri-list-check' },
   { value: 'fuel', label: 'Fuel', icon: 'ri-gas-station-line' },
-  { value: 'maintenance', label: 'Maintenance', icon: 'ri-tools-line' },
+  { value: 'maintenance', label: 'Maintenance & Repairs', icon: 'ri-tools-line' },
   { value: 'tools', label: 'Tools', icon: 'ri-hammer-line' },
   { value: 'equipment', label: 'Equipment', icon: 'ri-settings-3-line' },
   { value: 'vehicle_purchase', label: 'Vehicle Purchase', icon: 'ri-car-line' },
-  { value: 'office', label: 'Office', icon: 'ri-building-2-line' },
-  { value: 'salary', label: 'Salary', icon: 'ri-money-dollar-circle-line' },
+  { value: 'office', label: 'Office Supplies', icon: 'ri-building-2-line' },
+  { value: 'salary', label: 'Salary & Wages', icon: 'ri-money-dollar-circle-line' },
+  { value: 'allowance', label: 'Allowance', icon: 'ri-hand-coin-line' },
+  { value: 'truck_rental', label: 'Truck Rentals', icon: 'ri-truck-line' },
   { value: 'communication', label: 'Communication', icon: 'ri-phone-line' },
   { value: 'utilities', label: 'Utilities', icon: 'ri-lightbulb-line' },
   { value: 'trip_related', label: 'Trip Related', icon: 'ri-truck-line' },
@@ -111,26 +121,59 @@ const headCells: HeadCell[] = [
 const ExpenseListView = () => {
   const { hasPermission } = usePermissions()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   // Data State
   const [expenses, setExpenses] = useState<ExpenseType[]>([])
   const [vehicles, setVehicles] = useState<VehicleType[]>([])
+  const [trips, setTrips] = useState<TripType[]>([])
   const [loading, setLoading] = useState<boolean>(true)
 
-  // Filter State
+  // Snackbar State
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  })
+
+  // Read filters from URL search params (persisted across navigation)
+  const searchQuery = searchParams.get('search') || ''
+  const filterType = (searchParams.get('type') || '') as ExpenseTypeCategory | ''
+  const filterStatus = (searchParams.get('status') || '') as PaymentStatusType | ''
+  const filterVehicle = searchParams.get('vehicle') || ''
+  const filterDriver = searchParams.get('driver') || ''
+  const dateFrom = searchParams.get('dateFrom') ? dayjs(searchParams.get('dateFrom')) : null
+  const dateTo = searchParams.get('dateTo') ? dayjs(searchParams.get('dateTo')) : null
+
+  // Filter UI State
   const [showFilters, setShowFilters] = useState<boolean>(true)
-  const [searchQuery, setSearchQuery] = useState<string>('')
-  const [filterType, setFilterType] = useState<ExpenseTypeCategory | ''>('')
-  const [filterStatus, setFilterStatus] = useState<PaymentStatusType | ''>('')
-  const [filterVehicle, setFilterVehicle] = useState<string>('')
-  const [dateFrom, setDateFrom] = useState<Dayjs | null>(null)
-  const [dateTo, setDateTo] = useState<Dayjs | null>(null)
 
   // Table State
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(25)
   const [order, setOrder] = useState<Order>('desc')
   const [orderBy, setOrderBy] = useState<keyof ExpenseType>('expenseDate')
+
+  // Helper to update URL search params
+  const updateParam = useCallback((key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value) {
+      params.set(key, value)
+    } else {
+      params.delete(key)
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, pathname, router])
+
+  // Filter setters that update URL params
+  const setSearchQuery = useCallback((value: string) => updateParam('search', value), [updateParam])
+  const setFilterType = useCallback((value: ExpenseTypeCategory | '') => updateParam('type', value), [updateParam])
+  const setFilterStatus = useCallback((value: PaymentStatusType | '') => updateParam('status', value), [updateParam])
+  const setFilterVehicle = useCallback((value: string) => updateParam('vehicle', value), [updateParam])
+  const setFilterDriver = useCallback((value: string) => updateParam('driver', value), [updateParam])
+  const setDateFrom = useCallback((value: Dayjs | null) => updateParam('dateFrom', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
+  const setDateTo = useCallback((value: Dayjs | null) => updateParam('dateTo', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
 
   // Load data on mount and when filters change
   useEffect(() => {
@@ -145,18 +188,20 @@ const ExpenseListView = () => {
         if (filterVehicle) filters.vehicleId = filterVehicle
         if (dateFrom || dateTo) {
           filters.dateRange = {
-            start: dateFrom ? dateFrom.toISOString() : '',
-            end: dateTo ? dateTo.toISOString() : ''
+            start: dateFrom ? dateFrom.startOf('day').toISOString() : '',
+            end: dateTo ? dateTo.endOf('day').toISOString() : ''
           }
         }
 
-        const [expensesData, vehiclesData] = await Promise.all([
+        const [expensesData, vehiclesData, tripsData] = await Promise.all([
           getAllExpenses(Object.keys(filters).length > 0 ? filters : undefined),
-          getAllVehicles()
+          getAllVehicles(),
+          getAllTrips()
         ])
 
         setExpenses(expensesData)
         setVehicles(vehiclesData)
+        setTrips(tripsData)
       } catch (error) {
         console.error('Error loading expenses:', error)
       } finally {
@@ -167,9 +212,60 @@ const ExpenseListView = () => {
     loadData()
   }, [filterType, filterStatus, filterVehicle, dateFrom, dateTo])
 
+  // Get vehicle name by ID
+  const getVehicleName = (vehicleId: string | undefined): string => {
+    if (!vehicleId) return '-'
+    const vehicle = vehicles.find(v => v.$id === vehicleId)
+    return vehicle?.licensePlate || vehicleId
+  }
+
+  // Extract unique drivers from trips
+  const drivers = useMemo(() => {
+    const driverMap = new Map<string, string>()
+    trips.forEach(trip => {
+      if (trip.driver?.$id && trip.driver?.name) {
+        driverMap.set(trip.driver.$id, trip.driver.name)
+      }
+    })
+    return Array.from(driverMap, ([id, name]) => ({ id, name }))
+  }, [trips])
+
+  // Build a trip-to-driver lookup and driver-to-tripIds set
+  const tripDriverMap = useMemo(() => {
+    const map = new Map<string, string>()
+    trips.forEach(trip => {
+      if (trip.driver?.name) {
+        map.set(trip.$id, trip.driver.name)
+      }
+    })
+    return map
+  }, [trips])
+
+  const driverTripIds = useMemo(() => {
+    if (!filterDriver) return null
+    const ids = new Set<string>()
+    trips.forEach(trip => {
+      if (trip.driver?.$id === filterDriver) {
+        ids.add(trip.$id)
+      }
+    })
+    return ids
+  }, [trips, filterDriver])
+
+  // Get driver name for an expense (via trip)
+  const getDriverName = useCallback((expense: ExpenseType): string => {
+    if (!expense.tripId) return ''
+    return tripDriverMap.get(expense.tripId) || ''
+  }, [tripDriverMap])
+
   // Filter and sort expenses
   const filteredExpenses = useMemo(() => {
     let result = [...expenses]
+
+    // Driver filter
+    if (filterDriver && driverTripIds) {
+      result = result.filter(expense => expense.tripId && driverTripIds.has(expense.tripId))
+    }
 
     // Search filter
     if (searchQuery) {
@@ -177,7 +273,16 @@ const ExpenseListView = () => {
       result = result.filter(expense => 
         expense.description?.toLowerCase().includes(query) ||
         expense.vendor?.toLowerCase().includes(query) ||
-        expense.receiptNumber?.toLowerCase().includes(query)
+        expense.receiptNumber?.toLowerCase().includes(query) ||
+        expense.amount?.toString().includes(query) ||
+        expense.subCategory?.toLowerCase().includes(query) ||
+        expense.expenseType?.toLowerCase().includes(query) ||
+        getExpenseTypeLabel(expense.expenseType)?.toLowerCase().includes(query) ||
+        expense.paymentStatus?.toLowerCase().includes(query) ||
+        (PAYMENT_STATUS_CONFIG[expense.paymentStatus]?.label || '').toLowerCase().includes(query) ||
+        getVehicleName(expense.vehicleId)?.toLowerCase().includes(query) ||
+        getDriverName(expense)?.toLowerCase().includes(query) ||
+        dayjs(expense.expenseDate).format('DD MMM YYYY').toLowerCase().includes(query)
       )
     }
 
@@ -208,7 +313,7 @@ const ExpenseListView = () => {
     })
 
     return result
-  }, [expenses, searchQuery, order, orderBy])
+  }, [expenses, searchQuery, order, orderBy, vehicles, filterDriver, driverTripIds, getDriverName])
 
   // Paginated expenses
   const paginatedExpenses = useMemo(() => {
@@ -231,13 +336,6 @@ const ExpenseListView = () => {
     return { total, paid, pending }
   }, [filteredExpenses])
 
-  // Get vehicle name by ID
-  const getVehicleName = (vehicleId: string | undefined): string => {
-    if (!vehicleId) return '-'
-    const vehicle = vehicles.find(v => v.$id === vehicleId)
-    return vehicle?.licensePlate || vehicleId
-  }
-
   // Handle sort
   const handleSort = (property: keyof ExpenseType) => {
     const isAsc = orderBy === property && order === 'asc'
@@ -247,12 +345,7 @@ const ExpenseListView = () => {
 
   // Clear all filters
   const clearFilters = () => {
-    setSearchQuery('')
-    setFilterType('')
-    setFilterStatus('')
-    setFilterVehicle('')
-    setDateFrom(null)
-    setDateTo(null)
+    router.replace(pathname, { scroll: false })
   }
 
   // Format currency
@@ -262,6 +355,20 @@ const ExpenseListView = () => {
       currency: 'GHS',
       minimumFractionDigits: 2
     }).format(amount)
+  }
+
+  // Handle mark expense as paid
+  const handleMarkAsPaid = async (expenseId: string) => {
+    try {
+      await markExpenseAsPaid(expenseId)
+      setExpenses(prev => prev.map(e => 
+        e.$id === expenseId ? { ...e, paymentStatus: 'paid' as PaymentStatusType } : e
+      ))
+      setSnackbar({ open: true, message: 'Expense marked as paid', severity: 'success' })
+    } catch (error) {
+      console.error('Error marking expense as paid:', error)
+      setSnackbar({ open: true, message: 'Failed to mark expense as paid', severity: 'error' })
+    }
   }
 
   return (
@@ -279,15 +386,33 @@ const ExpenseListView = () => {
                 Manage and track all expenses
               </Typography>
             </Box>
-            {hasPermission('expenses.create') && (
-              <Button
-                variant="contained"
-                startIcon={<i className="ri-add-line" />}
-                onClick={() => router.push('/edms/expenses/create')}
-              >
-                Add Expense
-              </Button>
-            )}
+            <Box display="flex" gap={2}>
+              <OpenDialogOnElementClick
+                element={Button}
+                elementProps={{
+                  variant: 'outlined',
+                  startIcon: <i className="ri-download-line" />,
+                  children: 'Export',
+                  disabled: filteredExpenses.length === 0
+                }}
+                dialog={ExpenseExportDialog}
+                dialogProps={{
+                  tableData: filteredExpenses,
+                  totals,
+                  getExpenseTypeLabel,
+                  formatCurrency
+                }}
+              />
+              {hasPermission('expenses.create') && (
+                <Button
+                  variant="contained"
+                  startIcon={<i className="ri-add-line" />}
+                  onClick={() => router.push('/edms/expenses/create')}
+                >
+                  Add Expense
+                </Button>
+              )}
+            </Box>
           </Box>
         </Grid>
 
@@ -465,6 +590,25 @@ const ExpenseListView = () => {
                     </FormControl>
                   </Grid>
 
+                  {/* Driver Filter */}
+                  <Grid item xs={12} sm={6} md={2}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Driver</InputLabel>
+                      <Select
+                        value={filterDriver}
+                        label="Driver"
+                        onChange={(e) => setFilterDriver(e.target.value)}
+                      >
+                        <MenuItem value="">All</MenuItem>
+                        {drivers.map((d) => (
+                          <MenuItem key={d.id} value={d.id}>
+                            {d.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
                   {/* Date From */}
                   <Grid item xs={12} sm={6} md={1.5}>
                     <DatePicker
@@ -612,6 +756,20 @@ const ExpenseListView = () => {
                                 <i className="ri-eye-line" />
                               </IconButton>
                             </Tooltip>
+                            {hasPermission('expenses.edit') && expense.paymentStatus !== 'paid' && (
+                              <Tooltip title="Mark as Paid">
+                                <IconButton
+                                  size="small"
+                                  color="success"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleMarkAsPaid(expense.$id)
+                                  }}
+                                >
+                                  <i className="ri-checkbox-circle-line" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                             {hasPermission('expenses.edit') && (
                               <Tooltip title="Edit">
                                 <IconButton
@@ -648,6 +806,22 @@ const ExpenseListView = () => {
           </Card>
         </Grid>
       </Grid>
+
+      {/* Snackbar for feedback */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </LocalizationProvider>
   )
 }
