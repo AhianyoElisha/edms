@@ -219,7 +219,7 @@ const ExpenseListView = () => {
   const getVehicleName = (vehicleId: string | undefined): string => {
     if (!vehicleId) return '-'
     const vehicle = vehicles.find(v => v.$id === vehicleId)
-    return vehicle?.licensePlate || vehicleId
+    return vehicle?.vehicleNumber || vehicleId
   }
 
   // Extract unique drivers from trips

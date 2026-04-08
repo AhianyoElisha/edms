@@ -1,5 +1,5 @@
 import { ID, Query } from 'appwrite'
-import { databases } from '@/libs/appwrite.config'
+import { databases, tablesDB } from '@/libs/appwrite.config'
 import { appwriteConfig } from '@/libs/appwrite.config'
 import { VehicleType, VehicleStatusType } from '@/types/apps/deliveryTypes'
 import { addActivityHistory } from './activity-history.actions'
@@ -95,13 +95,13 @@ export async function getAllVehicles(filters?: VehicleFilters): Promise<VehicleT
       queries.push(Query.search('licensePlate', filters.search))
     }
     
-    const response = await databases.listDocuments(
+    const response = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.vehicles,
       queries
     )
     
-    return toVehicleTypeArray(response.documents)
+    return toVehicleTypeArray(response.rows)
   } catch (error) {
     console.error('Error fetching vehicles:', error)
     throw new Error('Failed to fetch vehicles')
@@ -111,7 +111,7 @@ export async function getAllVehicles(filters?: VehicleFilters): Promise<VehicleT
 // Get a single vehicle by ID
 export async function getVehicleById(vehicleId: string): Promise<VehicleType> {
   try {
-    const vehicle = await databases.getDocument(
+    const vehicle = await tablesDB.getRow(
       appwriteConfig.database,
       appwriteConfig.vehicles,
       vehicleId
