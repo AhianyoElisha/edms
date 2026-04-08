@@ -216,10 +216,10 @@ const ExpenseListView = () => {
   }, [filterType, filterStatus, filterVehicle, dateFromStr, dateToStr])
 
   // Get vehicle name by ID
-  const getVehicleName = (vehicleId: string | undefined): string => {
+  const getVehicleName = (vehicleId: string): string => {
     if (!vehicleId) return '-'
     const vehicle = vehicles.find(v => v.$id === vehicleId)
-    return vehicle?.vehicleNumber || vehicleId
+    return vehicle!.vehicleNumber
   }
 
   // Extract unique drivers from trips
@@ -283,7 +283,7 @@ const ExpenseListView = () => {
         getExpenseTypeLabel(expense.expenseType)?.toLowerCase().includes(query) ||
         expense.paymentStatus?.toLowerCase().includes(query) ||
         (PAYMENT_STATUS_CONFIG[expense.paymentStatus]?.label || '').toLowerCase().includes(query) ||
-        getVehicleName(expense.vehicleId)?.toLowerCase().includes(query) ||
+        getVehicleName(expense.vehicleId!!)?.toLowerCase().includes(query) ||
         getDriverName(expense)?.toLowerCase().includes(query) ||
         dayjs(expense.expenseDate).format('DD MMM YYYY').toLowerCase().includes(query)
       )
