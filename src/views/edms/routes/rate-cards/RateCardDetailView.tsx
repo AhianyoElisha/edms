@@ -236,7 +236,7 @@ const RateCardDetailView = ({ rateCard }: RateCardDetailViewProps) => {
                 <Grid item xs={12} md={6}>
                   <Box sx={{ mb: 2 }}>
                     <Chip 
-                      label='Big Truck (37-60 CBM)' 
+                      label='Big Truck (37-70 CBM)' 
                       color='secondary' 
                       variant='filled'
                       sx={{ mb: 2 }}

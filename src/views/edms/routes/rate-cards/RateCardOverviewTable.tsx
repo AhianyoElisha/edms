@@ -88,7 +88,7 @@ const VolumePricesSummary = ({ volumePrices }: { volumePrices: VolumePrice[] | s
               {vp.volume} CBM: {formatCurrency(vp.rate)}
             </Typography>
           ))}
-          <Typography variant='subtitle2' sx={{ mt: 1, mb: 1 }}>Big Truck (37-60 CBM)</Typography>
+          <Typography variant='subtitle2' sx={{ mt: 1, mb: 1 }}>Big Truck (37-70 CBM)</Typography>
           {bigTruckPrices.map((vp: VolumePrice) => (
             <Typography key={vp.volume} variant='body2'>
               {vp.volume} CBM: {formatCurrency(vp.rate)}
