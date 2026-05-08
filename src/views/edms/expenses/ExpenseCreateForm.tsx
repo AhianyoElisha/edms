@@ -25,6 +25,7 @@ import IconButton from '@mui/material/IconButton'
 import FormHelperText from '@mui/material/FormHelperText'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import Switch from '@mui/material/Switch'
+import Autocomplete from '@mui/material/Autocomplete'
 
 // Date Picker Imports
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers-pro'
@@ -438,68 +439,80 @@ const ExpenseCreateForm = () => {
                   <Grid container spacing={4}>
                     {/* Trip Selection */}
                     <Grid item xs={12}>
-                      <FormControl fullWidth disabled={dataLoading}>
-                        <InputLabel>Trip</InputLabel>
-                        <Select
-                          value={tripId}
-                          label="Trip"
-                          onChange={(e) => {
-                            setTripId(e.target.value)
-                            // Auto-fill vehicle from trip
-                            const trip = trips.find(t => t.$id === e.target.value)
-                            if (trip?.vehicle) {
-                              const vehicleId = typeof trip.vehicle === 'object' ? trip.vehicle.$id : trip.vehicle
-                              setVehicleId(vehicleId)
-                            }
-                          }}
-                        >
-                          <MenuItem value="">None</MenuItem>
-                          {trips.map((trip) => (
-                            <MenuItem key={trip.$id} value={trip.$id}>
-                              <Box display="flex" flexDirection="column">
-                                <Box display="flex" alignItems="center" gap={1}>
-                                  <Typography variant="body2">{trip.tripNumber}</Typography>
-                                  <Chip 
-                                    label={trip.status?.replace('_', ' ')} 
-                                    size="small" 
-                                    variant="outlined"
-                                    color={
-                                      trip.status === 'completed' ? 'success' :
-                                      trip.status === 'in_progress' ? 'primary' :
-                                      trip.status === 'cancelled' ? 'error' : 'default'
-                                    }
-                                  />
-                                </Box>
-                                <Typography variant="caption" color="text.secondary">
-                                  {trip.tripDate ? new Date(trip.tripDate).toLocaleDateString() : 'No date'}
-                                  {trip.driver && typeof trip.driver === 'object' && ` • ${trip.driver.name || 'Unknown driver'}`}
-                                </Typography>
+                      <Autocomplete
+                        fullWidth
+                        disabled={dataLoading}
+                        options={trips}
+                        getOptionLabel={t => t.tripNumber || ''}
+                        value={trips.find(t => t.$id === tripId) || null}
+                        onChange={(_, selected) => {
+                          setTripId(selected?.$id || '')
+                          // Auto-fill vehicle from trip
+                          if (selected?.vehicle) {
+                            const vid = typeof selected.vehicle === 'object'
+                              ? (selected.vehicle as any).$id
+                              : selected.vehicle
+                            setVehicleId(vid)
+                          }
+                        }}
+                        renderOption={(props, trip) => (
+                          <li {...props} key={trip.$id}>
+                            <Box display='flex' flexDirection='column'>
+                              <Box display='flex' alignItems='center' gap={1}>
+                                <Typography variant='body2'>{trip.tripNumber}</Typography>
+                                <Chip
+                                  label={trip.status?.replace('_', ' ')}
+                                  size='small'
+                                  variant='outlined'
+                                  color={
+                                    trip.status === 'completed' ? 'success' :
+                                    trip.status === 'in_progress' ? 'primary' :
+                                    trip.status === 'cancelled' ? 'error' : 'default'
+                                  }
+                                />
                               </Box>
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
+                              <Typography variant='caption' color='text.secondary'>
+                                {trip.tripDate ? new Date(trip.tripDate).toLocaleDateString() : 'No date'}
+                                {trip.driver && typeof trip.driver === 'object' && ` • ${(trip.driver as any).name || 'Unknown driver'}`}
+                              </Typography>
+                            </Box>
+                          </li>
+                        )}
+                        renderInput={params => (
+                          <TextField {...params} label='Trip' placeholder='Search by trip number...' />
+                        )}
+                        noOptionsText='No trips available'
+                        isOptionEqualToValue={(option, value) => option.$id === value.$id}
+                      />
                     </Grid>
 
                     {/* Vehicle Selection */}
                     <Grid item xs={12}>
-                      <FormControl fullWidth disabled={dataLoading}>
-                        <InputLabel>Vehicle</InputLabel>
-                        <Select
-                          value={vehicleId}
-                          label="Vehicle"
-                          onChange={(e) => setVehicleId(e.target.value)}
-                        >
-                          <MenuItem value="">None</MenuItem>
-                          {vehicles.map((vehicle) => (
-                            <MenuItem key={vehicle.$id} value={vehicle.$id}>
-                              {vehicle.vehicleNumber}
-                              {vehicle.brand && ` - ${vehicle.brand}`}
-                              {vehicle.model && ` ${vehicle.model}`}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
+                      <Autocomplete
+                        fullWidth
+                        disabled={dataLoading}
+                        options={vehicles}
+                        getOptionLabel={v => `${v.vehicleNumber}${v.brand ? ' - ' + v.brand : ''}${v.model ? ' ' + v.model : ''}`}
+                        value={vehicles.find(v => v.$id === vehicleId) || null}
+                        onChange={(_, selected) => setVehicleId(selected?.$id || '')}
+                        renderOption={(props, vehicle) => (
+                          <li {...props} key={vehicle.$id}>
+                            <div>
+                              <Typography variant='body2'>{vehicle.vehicleNumber}</Typography>
+                              {(vehicle.brand || vehicle.model) && (
+                                <Typography variant='caption' color='text.secondary'>
+                                  {vehicle.brand} {vehicle.model}
+                                </Typography>
+                              )}
+                            </div>
+                          </li>
+                        )}
+                        renderInput={params => (
+                          <TextField {...params} label='Vehicle' placeholder='Search vehicle...' />
+                        )}
+                        noOptionsText='No active vehicles available'
+                        isOptionEqualToValue={(option, value) => option.$id === value.$id}
+                      />
                     </Grid>
                   </Grid>
                 </CardContent>
