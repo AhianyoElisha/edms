@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
 import Grid from '@mui/material/Grid'
 import Typography from '@mui/material/Typography'
 import TextField from '@mui/material/TextField'
-import MenuItem from '@mui/material/MenuItem'
+import Autocomplete from '@mui/material/Autocomplete'
 import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
 import Alert from '@mui/material/Alert'
@@ -180,197 +180,209 @@ const StepTripDetails = ({ handleNext, wizardData, updateWizardData }: WizardSte
           <Typography variant='body2'>Select driver, vehicle, and route for this delivery trip</Typography>
         </Grid>
 
-      <Grid item xs={12} sm={6}>
-        <TextField
-          select
-          fullWidth
-          label='Select Vehicle'
-          value={vehicleId}
-          onChange={e => {
-            const selectedVehicleId = e.target.value
-            setVehicleId(selectedVehicleId)
-            
-            // Auto-populate driver if the vehicle has an assigned driver
-            const selectedVehicle = vehicles.find(v => v.$id === selectedVehicleId)
-            if (selectedVehicle?.driver) {
-              const driverField = selectedVehicle.driver as any
-              const vehicleDriverId = typeof driverField === 'object' 
-                ? driverField.$id 
-                : driverField
-              if (vehicleDriverId) {
-                // Check if this driver exists in our drivers list
-                const matchingDriver = drivers.find(d => d.$id === vehicleDriverId)
-                if (matchingDriver) {
-                  setDriverId(vehicleDriverId)
+        {/* Vehicle */}
+        <Grid item xs={12} sm={6}>
+          <Autocomplete
+            fullWidth
+            options={vehicles}
+            getOptionLabel={v => v.vehicleNumber || ''}
+            value={vehicles.find(v => v.$id === vehicleId) || null}
+            onChange={(_, selected) => {
+              const selectedVehicleId = selected?.$id || ''
+              setVehicleId(selectedVehicleId)
+              if (selected?.driver) {
+                const driverField = selected.driver as any
+                const vehicleDriverId = typeof driverField === 'object' ? driverField.$id : driverField
+                if (vehicleDriverId) {
+                  const matchingDriver = drivers.find(d => d.$id === vehicleDriverId)
+                  if (matchingDriver) setDriverId(vehicleDriverId)
                 }
               }
-            }
-          }}
-          required
-        >
-          {vehicles.length === 0 ? (
-            <MenuItem disabled>No active vehicles available</MenuItem>
-          ) : (
-            vehicles.map(vehicle => (
-              <MenuItem key={vehicle.$id} value={vehicle.$id}>
+            }}
+            renderOption={(props, vehicle) => (
+              <li {...props} key={vehicle.$id}>
                 <div>
                   <Typography variant='body1'>{vehicle.vehicleNumber}</Typography>
                   <Typography variant='caption' color='text.secondary'>
                     {vehicle.type} - {vehicle.brand} {vehicle.model}
                   </Typography>
                 </div>
-              </MenuItem>
-            ))
-          )}
-        </TextField>
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <TextField
-          select
-          fullWidth
-          label='Select Driver'
-          value={driverId}
-          onChange={e => {
-            const selectedDriverId = e.target.value
-            setDriverId(selectedDriverId)
-            
-            // Auto-populate vehicle if this driver is assigned to one
-            const matchingVehicle = vehicles.find(v => {
-              const driverField = v.driver as any
-              const vehicleDriverId = typeof driverField === 'object' ? driverField?.$id : driverField
-              return vehicleDriverId === selectedDriverId
-            })
-            if (matchingVehicle) {
-              setVehicleId(matchingVehicle.$id)
-            }
-          }}
-          required
-        >
-          {drivers.length === 0 ? (
-            <MenuItem disabled>No drivers available</MenuItem>
-          ) : (
-            drivers.map(driver => (
-              <MenuItem key={driver.$id} value={driver.$id}>
+              </li>
+            )}
+            renderInput={params => (
+              <TextField {...params} label='Select Vehicle' required placeholder='Search vehicle...' />
+            )}
+            noOptionsText='No active vehicles available'
+            isOptionEqualToValue={(option, value) => option.$id === value.$id}
+          />
+        </Grid>
+
+        {/* Driver */}
+        <Grid item xs={12} sm={6}>
+          <Autocomplete
+            fullWidth
+            options={drivers}
+            getOptionLabel={d => d.name || ''}
+            value={drivers.find(d => d.$id === driverId) || null}
+            onChange={(_, selected) => {
+              const selectedDriverId = selected?.$id || ''
+              setDriverId(selectedDriverId)
+              const matchingVehicle = vehicles.find(v => {
+                const driverField = v.driver as any
+                const vehicleDriverId = typeof driverField === 'object' ? driverField?.$id : driverField
+                return vehicleDriverId === selectedDriverId
+              })
+              if (matchingVehicle) setVehicleId(matchingVehicle.$id)
+            }}
+            renderOption={(props, driver) => (
+              <li {...props} key={driver.$id}>
                 <div>
                   <Typography variant='body1'>{driver.name}</Typography>
                   <Typography variant='caption' color='text.secondary'>
                     {driver.email}
                   </Typography>
                 </div>
-              </MenuItem>
-            ))
-          )}
-        </TextField>
-      </Grid>
+              </li>
+            )}
+            renderInput={params => (
+              <TextField {...params} label='Select Driver' required placeholder='Search driver...' />
+            )}
+            noOptionsText='No drivers available'
+            isOptionEqualToValue={(option, value) => option.$id === value.$id}
+          />
+        </Grid>
 
+        {/* Route */}
+        <Grid item xs={12}>
+          <Autocomplete
+            fullWidth
+            options={routes}
+            getOptionLabel={r => r.routeName || ''}
+            value={routes.find(r => r.$id === routeId) || null}
+            onChange={(_, selected) => setRouteId(selected?.$id || '')}
+            filterOptions={(options, { inputValue }) => {
+              const q = inputValue.toLowerCase()
+              return options.filter(r =>
+                r.routeName?.toLowerCase().includes(q) ||
+                r.routeCode?.toLowerCase().includes(q) ||
+                (typeof r.startLocation === 'object'
+                  ? (r.startLocation as any)?.locationName?.toLowerCase().includes(q)
+                  : String(r.startLocation).toLowerCase().includes(q)) ||
+                (typeof r.endLocation === 'object'
+                  ? (r.endLocation as any)?.locationName?.toLowerCase().includes(q)
+                  : String(r.endLocation).toLowerCase().includes(q))
+              )
+            }}
+            renderOption={(props, route) => {
+              const startName = typeof route.startLocation === 'object'
+                ? (route.startLocation as any)?.locationName || (route.startLocation as any)?.$id
+                : route.startLocation
+              const endName = typeof route.endLocation === 'object'
+                ? (route.endLocation as any)?.locationName || (route.endLocation as any)?.$id
+                : route.endLocation
+              return (
+                <li {...props} key={route.$id}>
+                  <div>
+                    <Typography variant='body1'>{route.routeName}</Typography>
+                    <Typography variant='caption' color='text.secondary'>
+                      {route.routeCode} · {startName} → {endName}
+                      {route.intermediateStops.length > 0 && ` (${route.intermediateStops.length} stops)`}
+                    </Typography>
+                  </div>
+                </li>
+              )
+            }}
+            renderInput={params => (
+              <TextField {...params} label='Select Route' required placeholder='Search by name, code, or location...' />
+            )}
+            noOptionsText='No active routes available'
+            isOptionEqualToValue={(option, value) => option.$id === value.$id}
+          />
+        </Grid>
 
-      <Grid item xs={12}>
-        <TextField
-          select
-          fullWidth
-          label='Select Route'
-          value={routeId}
-          onChange={e => setRouteId(e.target.value)}
-          required
-        >
-          {routes.length === 0 ? (
-            <MenuItem disabled>No active routes available</MenuItem>
-          ) : (
-            routes.map(route => (
-              <MenuItem key={route.$id} value={route.$id}>
+        {/* Tonnage */}
+        <Grid item xs={12} sm={6}>
+          <Autocomplete
+            fullWidth
+            options={VOLUME_TIERS}
+            getOptionLabel={tier => `${tier.tonnage} tons`}
+            value={VOLUME_TIERS.find(t => t.tonnage.toString() === tonnage) || null}
+            onChange={(_, selected) => setTonnage(selected ? selected.tonnage.toString() : '')}
+            renderOption={(props, tier) => (
+              <li {...props} key={tier.tonnage}>
                 <div>
-                  <Typography variant='body1'>{route.routeName}</Typography>
+                  <Typography variant='body1'>{tier.tonnage} tons</Typography>
                   <Typography variant='caption' color='text.secondary'>
-                    {route.routeCode} - {route.startLocation} → {route.endLocation}
-                    {route.intermediateStops.length > 0 && ` (${route.intermediateStops.length} stops)`}
+                    {tier.volume} CBM - {tier.truckCategory === 'small' ? 'Small' : 'Big'} Truck
                   </Typography>
                 </div>
-              </MenuItem>
-            ))
-          )}
-        </TextField>
-      </Grid>
-
-      {/* Tonnage Selection */}
-      <Grid item xs={12} sm={6}>
-        <TextField
-          select
-          fullWidth
-          label='Select Tonnage'
-          value={tonnage}
-          onChange={e => setTonnage(e.target.value)}
-          required
-        >
-          {VOLUME_TIERS.map(tier => (
-            <MenuItem key={tier.tonnage} value={tier.tonnage.toString()}>
-              <div>
-                <Typography variant='body1'>{tier.tonnage} tons</Typography>
-                <Typography variant='caption' color='text.secondary'>
-                  {tier.volume} CBM - {tier.truckCategory === 'small' ? 'Small' : 'Big'} Truck
-                </Typography>
-              </div>
-            </MenuItem>
-          ))}
-        </TextField>
-      </Grid>
-
-      {/* Trip Cost Display */}
-      <Grid item xs={12} sm={6}>
-        <TextField
-          fullWidth
-          label='Trip Cost (GH₵)'
-          value={tripCost !== undefined ? tripCost.toFixed(2) : ''}
-          InputProps={{ readOnly: true }}
-          helperText={costError || 'Auto-calculated from rate card'}
-          error={!!costError}
-        />
-      </Grid>
-
-      {costError && (
-        <Grid item xs={12}>
-          <Alert severity='warning'>{costError}</Alert>
+              </li>
+            )}
+            renderInput={params => (
+              <TextField {...params} label='Select Tonnage' required placeholder='Search tonnage...' />
+            )}
+            noOptionsText='No tonnage options available'
+            isOptionEqualToValue={(option, value) => option.tonnage === value.tonnage}
+          />
         </Grid>
-      )}
 
-      <Grid item xs={12} sm={6}>
-        <DateTimePicker
-          label='Trip Start Time'
-          value={startTime ? dayjs(startTime) : null}
-          onChange={(date) => {
-            const isoDate = date ? date.toISOString() : ''
-            setStartTime(isoDate)
-          }}
-          slotProps={{
-            textField: {
-              fullWidth: true,
-              required: true
-            }
-          }}
-        />
-      </Grid>
+        {/* Trip Cost Display */}
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            label='Trip Cost (GH₵)'
+            value={tripCost !== undefined ? tripCost.toFixed(2) : ''}
+            InputProps={{ readOnly: true }}
+            helperText={costError || 'Auto-calculated from rate card'}
+            error={!!costError}
+          />
+        </Grid>
 
-      <Grid item xs={12}>
-        <TextField
-          fullWidth
-          multiline
-          rows={3}
-          label='Notes (Optional)'
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          placeholder='Add any special instructions or notes for this trip...'
-        />
-      </Grid>
+        {costError && (
+          <Grid item xs={12}>
+            <Alert severity='warning'>{costError}</Alert>
+          </Grid>
+        )}
 
-      <Grid item xs={12}>
-        <div className='flex items-center justify-between'>
-          <Button variant='outlined' disabled>
-            Previous
-          </Button>
-          <Button variant='contained' onClick={handleSubmit}>
-            Next: Add Manifests
-          </Button>
-        </div>
-      </Grid>
+        <Grid item xs={12} sm={6}>
+          <DateTimePicker
+            label='Trip Start Time'
+            value={startTime ? dayjs(startTime) : null}
+            onChange={(date) => {
+              const isoDate = date ? date.toISOString() : ''
+              setStartTime(isoDate)
+            }}
+            slotProps={{
+              textField: {
+                fullWidth: true,
+                required: true
+              }
+            }}
+          />
+        </Grid>
+
+        <Grid item xs={12}>
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            label='Notes (Optional)'
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder='Add any special instructions or notes for this trip...'
+          />
+        </Grid>
+
+        <Grid item xs={12}>
+          <div className='flex items-center justify-between'>
+            <Button variant='outlined' disabled>
+              Previous
+            </Button>
+            <Button variant='contained' onClick={handleSubmit}>
+              Next: Add Manifests
+            </Button>
+          </div>
+        </Grid>
       </Grid>
     </LocalizationProvider>
   )
