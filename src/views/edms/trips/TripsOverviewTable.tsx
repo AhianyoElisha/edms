@@ -111,15 +111,23 @@ const TripsOverviewTable = () => {
   const setDateTo = useCallback((value: Dayjs | null) => updateParam('dateTo', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
 
   // Permissions
-  const { hasPermission } = usePermissions()
+  const { hasPermission, user } = usePermissions()
+
+  // Drivers only see the trips assigned to them (trip.driver === their user id)
+  const isDriver = user?.role?.name?.toLowerCase() === 'driver'
 
   // Load trips
   useEffect(() => {
+    // Wait until the current user is resolved so drivers never briefly see all trips
+    if (!user) return
+
     const loadTrips = async () => {
       try {
         setLoading(true)
-        const filters = statusFilter !== 'all' ? { status: statusFilter } : undefined
-        const trips = await getAllTrips(filters)
+        const filters: { status?: string; driverId?: string } = {}
+        if (statusFilter !== 'all') filters.status = statusFilter
+        if (isDriver && user?.$id) filters.driverId = user.$id
+        const trips = await getAllTrips(Object.keys(filters).length ? filters : undefined)
         setTripData(trips)
       } catch (error) {
         console.error('Error loading trips:', error)
@@ -129,7 +137,7 @@ const TripsOverviewTable = () => {
     }
 
     loadTrips()
-  }, [statusFilter])
+  }, [statusFilter, user, isDriver])
 
   // Client-side date filtering
   const filteredTripData = useMemo(() => {

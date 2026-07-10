@@ -82,7 +82,7 @@ const LocationTableFilters: React.FC<LocationTableFiltersProps> = ({
         <div className='flex items-center gap-2'>
           <Typography variant='h5'>Search</Typography>
           <TextField
-            placeholder={`Search ${locationType} locations...`}
+            placeholder={`Search ${locationType === 'pickup' ? 'warehouses' : 'pickup locations'}...`}
             value={filters.search}
             onChange={(e) => handleFilterChange('search', e.target.value)}
             className='max-sm:is-full'

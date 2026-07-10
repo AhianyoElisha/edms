@@ -158,11 +158,11 @@ const EditDropoffLocationDrawer: React.FC<EditDropoffLocationDrawerProps> = ({
         $id: location.$id,
         ...formData
       })
-      toast.success('Dropoff location updated successfully!')
+      toast.success('Pickup location updated successfully!')
       onSuccess()
       onClose()
     } catch (error) {
-      toast.error('Failed to update dropoff location. Please try again.')
+      toast.error('Failed to update pickup location. Please try again.')
       console.error('Error updating dropoff location:', error)
     } finally {
       setLoading(false)
@@ -179,7 +179,7 @@ const EditDropoffLocationDrawer: React.FC<EditDropoffLocationDrawerProps> = ({
       }}
     >
       <div className='flex items-center justify-between p-6 border-b'>
-        <Typography variant='h5'>Edit Dropoff Location</Typography>
+        <Typography variant='h5'>Edit Pickup Location</Typography>
         <IconButton onClick={onClose}>
           <i className='ri-close-line text-textSecondary' />
         </IconButton>
@@ -317,7 +317,7 @@ const EditDropoffLocationDrawer: React.FC<EditDropoffLocationDrawerProps> = ({
                 label='Contact Person'
                 value={formData.contactPerson}
                 onChange={(e) => handleInputChange('contactPerson', e.target.value)}
-                placeholder='Person responsible for this dropoff location'
+                placeholder='Person responsible for this pickup location'
               />
             </Grid>
             <Grid item xs={12} sm={6}>

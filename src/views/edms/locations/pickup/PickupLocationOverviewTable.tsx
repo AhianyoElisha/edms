@@ -212,7 +212,7 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
     return (
       <Card>
         <CardContent>
-          <Typography>Loading pickup locations...</Typography>
+          <Typography>Loading warehouses...</Typography>
         </CardContent>
       </Card>
     )
@@ -221,8 +221,8 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
   return (
     <>
       <Card>
-        <CardHeader 
-          title='Pickup Locations Management' 
+        <CardHeader
+          title='Warehouse Management'
           action={
             hasPermission('pickuplocations.create') ? (
               <Button
@@ -230,7 +230,7 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
                 startIcon={<i className='ri-add-line' />}
                 onClick={() => setAddDrawerOpen(true)}
               >
-                Add Pickup Location
+                Add Warehouse
               </Button>
             ) : undefined
           }
@@ -400,7 +400,7 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
                   <TableRow>
                     <TableCell colSpan={7} align="center">
                       <Typography color="text.secondary">
-                        No pickup locations found
+                        No warehouses found
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -528,7 +528,7 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete the pickup location "{locationToDelete?.locationName}"? 
+            Are you sure you want to delete the warehouse "{locationToDelete?.locationName}"?
             This action cannot be undone.
           </Typography>
         </DialogContent>

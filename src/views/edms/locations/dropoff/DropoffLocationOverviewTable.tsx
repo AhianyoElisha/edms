@@ -216,7 +216,7 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
     return (
       <Card>
         <CardContent>
-          <Typography>Loading dropoff locations...</Typography>
+          <Typography>Loading pickup locations...</Typography>
         </CardContent>
       </Card>
     )
@@ -225,8 +225,8 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
   return (
     <>
       <Card>
-        <CardHeader 
-          title='Dropoff Locations Management' 
+        <CardHeader
+          title='Pickup Locations Management'
           action={
             hasPermission('dropofflocations.create') ? (
               <Button
@@ -234,7 +234,7 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
                 startIcon={<i className='ri-add-line' />}
                 onClick={() => setAddDrawerOpen(true)}
               >
-                Add Dropoff Location
+                Add Pickup Location
               </Button>
             ) : undefined
           }
@@ -404,7 +404,7 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
                   <TableRow>
                     <TableCell colSpan={5} align="center">
                       <Typography color="text.secondary">
-                        No dropoff locations found
+                        No pickup locations found
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -432,7 +432,7 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
         fullWidth
       >
         <DialogTitle>
-          Dropoff Location Details
+          Pickup Location Details
         </DialogTitle>
         <DialogContent dividers>
           {selectedLocation && (
@@ -531,7 +531,7 @@ const DropoffLocationOverviewTable: React.FC<DropoffLocationOverviewTableProps> 
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete the dropoff location "{locationToDelete?.locationName}"? 
+            Are you sure you want to delete the pickup location "{locationToDelete?.locationName}"?
             This action cannot be undone.
           </Typography>
           {deleteError && (

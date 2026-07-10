@@ -158,11 +158,11 @@ const EditPickupLocationDrawer: React.FC<EditPickupLocationDrawerProps> = ({
         $id: location.$id,
         ...formData
       })
-      toast.success('Pickup location updated successfully!')
+      toast.success('Warehouse updated successfully!')
       onSuccess()
       onClose()
     } catch (error) {
-      toast.error('Failed to update pickup location. Please try again.')
+      toast.error('Failed to update warehouse. Please try again.')
       console.error('Error updating pickup location:', error)
     } finally {
       setLoading(false)
@@ -179,7 +179,7 @@ const EditPickupLocationDrawer: React.FC<EditPickupLocationDrawerProps> = ({
       }}
     >
       <div className='flex items-center justify-between p-6 border-b'>
-        <Typography variant='h5'>Edit Pickup Location</Typography>
+        <Typography variant='h5'>Edit Warehouse</Typography>
         <IconButton onClick={onClose}>
           <i className='ri-close-line text-textSecondary' />
         </IconButton>
@@ -317,7 +317,7 @@ const EditPickupLocationDrawer: React.FC<EditPickupLocationDrawerProps> = ({
                 label='Contact Person'
                 value={formData.contactPerson}
                 onChange={(e) => handleInputChange('contactPerson', e.target.value)}
-                placeholder='Person responsible for this pickup location'
+                placeholder='Person responsible for this warehouse'
               />
             </Grid>
             <Grid item xs={12} sm={6}>

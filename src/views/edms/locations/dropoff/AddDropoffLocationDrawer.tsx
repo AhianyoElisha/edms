@@ -145,11 +145,11 @@ const AddDropoffLocationDrawer: React.FC<AddDropoffLocationDrawerProps> = ({
     setLoading(true)
     try {
       await createDropoffLocation(formData)
-      toast.success('Dropoff location created successfully!')
+      toast.success('Pickup location created successfully!')
       onSuccess()
       onClose()
     } catch (error) {
-      toast.error('Failed to create dropoff location. Please try again.')
+      toast.error('Failed to create pickup location. Please try again.')
       console.error('Error creating dropoff location:', error)
     } finally {
       setLoading(false)
@@ -166,7 +166,7 @@ const AddDropoffLocationDrawer: React.FC<AddDropoffLocationDrawerProps> = ({
       }}
     >
       <div className='flex items-center justify-between p-6 border-b'>
-        <Typography variant='h5'>Add Dropoff Location</Typography>
+        <Typography variant='h5'>Add Pickup Location</Typography>
         <IconButton onClick={onClose}>
           <i className='ri-close-line text-textSecondary' />
         </IconButton>
@@ -303,7 +303,7 @@ const AddDropoffLocationDrawer: React.FC<AddDropoffLocationDrawerProps> = ({
                 label='Contact Person'
                 value={formData.contactPerson}
                 onChange={(e) => handleInputChange('contactPerson', e.target.value)}
-                placeholder='Person responsible for this dropoff location'
+                placeholder='Person responsible for this pickup location'
               />
             </Grid>
             <Grid item xs={12} sm={6}>

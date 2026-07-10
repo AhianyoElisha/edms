@@ -152,10 +152,10 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
             {(hasAnyPermission(['pickuplocations.view']) || hasAnyPermission(['dropofflocations.view'])) && (
               <SubMenu label="Locations" icon={<i className='ri-map-pin-line' />}>
                 {hasAnyPermission(['pickuplocations.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/locations/pickup')}>Pickup Locations</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/locations/pickup')}>Warehouse</MenuItem>
                 )}
                 {hasAnyPermission(['dropofflocations.view']) && (
-                  <MenuItem onClick={() => handleNavigation('/locations/dropoff')}>Dropoff Locations</MenuItem>
+                  <MenuItem onClick={() => handleNavigation('/locations/dropoff')}>Pickup Locations</MenuItem>
                 )}
               </SubMenu>
             )}

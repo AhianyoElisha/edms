@@ -145,11 +145,11 @@ const AddPickupLocationDrawer: React.FC<AddPickupLocationDrawerProps> = ({
     setLoading(true)
     try {
       await createPickupLocation(formData)
-      toast.success('Pickup location created successfully!')
+      toast.success('Warehouse created successfully!')
       onSuccess()
       onClose()
     } catch (error) {
-      toast.error('Failed to create pickup location. Please try again.')
+      toast.error('Failed to create warehouse. Please try again.')
       console.error('Error creating pickup location:', error)
     } finally {
       setLoading(false)
@@ -166,7 +166,7 @@ const AddPickupLocationDrawer: React.FC<AddPickupLocationDrawerProps> = ({
       }}
     >
       <div className='flex items-center justify-between p-6 border-b'>
-        <Typography variant='h5'>Add Pickup Location</Typography>
+        <Typography variant='h5'>Add Warehouse</Typography>
         <IconButton onClick={onClose}>
           <i className='ri-close-line text-textSecondary' />
         </IconButton>
@@ -303,7 +303,7 @@ const AddPickupLocationDrawer: React.FC<AddPickupLocationDrawerProps> = ({
                 label='Contact Person'
                 value={formData.contactPerson}
                 onChange={(e) => handleInputChange('contactPerson', e.target.value)}
-                placeholder='Person responsible for this pickup location'
+                placeholder='Person responsible for this warehouse'
               />
             </Grid>
             <Grid item xs={12} sm={6}>

@@ -19,6 +19,8 @@ import { useImageVariant } from '@core/hooks/useImageVariant'
 import type { Mode } from '@core/types'
 import Loader from '@/components/layout/shared/Loader'
 import { useAuth } from '@/contexts/AppwriteProvider'
+import { getCurrentUser } from '@/libs/actions/auth.actions'
+import { getLandingRouteForUser } from '@/utils/getDefaultRoute'
 
 const formSchema = z.object({
   username: z.string().min(1, { message: "Username is required." }),
@@ -63,9 +65,17 @@ const LoginForm = ({ mode }: { mode: Mode }) => {
     setLoading(true)
     try {
       await login(user.username, user.password)
-      router.push(`/dashboard`)
+
+      // Determine the landing page based on the user's role and permissions.
+      // Admins go to the dashboard; other roles are routed to the first page
+      // they have permission to access (e.g. drivers land on the Trips page).
+      const currentUser = await getCurrentUser()
+      const landingRoute = currentUser ? await getLandingRouteForUser(currentUser) : '/dashboard'
+
+      router.push(landingRoute)
     } catch (error) {
       console.error(error)
+      setLoading(false)
       // Handle login error (e.g., show error message)
     }
   }

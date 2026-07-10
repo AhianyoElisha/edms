@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AppwriteProvider'
 import { getUserPermissions } from '@/libs/actions/permissions.actions'
 
 // Fallback permissions based on role (in case API fails)
-const FALLBACK_PERMISSIONS: Record<string, string[]> = {
+export const FALLBACK_PERMISSIONS: Record<string, string[]> = {
   admin: [
     'dashboard.view', 'dashboard.analytics',
     'packages.view', 'packages.create', 'packages.edit', 'packages.delete', 'packages.manage', 'packages.tracking', 'packages.history', 'packages.bulkimport', 'packages.export',
