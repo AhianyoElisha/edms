@@ -120,8 +120,7 @@ export const getManifestByIdWithRelations = async (manifestId: string) => {
           'trip.driver.*',
           'trip.route.*',
           'dropofflocation.*',
-        ]),
-        Query.limit(1000)
+        ])
       ]
     )
 
