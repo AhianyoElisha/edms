@@ -129,6 +129,7 @@ const ExpenseListView = () => {
   const [vehicles, setVehicles] = useState<VehicleType[]>([])
   const [trips, setTrips] = useState<TripType[]>([])
   const [loading, setLoading] = useState<boolean>(true)
+  const [markingAll, setMarkingAll] = useState<boolean>(false)
 
   // Snackbar State
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
@@ -364,13 +365,56 @@ const ExpenseListView = () => {
   const handleMarkAsPaid = async (expenseId: string) => {
     try {
       await markExpenseAsPaid(expenseId)
-      setExpenses(prev => prev.map(e => 
+      setExpenses(prev => prev.map(e =>
         e.$id === expenseId ? { ...e, paymentStatus: 'paid' as PaymentStatusType } : e
       ))
       setSnackbar({ open: true, message: 'Expense marked as paid', severity: 'success' })
     } catch (error) {
       console.error('Error marking expense as paid:', error)
       setSnackbar({ open: true, message: 'Failed to mark expense as paid', severity: 'error' })
+    }
+  }
+
+  // Pending expenses in the current (filtered) view
+  const pendingExpenses = useMemo(
+    () => filteredExpenses.filter(e => e.paymentStatus === 'pending'),
+    [filteredExpenses]
+  )
+
+  // Handle mark all pending expenses as paid
+  const handleMarkAllAsPaid = async () => {
+    if (pendingExpenses.length === 0) return
+
+    if (!confirm(`Mark all ${pendingExpenses.length} pending expense${pendingExpenses.length > 1 ? 's' : ''} as paid?`)) {
+      return
+    }
+
+    try {
+      setMarkingAll(true)
+      const results = await Promise.allSettled(pendingExpenses.map(e => markExpenseAsPaid(e.$id)))
+      const paidIds = pendingExpenses
+        .filter((_, i) => results[i].status === 'fulfilled')
+        .map(e => e.$id)
+      const failedCount = pendingExpenses.length - paidIds.length
+
+      if (paidIds.length > 0) {
+        setExpenses(prev => prev.map(e =>
+          paidIds.includes(e.$id) ? { ...e, paymentStatus: 'paid' as PaymentStatusType } : e
+        ))
+      }
+
+      if (failedCount === 0) {
+        setSnackbar({ open: true, message: `${paidIds.length} expense${paidIds.length > 1 ? 's' : ''} marked as paid`, severity: 'success' })
+      } else if (paidIds.length === 0) {
+        setSnackbar({ open: true, message: 'Failed to mark expenses as paid', severity: 'error' })
+      } else {
+        setSnackbar({ open: true, message: `${paidIds.length} marked as paid, ${failedCount} failed`, severity: 'error' })
+      }
+    } catch (error) {
+      console.error('Error marking all expenses as paid:', error)
+      setSnackbar({ open: true, message: 'Failed to mark expenses as paid', severity: 'error' })
+    } finally {
+      setMarkingAll(false)
     }
   }
 
@@ -646,6 +690,21 @@ const ExpenseListView = () => {
         {/* Expenses Table */}
         <Grid item xs={12}>
           <Card>
+            {hasPermission('expenses.edit') && (
+              <Box display="flex" justifyContent="flex-end" alignItems="center" gap={2} p={4} pb={0}>
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<i className="ri-checkbox-multiple-line" />}
+                  onClick={handleMarkAllAsPaid}
+                  disabled={markingAll || pendingExpenses.length === 0}
+                >
+                  {markingAll
+                    ? 'Processing...'
+                    : `Mark All as Paid${pendingExpenses.length > 0 ? ` (${pendingExpenses.length})` : ''}`}
+                </Button>
+              </Box>
+            )}
             <TableContainer component={Paper}>
               <Table>
                 <TableHead>

@@ -152,6 +152,7 @@ const UserListTable = ({ tableData, onRefresh }: { tableData?: UsersType[]; onRe
   const [globalFilter, setGlobalFilter] = useState('')
   const [role, setRole] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const [availableRoles, setAvailableRoles] = useState<any[]>([])
 
   const router = useRouter()
@@ -331,6 +332,42 @@ const UserListTable = ({ tableData, onRefresh }: { tableData?: UsersType[]; onRe
     getFacetedMinMaxValues: getFacetedMinMaxValues()
   })
 
+  const handleDeleteSelected = async () => {
+    const selectedRows = table.getSelectedRowModel().rows
+    const ids = selectedRows.map(row => row.original.$id)
+
+    if (ids.length === 0) return
+
+    if (!confirm(`Are you sure you want to delete ${ids.length} selected user${ids.length > 1 ? 's' : ''}? This will also remove their login accounts.`)) {
+      return
+    }
+
+    try {
+      setIsBulkDeleting(true)
+      const results = await Promise.allSettled(ids.map(id => deleteUser(id)))
+      const deletedIds = ids.filter((_, i) => results[i].status === 'fulfilled')
+      const failedCount = ids.length - deletedIds.length
+
+      if (deletedIds.length > 0) {
+        setData(prevData => prevData?.filter(user => !deletedIds.includes(user.$id)))
+      }
+      table.resetRowSelection()
+
+      if (failedCount === 0) {
+        toast.success(`${deletedIds.length} user${deletedIds.length > 1 ? 's' : ''} deleted successfully`)
+      } else if (deletedIds.length === 0) {
+        toast.error('Failed to delete selected users')
+      } else {
+        toast.warning(`${deletedIds.length} deleted, ${failedCount} failed`)
+      }
+    } catch (error: any) {
+      console.error('Error deleting selected users:', error)
+      toast.error(error?.message || 'Failed to delete selected users')
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
+
   const getAvatar = (params: Pick<UsersType, 'avatar' | 'fullName'>) => {
     const { avatar, fullName } = params
 
@@ -354,14 +391,30 @@ const UserListTable = ({ tableData, onRefresh }: { tableData?: UsersType[]; onRe
     <>
       <Card>
         <CardContent className='flex justify-between flex-col items-start sm:flex-row sm:items-center max-sm:gap-4'>
-          <Button
-            variant='outlined'
-            color='secondary'
-            startIcon={<i className='ri-upload-2-line' />}
-            className='max-sm:is-full'
-          >
-            Export
-          </Button>
+          <div className='flex flex-col sm:flex-row items-center gap-4 max-sm:is-full'>
+            <Button
+              variant='outlined'
+              color='secondary'
+              startIcon={<i className='ri-upload-2-line' />}
+              className='max-sm:is-full'
+            >
+              Export
+            </Button>
+            {hasPermission('users.delete') && table.getSelectedRowModel().rows.length > 0 && (
+              <Button
+                variant='contained'
+                color='error'
+                startIcon={<i className='ri-delete-bin-7-line' />}
+                onClick={handleDeleteSelected}
+                disabled={isBulkDeleting}
+                className='max-sm:is-full'
+              >
+                {isBulkDeleting
+                  ? 'Deleting...'
+                  : `Delete Selected (${table.getSelectedRowModel().rows.length})`}
+              </Button>
+            )}
+          </div>
           <div className='flex flex-col !items-start max-sm:is-full sm:flex-row sm:items-center gap-4'>
             <DebouncedInput
               value={globalFilter ?? ''}
