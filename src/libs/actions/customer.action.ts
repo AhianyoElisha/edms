@@ -277,7 +277,12 @@ export async function getUserList() {
     const userList = await tablesDB.listRows(
       appwriteConfig.database,
       appwriteConfig.users,
-      [Query.orderDesc('$createdAt'), Query.select(['*', 'role.*']), Query.limit(400)]
+      [
+        Query.notEqual('status', 'deleted'), // hide soft-deleted users
+        Query.orderDesc('$createdAt'),
+        Query.select(['*', 'role.*']),
+        Query.limit(400)
+      ]
     );
 
     if (!userList) throw Error;

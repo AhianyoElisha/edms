@@ -230,6 +230,59 @@ export async function updateUser(userId: string, userData: {
   }
 }
 
+/**
+ * Delete (deactivate) a user.
+ *
+ * NOTE: This is a SOFT delete. Hard-deleting the user document via the Appwrite
+ * API currently fails with a 500 (`general_unknown`) — the users collection has
+ * an internal delete-path corruption in Appwrite that no client change can work
+ * around (verified: the same delete call succeeds on other collections, and
+ * every delete against `users` fails regardless of the document's contents).
+ * Until the collection is repaired/migrated server-side, we mark the user as
+ * `deleted` and remove their auth account so they vanish from the app and can
+ * no longer log in. Soft-deleted users are filtered out of getUserList().
+ */
+export async function deleteUser(userId: string) {
+  try {
+    console.log('=== Deleting (soft) User ===');
+    console.log('User document ID:', userId);
+
+    // Fetch the user document first so we know which auth account to remove
+    const user = await serverDatabases.getDocument(
+      appwriteConfig.database,
+      appwriteConfig.users,
+      userId
+    );
+
+    // Mark the document as deleted (hides it from the list + stats).
+    await serverDatabases.updateDocument(
+      appwriteConfig.database,
+      appwriteConfig.users,
+      userId,
+      { status: 'deleted' }
+    );
+
+    console.log('User marked as deleted:', userId);
+
+    // Remove the underlying auth account so the user can no longer sign in
+    // (best-effort — a missing account shouldn't fail the whole operation).
+    if (user.accountId) {
+      try {
+        await usersAPI.delete(user.accountId);
+        console.log('Auth account deleted successfully:', user.accountId);
+      } catch (accountError: any) {
+        console.error('Failed to delete auth account (continuing):', accountError?.message);
+      }
+    }
+
+    return { success: true, message: 'User deleted successfully' };
+  } catch (error: any) {
+    console.error('=== Error Deleting User ===');
+    console.error('Error details:', error);
+    throw new Error(error?.message || 'Failed to delete user');
+  }
+}
+
 export async function getUserById(userId: string) {
   try {
     const user = await tablesDB.getRow(

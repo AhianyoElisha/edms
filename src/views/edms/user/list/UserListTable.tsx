@@ -59,6 +59,7 @@ import { getRolesList } from '@/libs/actions/roles.actions'
 // Style Imports
 import tableStyles from '@core/styles/table.module.css'
 import { getUserList } from '@/libs/actions/customer.action'
+import { deleteUser } from '@/libs/actions/user.actions'
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
@@ -184,6 +185,21 @@ const UserListTable = ({ tableData, onRefresh }: { tableData?: UsersType[]; onRe
   // Hooks
   const { lang: locale } = useParams()
 
+  const handleDeleteUser = async (userId: string) => {
+    if (confirm('Are you sure you want to delete this user? This will also remove their login account.')) {
+      try {
+        await deleteUser(userId)
+
+        // Remove from local state
+        setData(prevData => prevData?.filter(user => user.$id !== userId))
+        toast.success('User deleted successfully')
+      } catch (error: any) {
+        console.error('Error deleting user:', error)
+        toast.error(error?.message || 'Failed to delete user')
+      }
+    }
+  }
+
   const columns = useMemo<ColumnDef<UsersTypeWithAction, any>[]>(
     () => [
       {
@@ -274,7 +290,7 @@ const UserListTable = ({ tableData, onRefresh }: { tableData?: UsersType[]; onRe
                   icon: 'ri-delete-bin-7-line',
                   menuItemProps: {
                     className: 'flex items-center',
-                    onClick: () => setData(data?.filter(user => user.$id !== row.original.$id))
+                    onClick: () => handleDeleteUser(row.original.$id)
                   }
                 }] : [])
               ]}
