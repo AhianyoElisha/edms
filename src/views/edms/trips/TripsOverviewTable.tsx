@@ -14,6 +14,7 @@ import Typography from '@mui/material/Typography'
 import TextField from '@mui/material/TextField'
 import TablePagination from '@mui/material/TablePagination'
 import IconButton from '@mui/material/IconButton'
+import Checkbox from '@mui/material/Checkbox'
 import Chip from '@mui/material/Chip'
 import MenuItem from '@mui/material/MenuItem'
 import Grid from '@mui/material/Grid'
@@ -25,6 +26,7 @@ import dayjs, { Dayjs } from 'dayjs'
 
 // Third-party Imports
 import classnames from 'classnames'
+import { toast } from 'react-toastify'
 import { rankItem } from '@tanstack/match-sorter-utils'
 import {
   createColumnHelper,
@@ -48,7 +50,7 @@ import OptionMenu from '@core/components/option-menu'
 import tableStyles from '@core/styles/table.module.css'
 
 // Actions Imports
-import { getAllTrips, updateTripStatus } from '@/libs/actions/trip.actions'
+import { getAllTrips, updateTripStatus, deleteTrip } from '@/libs/actions/trip.actions'
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
@@ -56,6 +58,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 // Dialog Imports
 import OpenDialogOnElementClick from '@/components/dialogs/OpenDialogOnElementClick'
 import GenericTableExportDialog from '@/components/dialogs/generic-table-export-dialog'
+import DeleteConfirmationDialog from '@/components/dialogs/delete-confirmation-dialog'
 import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-table-export-dialog'
 
 LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz03MTc0MCxFPTE3MjI1MzA1NTIwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
@@ -82,6 +85,10 @@ const TripsOverviewTable = () => {
   // States
   const [tripData, setTripData] = useState<TripType[]>([])
   const [loading, setLoading] = useState(true)
+  const [rowSelection, setRowSelection] = useState({})
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [tripIdsToDelete, setTripIdsToDelete] = useState<string[]>([])
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Routing
   const router = useRouter()
@@ -115,6 +122,46 @@ const TripsOverviewTable = () => {
 
   // Drivers only see the trips assigned to them (trip.driver === their user id)
   const isDriver = user?.role?.name?.toLowerCase() === 'driver'
+
+  // Only admins hold the trips.delete permission
+  const canDelete = hasPermission('trips.delete')
+
+  const openDeleteDialog = useCallback((tripIds: string[]) => {
+    if (tripIds.length === 0) return
+    setTripIdsToDelete(tripIds)
+    setDeleteDialogOpen(true)
+  }, [])
+
+  const handleConfirmDelete = async (deletedBy: string) => {
+    const ids = tripIdsToDelete
+
+    try {
+      setIsDeleting(true)
+      const results = await Promise.all(ids.map(id => deleteTrip(id, deletedBy)))
+      const deletedIds = ids.filter((_, i) => results[i].success)
+      const failedCount = ids.length - deletedIds.length
+
+      if (deletedIds.length > 0) {
+        setTripData(prevData => prevData.filter(trip => !deletedIds.includes(trip.$id)))
+      }
+      setRowSelection({})
+      setDeleteDialogOpen(false)
+      setTripIdsToDelete([])
+
+      if (failedCount === 0) {
+        toast.success(`${deletedIds.length} trip${deletedIds.length > 1 ? 's' : ''} deleted successfully`)
+      } else if (deletedIds.length === 0) {
+        toast.error('Failed to delete selected trips')
+      } else {
+        toast.warning(`${deletedIds.length} deleted, ${failedCount} failed`)
+      }
+    } catch (error: any) {
+      console.error('Error deleting trips:', error)
+      toast.error(error?.message || 'Failed to delete trips')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   // Load trips
   useEffect(() => {
@@ -171,6 +218,28 @@ const TripsOverviewTable = () => {
 
   const columns = useMemo<ColumnDef<TripType, any>[]>(
     () => [
+      ...(canDelete ? [{
+        id: 'select',
+        header: ({ table }: any) => (
+          <Checkbox
+            {...{
+              checked: table.getIsAllRowsSelected(),
+              indeterminate: table.getIsSomeRowsSelected(),
+              onChange: table.getToggleAllRowsSelectedHandler()
+            }}
+          />
+        ),
+        cell: ({ row }: any) => (
+          <Checkbox
+            {...{
+              checked: row.getIsSelected(),
+              disabled: !row.getCanSelect(),
+              indeterminate: row.getIsSomeSelected(),
+              onChange: row.getToggleSelectedHandler()
+            }}
+          />
+        )
+      } as ColumnDef<TripType, any>] : []),
       columnHelper.accessor('tripNumber', {
         header: 'Trip Number',
         cell: ({ row }) => (
@@ -275,6 +344,14 @@ const TripsOverviewTable = () => {
                   icon: 'ri-edit-box-line',
                   href: `/edms/trips/${row.original.$id}/edit`,
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' }
+                }] : []),
+                ...(canDelete ? [{
+                  text: 'Delete',
+                  icon: 'ri-delete-bin-7-line',
+                  menuItemProps: {
+                    className: 'flex items-center gap-2 text-error',
+                    onClick: () => openDeleteDialog([row.original.$id])
+                  }
                 }] : [])
               ]}
             />
@@ -282,7 +359,7 @@ const TripsOverviewTable = () => {
         )
       })
     ],
-    []
+    [hasPermission, canDelete, openDeleteDialog]
   )
 
   const table = useReactTable({
@@ -292,8 +369,11 @@ const TripsOverviewTable = () => {
       fuzzy: fuzzyFilter
     },
     state: {
-      globalFilter
+      globalFilter,
+      rowSelection
     },
+    enableRowSelection: canDelete,
+    onRowSelectionChange: setRowSelection,
     globalFilterFn: fuzzyFilter,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
@@ -331,6 +411,17 @@ const TripsOverviewTable = () => {
             />
           </div>
           <div className='flex items-center gap-2'>
+            {canDelete && table.getSelectedRowModel().rows.length > 0 && (
+              <Button
+                variant='contained'
+                color='error'
+                startIcon={<i className='ri-delete-bin-7-line' />}
+                onClick={() => openDeleteDialog(table.getSelectedRowModel().rows.map(row => row.original.$id))}
+                disabled={isDeleting}
+              >
+                Delete Selected ({table.getSelectedRowModel().rows.length})
+              </Button>
+            )}
             <OpenDialogOnElementClick
               element={Button}
               elementProps={{
@@ -451,6 +542,20 @@ const TripsOverviewTable = () => {
         onRowsPerPageChange={e => table.setPageSize(Number(e.target.value))}
       />
     </Card>
+
+    <DeleteConfirmationDialog
+      open={deleteDialogOpen}
+      setOpen={setDeleteDialogOpen}
+      title={
+        tripIdsToDelete.length > 1
+          ? `Delete ${tripIdsToDelete.length} selected trips?`
+          : 'Delete this trip?'
+      }
+      description='This action cannot be undone.'
+      confirmButtonText={tripIdsToDelete.length > 1 ? 'Yes, Delete Trips' : 'Yes, Delete Trip'}
+      isDeleting={isDeleting}
+      onConfirm={handleConfirmDelete}
+    />
     </LocalizationProvider>
   )
 }

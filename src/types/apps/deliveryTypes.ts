@@ -61,7 +61,7 @@ export interface DeliveryHistory {
 // Package size type - each manifest holds ONE type of package
 export type PackageSizeType = 'small' | 'medium' | 'big'
 
-export type TripStatusType = 'scheduled' | 'in-progress' | 'completed' | 'cancelled' | 'delayed'
+export type TripStatusType = 'scheduled' | 'in-progress' | 'completed' | 'cancelled' | 'delayed' | 'deleted'
 
 export type VehicleStatusType = 'active' | 'maintenance' | 'available' | 'unavailable' | 'retired'
 
@@ -128,9 +128,13 @@ export interface TripType {
   driverRate?: number
   profit?: number
   manifests: string[] // array of manifest IDs (One-to-many)
-  status: 'planned' | 'in_progress' | 'at_pickup' | 'on_route' | 'completed' | 'cancelled' | 'awaiting_manifests'
+  status: 'planned' | 'in_progress' | 'at_pickup' | 'on_route' | 'completed' | 'cancelled' | 'awaiting_manifests' | 'deleted'
   notes?: string
   creator: string // creator ID (Many-to-one)
+
+  // Soft-delete audit trail
+  deletedBy?: string | null // name of the person who deleted the trip
+  deletedAt?: string | null
   
   // Trip Checkpoint Tracking
   checkpoints?: string | null // JSON string of checkpoint array

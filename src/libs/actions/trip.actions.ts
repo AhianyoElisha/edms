@@ -351,6 +351,9 @@ export async function getAllTrips(filters?: {
       }
     }
 
+    // Exclude soft-deleted trips
+    queries.push(Query.notEqual('status', 'deleted'))
+
     queries.push(Query.orderDesc('$createdAt'))
 
     console.log('Trip query filters:', queries)
@@ -435,6 +438,37 @@ export async function updateTripStatus(tripId: string, status: string): Promise<
   } catch (error) {
     console.error('Error updating trip status:', error)
     throw new Error('Failed to update trip status')
+  }
+}
+
+/**
+ * Soft-delete a trip
+ * Marks the trip as deleted and records who deleted it (audit trail).
+ * Deleted trips are excluded from all trip listings via the status filter.
+ */
+export async function deleteTrip(tripId: string, deletedBy: string): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    await databases.updateDocument(
+      appwriteConfig.database,
+      appwriteConfig.trips,
+      tripId,
+      {
+        status: 'deleted',
+        deletedBy: deletedBy.trim(),
+        deletedAt: new Date().toISOString()
+      }
+    )
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting trip:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete trip'
+    }
   }
 }
 

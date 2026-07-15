@@ -162,6 +162,7 @@ export async function getTripStatistics(month?: number, year?: number) {
       [
         Query.greaterThanEqual('$createdAt', startDate),
         Query.lessThanEqual('$createdAt', endDate),
+        Query.notEqual('status', 'deleted'),
         Query.limit(1000)
       ]
     )
@@ -261,6 +262,7 @@ export async function getDriverPerformance(month?: number, year?: number) {
       [
         Query.greaterThanEqual('$createdAt', startDate),
         Query.lessThanEqual('$createdAt', endDate),
+        Query.notEqual('status', 'deleted'),
         Query.limit(1000)
       ]
     )

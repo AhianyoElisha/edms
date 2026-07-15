@@ -25,6 +25,7 @@ export async function getDailyOperationsReport(date?: string) {
         Query.greaterThanEqual('tripDate', startOfDay),
         Query.lessThanEqual('tripDate', endOfDay),
         Query.select(['*', 'vehicle.*', 'driver.*', 'route.*']),
+        Query.notEqual('status', 'deleted'),
         Query.limit(100)
       ]
     )
@@ -130,6 +131,7 @@ export async function getDeliveryPerformanceReport(month?: number, year?: number
       [
         Query.greaterThanEqual('tripDate', startDate),
         Query.lessThanEqual('tripDate', endDate),
+        Query.notEqual('status', 'deleted'),
         Query.limit(1000)
       ]
     )
@@ -247,6 +249,7 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
       [
         Query.greaterThanEqual('tripDate', startDate),
         Query.lessThanEqual('tripDate', endDate),
+        Query.notEqual('status', 'deleted'),
         Query.limit(2000)
       ]
     )
@@ -377,6 +380,7 @@ export async function getRouteAnalysisReport(month?: number, year?: number) {
       [
         Query.greaterThanEqual('tripDate', startDate),
         Query.lessThanEqual('tripDate', endDate),
+        Query.notEqual('status', 'deleted'),
         Query.limit(2000)
       ]
     )
@@ -482,6 +486,7 @@ export async function getRevenueReport(month?: number, year?: number) {
       [
         Query.greaterThanEqual('tripDate', startDate),
         Query.lessThanEqual('tripDate', endDate),
+        Query.notEqual('status', 'deleted'),
         Query.limit(2000)
       ]
     )
@@ -796,6 +801,7 @@ export async function getInvoicingReport(month?: number, year?: number) {
       [
         Query.greaterThanEqual('tripDate', startDate),
         Query.lessThanEqual('tripDate', endDate),
+        Query.notEqual('status', 'deleted'),
         Query.limit(2000)
       ]
     )

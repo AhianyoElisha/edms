@@ -96,7 +96,7 @@ export async function deleteVehicleFromDB(vehicleId: string): Promise<void> {
       const tripRefs = await databases.listDocuments(
         appwriteConfig.database,
         appwriteConfig.trips,
-        [Query.equal('vehicle', vehicleId), Query.limit(1)]
+        [Query.equal('vehicle', vehicleId), Query.notEqual('status', 'deleted'), Query.limit(1)]
       )
       if (tripRefs.documents.length > 0) {
         throw new Error(

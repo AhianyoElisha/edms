@@ -472,6 +472,7 @@ export async function getAllMonthsLogisticsToExpenseEstimate(vehicleId: any) {
         Query.greaterThanEqual('tripDate', startDate),
         Query.lessThanEqual('tripDate', endDate),
         Query.equal('vehicle', vehicleId),
+        Query.notEqual('status', 'deleted'),
         Query.limit(500)
       ]
     );
