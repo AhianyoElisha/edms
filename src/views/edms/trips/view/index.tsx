@@ -92,7 +92,7 @@ const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | '
 }
 
 const TripView = ({ tripData }: { tripData: any }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'manifests' | 'checkpoints' | 'returns'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'manifests' | 'checkpoints' | 'returns'>('manifests')
   const [returnWaybills, setReturnWaybills] = useState<any[]>([])
   const [loadingReturns, setLoadingReturns] = useState(false)
   
@@ -259,29 +259,32 @@ const TripView = ({ tripData }: { tripData: any }) => {
           value={activeTab}
           onChange={(e, newValue) => setActiveTab(newValue)}
           aria-label='trip details tabs'
+          variant='scrollable'
+          scrollButtons='auto'
+          allowScrollButtonsMobile
         >
-          <Tab 
-            label='Overview' 
-            value='overview'
-            icon={<i className='ri-dashboard-line' />}
-            iconPosition='start'
-          />
-          <Tab 
+          <Tab
             label={`Manifests (${tripData.manifests?.length || 0})`}
             value='manifests'
             icon={<i className='ri-file-list-3-line' />}
             iconPosition='start'
           />
-          <Tab 
-            label={`Checkpoints (${checkpoints.length})`}
-            value='checkpoints'
-            icon={<i className='ri-map-pin-line' />}
-            iconPosition='start'
-          />
-          <Tab 
+          <Tab
             label={`Returns (${returnWaybills.length})`}
             value='returns'
             icon={<i className='ri-arrow-go-back-line' />}
+            iconPosition='start'
+          />
+          <Tab
+            label='Overview'
+            value='overview'
+            icon={<i className='ri-dashboard-line' />}
+            iconPosition='start'
+          />
+          <Tab
+            label={`Checkpoints (${checkpoints.length})`}
+            value='checkpoints'
+            icon={<i className='ri-map-pin-line' />}
             iconPosition='start'
           />
         </Tabs>
