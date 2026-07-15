@@ -1,7 +1,7 @@
 'use client'
 
 // React Imports
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 // Next Imports
 import Link from 'next/link'
@@ -95,6 +95,7 @@ const TripView = ({ tripData }: { tripData: any }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'manifests' | 'checkpoints' | 'returns'>('manifests')
   const [returnWaybills, setReturnWaybills] = useState<any[]>([])
   const [loadingReturns, setLoadingReturns] = useState(false)
+  const tabsRef = useRef<HTMLDivElement>(null)
   
   const router = useRouter()
   const { hasPermission } = usePermissions()
@@ -135,6 +136,23 @@ const TripView = ({ tripData }: { tripData: any }) => {
         })
     }
   }, [tripData.$id])
+
+  // Keep the tab strip pinned to the start when the first tab (Manifests) is
+  // active. On narrow screens MUI's scroll-into-view over-scrolls the selected
+  // first tab, clipping it behind the start scroll button. Runs after MUI's own
+  // layout effect so our reset wins.
+  useEffect(() => {
+    if (activeTab !== 'manifests') return
+    let raf = 0
+    const start = performance.now()
+    const pin = () => {
+      const scroller = tabsRef.current?.querySelector<HTMLElement>('.MuiTabs-scroller')
+      if (scroller && scroller.scrollLeft !== 0) scroller.scrollLeft = 0
+      if (performance.now() - start < 450) raf = requestAnimationFrame(pin)
+    }
+    raf = requestAnimationFrame(pin)
+    return () => cancelAnimationFrame(raf)
+  }, [activeTab])
 
   return (
     <>
@@ -256,6 +274,7 @@ const TripView = ({ tripData }: { tripData: any }) => {
       {/* Tabs */}
       <Card>
         <Tabs
+          ref={tabsRef}
           value={activeTab}
           onChange={(e, newValue) => setActiveTab(newValue)}
           aria-label='trip details tabs'
