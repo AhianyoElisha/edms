@@ -29,11 +29,16 @@ import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Paper from '@mui/material/Paper'
 
+// Third-party Imports
+import { toast } from 'react-toastify'
+
 // Component Imports
 import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
+import DeleteConfirmationDialog from '@/components/dialogs/delete-confirmation-dialog'
 
 // Action Imports
 import { getReturnWaybillsByTrip } from '@/libs/actions/returnwaybill.actions'
+import { deleteTrip } from '@/libs/actions/trip.actions'
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
@@ -95,10 +100,31 @@ const TripView = ({ tripData }: { tripData: any }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'manifests' | 'checkpoints' | 'returns'>('manifests')
   const [returnWaybills, setReturnWaybills] = useState<any[]>([])
   const [loadingReturns, setLoadingReturns] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const tabsRef = useRef<HTMLDivElement>(null)
-  
+
   const router = useRouter()
   const { hasPermission } = usePermissions()
+
+  const handleConfirmDelete = async (deletedBy: string) => {
+    try {
+      setIsDeleting(true)
+      const result = await deleteTrip(tripData.$id, deletedBy)
+
+      if (result.success) {
+        toast.success('Trip deleted successfully')
+        router.push('/edms/trips')
+      } else {
+        toast.error(result.error || 'Failed to delete trip')
+        setIsDeleting(false)
+      }
+    } catch (error: any) {
+      console.error('Error deleting trip:', error)
+      toast.error(error?.message || 'Failed to delete trip')
+      setIsDeleting(false)
+    }
+  }
 
   // Parse checkpoints
   const checkpoints = parseJSON(tripData.checkpoints)
@@ -243,6 +269,18 @@ const TripView = ({ tripData }: { tripData: any }) => {
                   startIcon={<i className='ri-edit-line' />}
                 >
                   Edit
+                </Button>
+              )}
+              {hasPermission('trips.delete') && (
+                <Button
+                  variant='outlined'
+                  size='small'
+                  color='error'
+                  startIcon={<i className='ri-delete-bin-7-line' />}
+                  onClick={() => setDeleteDialogOpen(true)}
+                  disabled={isDeleting}
+                >
+                  Delete
                 </Button>
               )}
             </div>
@@ -889,6 +927,16 @@ const TripView = ({ tripData }: { tripData: any }) => {
           )}
         </CardContent>
       </Card>
+
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        setOpen={setDeleteDialogOpen}
+        title={`Delete trip ${tripData.tripNumber}?`}
+        description='This action cannot be undone.'
+        confirmButtonText='Yes, Delete Trip'
+        isDeleting={isDeleting}
+        onConfirm={handleConfirmDelete}
+      />
     </>
   )
 }
