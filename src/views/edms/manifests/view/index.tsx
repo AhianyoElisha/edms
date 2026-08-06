@@ -308,6 +308,24 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
             <div className='flex flex-wrap gap-2'>
               {!isDelivered && (
                 <>
+                  {/* Proof of delivery is photo-only: take one now, or pick one already
+                      on the device. Documents/PDFs are deliberately not accepted. */}
+                  <Button
+                    variant='contained'
+                    size='small'
+                    component='label'
+                    startIcon={uploading ? <CircularProgress size={16} /> : <i className='ri-camera-line' />}
+                    disabled={uploading}
+                  >
+                    {manifestData.proofOfDeliveryImage ? 'Retake' : 'Take'} Photo
+                    <input
+                      type='file'
+                      hidden
+                      accept='image/*'
+                      capture='environment'
+                      onChange={handleImageUpload}
+                    />
+                  </Button>
                   <Button
                     variant='outlined'
                     size='small'
@@ -315,11 +333,11 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                     startIcon={uploading ? <CircularProgress size={16} /> : <i className='ri-image-add-line' />}
                     disabled={uploading}
                   >
-                    {manifestData.proofOfDeliveryImage ? 'Change' : 'Upload'} Proof
+                    Choose Photo
                     <input
                       type='file'
                       hidden
-                      accept='image/*'
+                      accept='image/png,image/jpeg,image/jpg,image/webp,image/heic,image/heif'
                       onChange={handleImageUpload}
                     />
                   </Button>

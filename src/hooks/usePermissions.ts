@@ -119,13 +119,22 @@ export function usePermissions() {
     return perms.every(p => permissions.includes(p))
   }, [user, permissions])
 
+  const isAdmin = user?.role?.name === 'admin'
+  const isDriver = user?.role?.name?.toLowerCase() === 'driver'
+
+  // Trip pricing, rates, profit and revenue are back-office figures. Field roles
+  // (drivers, pickup/delivery agents) must never see them.
+  const canViewFinancials = !isDriver && hasAnyPermission(['ratecards.view', 'reports.revenue', 'trips.manage'])
+
   return {
     permissions,
     isLoading,
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
-    isAdmin: user?.role?.name === 'admin',
+    isAdmin,
+    isDriver,
+    canViewFinancials,
     user
   }
 }

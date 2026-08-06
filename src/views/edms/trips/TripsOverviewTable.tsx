@@ -118,10 +118,7 @@ const TripsOverviewTable = () => {
   const setDateTo = useCallback((value: Dayjs | null) => updateParam('dateTo', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
 
   // Permissions
-  const { hasPermission, user } = usePermissions()
-
-  // Drivers only see the trips assigned to them (trip.driver === their user id)
-  const isDriver = user?.role?.name?.toLowerCase() === 'driver'
+  const { hasPermission, canViewFinancials, isDriver, user } = usePermissions()
 
   // Only admins hold the trips.delete permission
   const canDelete = hasPermission('trips.delete')
@@ -206,14 +203,16 @@ const TripsOverviewTable = () => {
     { header: 'Vehicle', accessor: (row: TripType) => row.vehicle?.vehicleNumber || 'N/A', width: 22, excelWidth: 15 },
     { header: 'Route', accessor: (row: TripType) => row.route?.routeName || 'N/A', width: 30, excelWidth: 20 },
     { header: 'Tonnage', accessor: (row: TripType) => row.tonnage ? `${row.tonnage} tons` : '-', align: 'right', width: 18, excelWidth: 12 },
-    { header: 'Price (GH₵)', accessor: (row: TripType) => row.tripCost ? `GH₵ ${Number(row.tripCost).toFixed(2)}` : '-', align: 'right', width: 22, excelWidth: 15 },
+    ...(canViewFinancials ? [{ header: 'Price (GH₵)', accessor: (row: TripType) => row.tripCost ? `GH₵ ${Number(row.tripCost).toFixed(2)}` : '-', align: 'right' as const, width: 22, excelWidth: 15 }] : []),
     { header: 'Status', accessor: (row: TripType) => row.status?.replace('_', ' ') || '', width: 20, excelWidth: 15 }
-  ], [])
+  ], [canViewFinancials])
 
   const exportSummary: ExportSummary[] = useMemo(() => [
     { label: 'Total Trips', value: String(filteredTripData.length) },
-    { label: 'Total Revenue', value: `GH₵ ${filteredTripData.reduce((sum, t) => sum + (Number(t.tripCost) || 0), 0).toFixed(2)}` }
-  ], [filteredTripData])
+    ...(canViewFinancials
+      ? [{ label: 'Total Revenue', value: `GH₵ ${filteredTripData.reduce((sum, t) => sum + (Number(t.tripCost) || 0), 0).toFixed(2)}` }]
+      : [])
+  ], [filteredTripData, canViewFinancials])
 
 
   const columns = useMemo<ColumnDef<TripType, any>[]>(
@@ -288,14 +287,14 @@ const TripsOverviewTable = () => {
           </Typography>
         )
       }),
-      columnHelper.accessor('tripCost', {
+      ...(canViewFinancials ? [columnHelper.accessor('tripCost', {
         header: 'Price (GH₵)',
-        cell: ({ row }) => (
+        cell: ({ row }: any) => (
           <Typography color='text.primary' className='font-medium'>
             {row.original.tripCost ? `GH₵ ${Number(row.original.tripCost).toFixed(2)}` : '-'}
           </Typography>
         )
-      }),
+      })] : []),
       columnHelper.accessor('manifests', {
         header: 'Manifests',
         cell: ({ row }) => {
@@ -359,7 +358,7 @@ const TripsOverviewTable = () => {
         )
       })
     ],
-    [hasPermission, canDelete, openDeleteDialog]
+    [hasPermission, canDelete, canViewFinancials, openDeleteDialog]
   )
 
   const table = useReactTable({

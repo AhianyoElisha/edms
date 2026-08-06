@@ -105,7 +105,7 @@ const TripView = ({ tripData }: { tripData: any }) => {
   const tabsRef = useRef<HTMLDivElement>(null)
 
   const router = useRouter()
-  const { hasPermission } = usePermissions()
+  const { hasPermission, canViewFinancials } = usePermissions()
 
   const handleConfirmDelete = async (deletedBy: string) => {
     try {
@@ -491,7 +491,7 @@ const TripView = ({ tripData }: { tripData: any }) => {
               </Grid>
 
               {/* Financial Information */}
-              {(tripData.clientRate || tripData.driverRate || tripData.profit || tripData.invoiceAmount) && (
+              {canViewFinancials && (tripData.clientRate || tripData.driverRate || tripData.profit || tripData.invoiceAmount) && (
                 <>
                   <Grid item xs={12}>
                     <Divider />
