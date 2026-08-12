@@ -13,6 +13,8 @@ interface PermissionGuardProps {
   permission?: string
   permissions?: string[]
   requireAll?: boolean
+  // Restrict access to the admin role regardless of granted permissions
+  adminOnly?: boolean
   fallback?: React.ReactNode
 }
 
@@ -37,8 +39,15 @@ const DefaultFallback = () => {
   )
 }
 
-const PermissionGuard = ({ children, permission, permissions, requireAll = false, fallback }: PermissionGuardProps) => {
-  const { hasPermission, hasAnyPermission, hasAllPermissions, isLoading } = usePermissions()
+const PermissionGuard = ({
+  children,
+  permission,
+  permissions,
+  requireAll = false,
+  adminOnly = false,
+  fallback
+}: PermissionGuardProps) => {
+  const { hasPermission, hasAnyPermission, hasAllPermissions, isAdmin, isLoading } = usePermissions()
 
   if (isLoading) {
     return (
@@ -46,6 +55,10 @@ const PermissionGuard = ({ children, permission, permissions, requireAll = false
         <CircularProgress />
       </div>
     )
+  }
+
+  if (adminOnly && !isAdmin) {
+    return fallback ? <>{fallback}</> : <DefaultFallback />
   }
 
   let hasAccess = false

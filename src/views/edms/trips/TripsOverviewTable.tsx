@@ -118,7 +118,7 @@ const TripsOverviewTable = () => {
   const setDateTo = useCallback((value: Dayjs | null) => updateParam('dateTo', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
 
   // Permissions
-  const { hasPermission, canViewFinancials, isDriver, user } = usePermissions()
+  const { hasPermission, canViewFinancials, isDriver, isAdmin, user } = usePermissions()
 
   // Only admins hold the trips.delete permission
   const canDelete = hasPermission('trips.delete')
@@ -338,7 +338,7 @@ const TripsOverviewTable = () => {
                   href: `/edms/trips/${row.original.$id}/add-manifests`,
                   linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' }
                 }] : []),
-                ...(hasPermission('trips.edit') ? [{
+                ...(isAdmin ? [{
                   text: 'Edit',
                   icon: 'ri-edit-box-line',
                   href: `/edms/trips/${row.original.$id}/edit`,
@@ -358,7 +358,7 @@ const TripsOverviewTable = () => {
         )
       })
     ],
-    [hasPermission, canDelete, canViewFinancials, openDeleteDialog]
+    [hasPermission, canDelete, canViewFinancials, isAdmin, openDeleteDialog]
   )
 
   const table = useReactTable({

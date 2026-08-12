@@ -105,7 +105,7 @@ const TripView = ({ tripData }: { tripData: any }) => {
   const tabsRef = useRef<HTMLDivElement>(null)
 
   const router = useRouter()
-  const { hasPermission, canViewFinancials } = usePermissions()
+  const { hasPermission, canViewFinancials, isAdmin } = usePermissions()
 
   const handleConfirmDelete = async (deletedBy: string) => {
     try {
@@ -262,11 +262,12 @@ const TripView = ({ tripData }: { tripData: any }) => {
               >
                 Print
               </Button>
-              {hasPermission('trips.edit') && (
+              {isAdmin && (
                 <Button
                   variant='contained'
                   size='small'
                   startIcon={<i className='ri-edit-line' />}
+                  onClick={() => router.push(`/edms/trips/${tripData.$id}/edit`)}
                 >
                   Edit
                 </Button>

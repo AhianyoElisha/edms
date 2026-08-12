@@ -289,6 +289,198 @@ export async function addManifestsToTrip(tripId: string, manifests: TripWizardDa
 }
 
 /**
+ * Update an existing trip and reconcile its manifests.
+ *
+ * The edit wizard submits the full desired state of the trip:
+ * - manifests carrying a `$id` are existing manifests to update
+ * - manifests without a `$id` are new manifests to create
+ * - existing manifests missing from the payload are deleted
+ *
+ * Manifests that already have delivery progress are protected: they cannot be
+ * deleted, and the route cannot be swapped out from under them.
+ */
+export async function updateTripWithManifests(
+  tripId: string,
+  wizardData: TripWizardData
+): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    const { tripDetails, manifests } = wizardData
+
+    const trip = await getTripById(tripId)
+
+    if (!trip) {
+      return { success: false, error: 'Trip not found' }
+    }
+
+    const existingManifests: any[] = trip.manifests || []
+    const hasProgress = (m: any) =>
+      m.status === 'delivered' || m.status === 'completed' || (m.deliveredCount || 0) > 0
+
+    // Guard 1: the route may not change while a manifest is already in progress,
+    // because manifests are pinned to dropoff locations belonging to that route.
+    const currentRouteId = typeof trip.route === 'object' ? trip.route?.$id : trip.route
+    if (currentRouteId && currentRouteId !== tripDetails.routeId && existingManifests.some(hasProgress)) {
+      return {
+        success: false,
+        error: 'The route cannot be changed because one or more manifests have already been delivered.'
+      }
+    }
+
+    // Guard 2: manifests with delivery progress may not be removed.
+    const submittedIds = new Set(manifests.map(m => m.$id).filter(Boolean) as string[])
+    const toDelete = existingManifests.filter(m => !submittedIds.has(m.$id))
+    const protectedDeletions = toDelete.filter(hasProgress)
+
+    if (protectedDeletions.length > 0) {
+      return {
+        success: false,
+        error: `Cannot remove manifest(s) ${protectedDeletions
+          .map(m => m.manifestNumber)
+          .join(', ')} because they have already been delivered.`
+      }
+    }
+
+    const manifestDate = new Date(tripDetails.startTime).toISOString()
+
+    // Step 1: delete manifests the user removed
+    for (const manifest of toDelete) {
+      await databases.deleteDocument(appwriteConfig.database, appwriteConfig.manifests, manifest.$id)
+    }
+
+    // Step 2: update existing manifests and create new ones, keeping the
+    // submitted order as the dropoff sequence
+    const manifestIdByTempId = new Map<string, string>()
+
+    for (let index = 0; index < manifests.length; index++) {
+      const manifestData = manifests[index]
+
+      if (manifestData.$id) {
+        const existing = existingManifests.find(m => m.$id === manifestData.$id)
+
+        // Delivered manifests are locked in the UI; only re-sequence them here
+        // so the checkpoint order stays consistent.
+        const updatePayload = existing && hasProgress(existing)
+          ? { dropoffSequence: index + 1 }
+          : {
+              manifestNumber: manifestData.manifestNumber,
+              dropofflocation: manifestData.dropoffLocationId,
+              dropoffSequence: index + 1,
+              manifestDate,
+              packageSize: manifestData.packageSize,
+              packageCount: manifestData.packageCount,
+              estimatedArrival: manifestData.estimatedArrival || null,
+              notes: manifestData.notes || ''
+            }
+
+        await databases.updateDocument(
+          appwriteConfig.database,
+          appwriteConfig.manifests,
+          manifestData.$id,
+          updatePayload
+        )
+
+        manifestIdByTempId.set(manifestData.tempId, manifestData.$id)
+      } else {
+        const manifest = await databases.createDocument(
+          appwriteConfig.database,
+          appwriteConfig.manifests,
+          ID.unique(),
+          {
+            manifestNumber: manifestData.manifestNumber,
+            trip: tripId,
+            dropofflocation: manifestData.dropoffLocationId,
+            dropoffSequence: index + 1,
+            manifestDate,
+            packageSize: manifestData.packageSize,
+            packageCount: manifestData.packageCount,
+            deliveredCount: 0,
+            status: 'pending',
+            notes: manifestData.notes || '',
+            arrivalTime: null,
+            deliveryTime: null,
+            estimatedArrival: manifestData.estimatedArrival || null,
+            manifestImage: null,
+            proofOfDeliveryImage: null,
+            deliveryGpsCoordinates: null,
+            deliveryGpsVerified: false,
+            gpsVerificationDistance: null,
+            deliveredPackages: 0
+          }
+        )
+
+        manifestIdByTempId.set(manifestData.tempId, manifest.$id)
+      }
+    }
+
+    // Step 3: rebuild checkpoints, preserving the progress already recorded
+    // against manifests that survived the edit
+    const previousCheckpoints: any[] = (() => {
+      try {
+        return trip.checkpoints ? JSON.parse(trip.checkpoints) : []
+      } catch {
+        return []
+      }
+    })()
+
+    const checkpoints = manifests.map((manifest, index) => {
+      const manifestId = manifestIdByTempId.get(manifest.tempId) || ''
+      const previous = previousCheckpoints.find((c: any) => c.manifestId && c.manifestId === manifestId)
+
+      return {
+        dropoffLocationId: manifest.dropoffLocationId,
+        dropoffLocationName: manifest.dropoffLocationName,
+        manifestId,
+        manifestNumber: manifest.manifestNumber,
+        packageSize: manifest.packageSize,
+        sequence: index + 1,
+        status: previous?.status || 'pending',
+        arrivalTime: previous?.arrivalTime ?? null,
+        completionTime: previous?.completionTime ?? null,
+        gpsCoordinates: previous?.gpsCoordinates ?? null,
+        gpsVerified: previous?.gpsVerified ?? false,
+        packagesDelivered: previous?.packagesDelivered ?? 0,
+        packagesMissing: previous?.packagesMissing ?? 0
+      }
+    })
+
+    // Step 4: update the trip itself. Status is only nudged between the two
+    // "not started" states - an in-progress or completed trip keeps its status.
+    let status = trip.status
+
+    if (trip.status === 'awaiting_manifests' && manifests.length > 0) {
+      status = 'planned'
+    } else if (trip.status === 'planned' && manifests.length === 0) {
+      status = 'awaiting_manifests'
+    }
+
+    await databases.updateDocument(appwriteConfig.database, appwriteConfig.trips, tripId, {
+      vehicle: tripDetails.vehicleId,
+      driver: tripDetails.driverId,
+      route: tripDetails.routeId,
+      tripDate: new Date(tripDetails.startTime).toISOString(),
+      startTime: new Date(tripDetails.startTime).toISOString(),
+      status,
+      notes: tripDetails.notes || '',
+      totalPackages: manifests.reduce((sum, m) => sum + m.packageCount, 0),
+      tonnage: tripDetails.tonnage || null,
+      tripCost: tripDetails.tripCost || 0,
+      checkpoints: JSON.stringify(checkpoints)
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error updating trip with manifests:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update trip'
+    }
+  }
+}
+
+/**
  * Generate unique trip number
  */
 async function generateTripNumber(): Promise<string> {

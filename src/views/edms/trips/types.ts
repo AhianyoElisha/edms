@@ -17,6 +17,13 @@ export interface TripDetailsData {
 // Each manifest holds ONE type of package size (small, medium, or big)
 export interface ManifestData {
   tempId: string
+  // Present only when the manifest already exists in the database (edit flow).
+  // New manifests added while editing leave this undefined.
+  $id?: string
+  // Current delivery state, carried through the edit wizard so already-delivered
+  // manifests can be locked from edits/removal.
+  status?: string
+  deliveredCount?: number
   dropoffLocationId: string
   dropoffLocationName: string
   dropoffAddress: string

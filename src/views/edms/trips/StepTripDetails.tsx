@@ -37,7 +37,12 @@ interface DriverUser {
   email: string
 }
 
-const StepTripDetails = ({ handleNext, wizardData, updateWizardData }: WizardStepProps) => {
+const StepTripDetails = ({
+  handleNext,
+  wizardData,
+  updateWizardData,
+  nextLabel = 'Next: Add Manifests'
+}: WizardStepProps & { nextLabel?: string }) => {
   // States
   const [drivers, setDrivers] = useState<DriverUser[]>([])
   const [vehicles, setVehicles] = useState<VehicleType[]>([])
@@ -147,11 +152,13 @@ const StepTripDetails = ({ handleNext, wizardData, updateWizardData }: WizardSte
     updateWizardData({
       tripDetails: {
         driverId,
-        driverName: driver?.name || '',
+        // Fall back to the name already on the wizard data: when editing a trip
+        // whose vehicle/route has since been deactivated it won't be in the lists
+        driverName: driver?.name || wizardData.tripDetails.driverName || '',
         vehicleId,
-        vehicleNumber: vehicle?.vehicleNumber || '',
+        vehicleNumber: vehicle?.vehicleNumber || wizardData.tripDetails.vehicleNumber || '',
         routeId,
-        routeName: route?.routeName || '',
+        routeName: route?.routeName || wizardData.tripDetails.routeName || '',
         startTime,
         tonnage,
         tripCost: tripCost || 0,
@@ -379,7 +386,7 @@ const StepTripDetails = ({ handleNext, wizardData, updateWizardData }: WizardSte
               Previous
             </Button>
             <Button variant='contained' onClick={handleSubmit}>
-              Next: Add Manifests
+              {nextLabel}
             </Button>
           </div>
         </Grid>
