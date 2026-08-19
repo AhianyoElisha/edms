@@ -42,7 +42,7 @@ const StepEditReview = ({ handlePrev, wizardData, tripData }: WizardStepProps & 
   const newManifests = manifests.filter(m => !m.$id)
   const keptManifests = manifests.filter(m => m.$id)
 
-  const getTotalPackages = () => manifests.reduce((sum, m) => sum + m.packageCount, 0)
+  const getTotalPackages = () => manifests.reduce((sum, m) => sum + (m.packageCount || 0), 0)
 
   const handleSubmit = async () => {
     try {
@@ -205,22 +205,28 @@ const StepEditReview = ({ handlePrev, wizardData, tripData }: WizardStepProps & 
                         </TableCell>
                         <TableCell>{manifest.dropoffLocationName || '-'}</TableCell>
                         <TableCell>
-                          <Chip
-                            label={manifest.packageSize.charAt(0).toUpperCase() + manifest.packageSize.slice(1)}
-                            size='small'
-                            color={
-                              manifest.packageSize === 'small'
-                                ? 'success'
-                                : manifest.packageSize === 'medium'
-                                  ? 'warning'
-                                  : 'error'
-                            }
-                            variant='tonal'
-                          />
+                          {/* A manifest the driver captured in the field carries no size
+                              until the office reviews it. */}
+                          {manifest.packageSize ? (
+                            <Chip
+                              label={manifest.packageSize.charAt(0).toUpperCase() + manifest.packageSize.slice(1)}
+                              size='small'
+                              color={
+                                manifest.packageSize === 'small'
+                                  ? 'success'
+                                  : manifest.packageSize === 'medium'
+                                    ? 'warning'
+                                    : 'error'
+                              }
+                              variant='tonal'
+                            />
+                          ) : (
+                            <Chip label='Pending review' size='small' color='warning' variant='tonal' />
+                          )}
                         </TableCell>
                         <TableCell>
                           <Typography variant='body1' className='font-semibold'>
-                            {manifest.packageCount}
+                            {manifest.packageCount || '—'}
                           </Typography>
                         </TableCell>
                         <TableCell>{manifest.estimatedArrival || '-'}</TableCell>
@@ -257,7 +263,7 @@ const StepEditReview = ({ handlePrev, wizardData, tripData }: WizardStepProps & 
                 {removedManifests.map((manifest: any) => (
                   <Chip
                     key={manifest.$id}
-                    label={`${manifest.manifestNumber} (${manifest.packageCount} ${manifest.packageSize})`}
+                    label={`${manifest.manifestNumber} (${manifest.packageSize ? `${manifest.packageCount} ${manifest.packageSize}` : 'pending review'})`}
                     color='error'
                     variant='tonal'
                   />
