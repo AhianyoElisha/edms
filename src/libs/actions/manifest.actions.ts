@@ -643,14 +643,24 @@ export const markManifestAsDelivered = async (
     
     // Get package counts from manifest (new schema)
     const packageCount = existingManifest.packageCount || 0
-    const deliveredCount = existingManifest.deliveredCount || 0
-    const missingCount = packageCount - deliveredCount
-    
+
+    // Drivers are no longer asked to tally packages before submitting. When an
+    // admin planned the manifest with a package count and the driver did not
+    // report a shortfall, treat the whole manifest as delivered; if the driver
+    // did enter a count, that figure stands.
+    const reportedCount = existingManifest.deliveredCount || 0
+    const deliveredCount = reportedCount > 0 ? reportedCount : packageCount
+    const missingCount = Math.max(0, packageCount - deliveredCount)
+
     // Build update object with all delivery tracking fields
-    const updateData: Record<string, string> = {
+    const updateData: Record<string, string | number> = {
       status: 'delivered',
       deliveryTime: now,
       arrivalTime: now // Mark arrival time as well
+    }
+
+    if (deliveredCount !== reportedCount) {
+      updateData.deliveredCount = deliveredCount
     }
     
     // Update manifest
@@ -817,5 +827,269 @@ export const getManifestPackageStats = async (manifestId: string): Promise<{
   } catch (error) {
     console.error('Error fetching manifest package stats:', error)
     throw new Error('Failed to fetch manifest package statistics')
+  }
+}
+/* -------------------------------------------------------------------------- */
+/*  Field capture (driver) + back-office verification (admin)                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Generate a placeholder manifest number for a manifest captured in the field.
+ * The driver does not read the number off the paper - the admin enters the real
+ * one during verification - so we mint a traceable stand-in.
+ */
+const generateFieldManifestNumber = (): string => {
+  const now = new Date()
+  const stamp = [
+    now.getFullYear().toString().slice(-2),
+    (now.getMonth() + 1).toString().padStart(2, '0'),
+    now.getDate().toString().padStart(2, '0')
+  ].join('')
+
+  return `MF-F${stamp}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`
+}
+
+/**
+ * A manifest still waiting on the back office is one the driver captured in the
+ * field: it was never verified and carries no package figures.
+ */
+export const isManifestAwaitingVerification = (manifest: any): boolean =>
+  manifest?.detailsVerified !== true && (!manifest?.packageSize || !manifest?.packageCount)
+
+/**
+ * Log a delivery from the field in a single step.
+ *
+ * The driver picks the stop and takes one photo of the signed manifest; that
+ * photo both creates the manifest and closes it out as delivered. Package size,
+ * counts and the real manifest number are deliberately left blank - an admin
+ * fills them in later from the review queue, so paperwork never blocks the road.
+ */
+export const logManifestDelivery = async (params: {
+  tripId: string
+  dropoffLocationId: string
+  dropoffLocationName?: string
+  dropoffSequence?: number
+  photoUrl: string
+  gpsCoordinates?: string
+  notes?: string
+}): Promise<ManifestType> => {
+  const {
+    tripId,
+    dropoffLocationId,
+    dropoffLocationName = '',
+    dropoffSequence,
+    photoUrl,
+    gpsCoordinates,
+    notes
+  } = params
+
+  try {
+    const now = new Date().toISOString()
+    const manifestNumber = generateFieldManifestNumber()
+
+    const trip = (await databases.getDocument(DATABASE_ID, appwriteConfig.trips, tripId)) as any
+
+    // Fall back to appending after the existing checkpoints when the caller did
+    // not tell us where this stop sits in the route.
+    const existingCheckpoints = trip.checkpoints ? JSON.parse(trip.checkpoints) : []
+    const sequence = dropoffSequence ?? existingCheckpoints.length + 1
+
+    const manifest = (await databases.createDocument(
+      DATABASE_ID,
+      MANIFESTS_COLLECTION_ID,
+      ID.unique(),
+      {
+        manifestNumber,
+        trip: tripId,
+        dropofflocation: dropoffLocationId,
+        dropoffSequence: sequence,
+        manifestDate: trip.tripDate || now,
+        // Figures are unknown in the field - the admin supplies them on review.
+        packageSize: null,
+        packageCount: 0,
+        deliveredCount: 0,
+        status: 'delivered',
+        notes: notes || '',
+        arrivalTime: now,
+        deliveryTime: now,
+        // The same shot serves as the manifest document and the delivery proof.
+        manifestImage: photoUrl,
+        proofOfDeliveryImage: photoUrl,
+        deliveryGpsCoordinates: gpsCoordinates || null,
+        deliveryGpsVerified: false,
+        detailsVerified: false
+      }
+    )) as any
+
+    // Record the stop on the trip so checkpoints and the route view stay in sync.
+    const checkpointIndex = existingCheckpoints.findIndex(
+      (cp: any) => cp.dropoffLocationId === dropoffLocationId && !cp.manifestId
+    )
+
+    const checkpoint = {
+      dropoffLocationId,
+      dropoffLocationName,
+      manifestId: manifest.$id,
+      manifestNumber,
+      packageSize: null,
+      sequence,
+      status: 'completed',
+      arrivalTime: now,
+      completionTime: now,
+      gpsCoordinates: gpsCoordinates || null,
+      gpsVerified: false,
+      packagesDelivered: 0,
+      packagesMissing: 0
+    }
+
+    if (checkpointIndex !== -1) {
+      existingCheckpoints[checkpointIndex] = { ...existingCheckpoints[checkpointIndex], ...checkpoint }
+    } else {
+      existingCheckpoints.push(checkpoint)
+    }
+
+    const tripUpdate: Record<string, unknown> = {
+      checkpoints: JSON.stringify(existingCheckpoints),
+      currentCheckpoint: existingCheckpoints.filter((cp: any) => cp.status === 'completed').length
+    }
+
+    await databases.updateDocument(DATABASE_ID, appwriteConfig.trips, tripId, tripUpdate)
+
+    // Move the trip off 'awaiting_manifests' and complete it once every stop is covered.
+    try {
+      const { checkAndUpdateTripStatus } = await import('./trip.actions')
+
+      await checkAndUpdateTripStatus(tripId)
+    } catch (error) {
+      console.warn('Could not update trip status after field capture:', error)
+    }
+
+    return manifest as unknown as ManifestType
+  } catch (error) {
+    console.error('Error logging manifest delivery:', error)
+    throw new Error('Failed to log delivery. Please try again.')
+  }
+}
+
+/**
+ * Fill in the details a driver could not capture in the field and mark the
+ * manifest verified. Keeps the trip checkpoint figures in step.
+ */
+export const verifyManifestDetails = async (
+  manifestId: string,
+  details: {
+    manifestNumber?: string
+    packageSize?: string | null
+    packageCount?: number
+    deliveredCount?: number
+    notes?: string
+  },
+  verifiedBy?: string
+): Promise<ManifestType> => {
+  try {
+    const packageCount = details.packageCount ?? 0
+    const deliveredCount = Math.min(Math.max(0, details.deliveredCount ?? packageCount), packageCount)
+
+    // Appwrite's updateDocument response does NOT carry the `trip` relationship, so the
+    // trip id has to be read from the stored document first. Taking it off the update
+    // response instead leaves it undefined, which skipped the whole checkpoint/totals
+    // sync below without raising anything - the admin got a success toast while the
+    // trip kept the driver's temporary manifest number and a zero package total.
+    const stored = (await databases.getDocument(DATABASE_ID, MANIFESTS_COLLECTION_ID, manifestId)) as any
+
+    const updateData: Record<string, unknown> = {
+      packageSize: details.packageSize || null,
+      packageCount,
+      deliveredCount,
+      detailsVerified: true,
+      verifiedAt: new Date().toISOString()
+    }
+
+    if (details.manifestNumber) updateData.manifestNumber = details.manifestNumber
+    if (details.notes !== undefined) updateData.notes = details.notes
+    if (verifiedBy) updateData.verifiedBy = verifiedBy
+
+    const manifest = (await databases.updateDocument(
+      DATABASE_ID,
+      MANIFESTS_COLLECTION_ID,
+      manifestId,
+      updateData
+    )) as any
+
+    // Push the confirmed figures onto the trip checkpoint.
+    const tripId = stored.trip
+
+    if (!tripId) {
+      console.warn(`Manifest ${manifestId} has no trip relationship; skipping checkpoint sync`)
+    }
+
+    if (tripId) {
+      const tripIdStr = typeof tripId === 'string' ? tripId : tripId.$id
+
+      try {
+        const trip = (await databases.getDocument(DATABASE_ID, appwriteConfig.trips, tripIdStr)) as any
+
+        if (trip.checkpoints) {
+          const checkpoints = JSON.parse(trip.checkpoints)
+          const index = checkpoints.findIndex((cp: any) => cp.manifestId === manifestId)
+
+          if (index !== -1) {
+            checkpoints[index] = {
+              ...checkpoints[index],
+              manifestNumber: updateData.manifestNumber || checkpoints[index].manifestNumber,
+              packageSize: details.packageSize || null,
+              packagesDelivered: deliveredCount,
+              packagesMissing: Math.max(0, packageCount - deliveredCount)
+            }
+
+            await databases.updateDocument(DATABASE_ID, appwriteConfig.trips, tripIdStr, {
+              checkpoints: JSON.stringify(checkpoints)
+            })
+          }
+        }
+
+        // Keep the trip's headline package total in step with the verified figures.
+        const tripManifests = await databases.listDocuments(DATABASE_ID, MANIFESTS_COLLECTION_ID, [
+          Query.equal('trip', tripIdStr),
+          Query.limit(1000)
+        ])
+
+        const totalPackages = tripManifests.documents.reduce(
+          (sum: number, m: any) => sum + (m.packageCount || 0),
+          0
+        )
+
+        await databases.updateDocument(DATABASE_ID, appwriteConfig.trips, tripIdStr, { totalPackages })
+      } catch (error) {
+        console.warn('Could not sync trip after verification:', error)
+      }
+    }
+
+    return manifest as unknown as ManifestType
+  } catch (error) {
+    console.error('Error verifying manifest details:', error)
+    throw new Error('Failed to save manifest details')
+  }
+}
+
+/**
+ * Every manifest waiting on the back office to supply its figures, newest first.
+ *
+ * Manifests predating the detailsVerified attribute default to false, so we also
+ * require the package figures to be missing before flagging one for review.
+ */
+export const getManifestsAwaitingVerification = async (): Promise<any[]> => {
+  try {
+    const response = await tablesDB.listRows(DATABASE_ID, MANIFESTS_COLLECTION_ID, [
+      Query.equal('detailsVerified', false),
+      Query.orderDesc('$createdAt'),
+      Query.select(['*', 'trip.*', 'trip.driver.*', 'trip.vehicle.*', 'dropofflocation.*']),
+      Query.limit(500)
+    ])
+
+    return (response.rows as any[]).filter(isManifestAwaitingVerification)
+  } catch (error) {
+    console.error('Error fetching manifests awaiting verification:', error)
+    throw new Error('Failed to fetch manifests awaiting verification')
   }
 }

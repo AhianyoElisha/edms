@@ -344,10 +344,19 @@ export interface ManifestType {
   dropoffSequence: number // order in route
   manifestDate: string
   
-  // NEW: Package tracking by head count - each manifest holds ONE package size type
-  packageSize: PackageSizeType // 'small' | 'medium' | 'big' - the type of packages in this manifest
-  packageCount: number // total head count of packages in this manifest
-  deliveredCount: number // number of packages successfully delivered
+  // Package tracking by head count - each manifest holds ONE package size type.
+  // These are optional at creation time: a driver logging a delivery in the field
+  // captures only a photo, and an admin fills the counts in afterwards.
+  packageSize?: PackageSizeType | null // 'small' | 'medium' | 'big' - the type of packages in this manifest
+  packageCount?: number // total head count of packages in this manifest
+  deliveredCount?: number // number of packages successfully delivered
+
+  // Back-office verification. Manifests captured by a driver in the field land with
+  // detailsVerified = false and no counts; an admin reviews the manifest photo later,
+  // enters the real figures and marks the manifest verified.
+  detailsVerified?: boolean
+  verifiedAt?: string | null
+  verifiedBy?: string | null
   
   status: ManifestStatusType
   manifestImage?: string | null // uploaded manifest photo

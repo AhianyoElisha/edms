@@ -31,7 +31,7 @@ export async function createTripWithManifests(wizardData: TripWizardData): Promi
     const tripNumber = await generateTripNumber()
 
     // Calculate total packages across all manifests
-    const totalPackages = manifests.reduce((sum, m) => sum + m.packageCount, 0)
+    const totalPackages = manifests.reduce((sum, m) => sum + (m.packageCount || 0), 0)
 
     // Determine initial status based on whether manifests are provided
     const initialStatus = manifests.length === 0 ? 'awaiting_manifests' : 'planned'
@@ -212,7 +212,7 @@ export async function addManifestsToTrip(tripId: string, manifests: TripWizardDa
     const manifestMap = new Map<string, string>()
 
     // Calculate total packages
-    const totalPackages = manifests.reduce((sum, m) => sum + m.packageCount, 0)
+    const totalPackages = manifests.reduce((sum, m) => sum + (m.packageCount || 0), 0)
 
     // Create manifest documents
     for (const manifestData of manifests) {
@@ -464,7 +464,7 @@ export async function updateTripWithManifests(
       startTime: new Date(tripDetails.startTime).toISOString(),
       status,
       notes: tripDetails.notes || '',
-      totalPackages: manifests.reduce((sum, m) => sum + m.packageCount, 0),
+      totalPackages: manifests.reduce((sum, m) => sum + (m.packageCount || 0), 0),
       tonnage: tripDetails.tonnage || null,
       tripCost: tripDetails.tripCost || 0,
       checkpoints: JSON.stringify(checkpoints)
@@ -665,6 +665,33 @@ export async function deleteTrip(tripId: string, deletedBy: string): Promise<{
 }
 
 /**
+ * How many dropoff stops a route has: every intermediate stop plus the final
+ * destination. Used to tell a trip that is genuinely finished from one whose
+ * driver has only logged the first stop so far.
+ *
+ * The trip's own `route` relationship is fetched one level deep, so it carries no
+ * intermediate stops - we go back to the route for them. Returns null when the
+ * count cannot be established, and callers then decline to auto-complete rather
+ * than risk closing a trip mid-route.
+ */
+async function countRouteDropoffStops(route: any): Promise<number | null> {
+  const routeId = typeof route === 'object' && route !== null ? route.$id : route
+
+  if (!routeId) return null
+
+  try {
+    const { getRouteDropoffLocations } = await import('./route.actions')
+    const stops = await getRouteDropoffLocations(routeId)
+
+    return stops.length || null
+  } catch (error) {
+    console.warn('Could not count route dropoff stops:', error)
+
+    return null
+  }
+}
+
+/**
  * Check and update trip status based on manifest progress
  * Status flow:
  * - awaiting_manifests: Trip created without manifests
@@ -715,16 +742,50 @@ export async function checkAndUpdateTripStatus(tripId: string): Promise<{
       // Continue without return waybill check
     }
     
+    // Trips whose manifests were captured in the field start life with no
+    // manifests at all, so "every manifest is delivered" is trivially true after
+    // the very first stop. For those we require every dropoff stop on the route
+    // to be covered before calling the trip done.
+    // Note the package figures in the test: Appwrite backfills detailsVerified = false
+    // on every manifest that predates the attribute, and admin-created manifests are
+    // not verified either. Only a manifest with no figures at all came from the field,
+    // and gating on detailsVerified alone would stop ordinary trips auto-completing
+    // whenever they serve fewer stops than their route lists.
+    const hasFieldCapturedManifest = manifests.some(
+      (m: any) => m.detailsVerified !== true && (!m.packageSize || !m.packageCount)
+    )
+
+    let allStopsCovered = true
+
+    if (hasFieldCapturedManifest) {
+      const routeStopCount = await countRouteDropoffStops(trip.route)
+      const coveredStops = new Set(
+        manifests
+          .filter((m: any) => m.status === 'delivered' || m.status === 'completed')
+          .map((m: any) =>
+            typeof m.dropofflocation === 'object' && m.dropofflocation !== null
+              ? m.dropofflocation.$id
+              : m.dropofflocation
+          )
+          .filter(Boolean)
+      )
+
+      allStopsCovered = routeStopCount !== null && coveredStops.size >= routeStopCount
+    }
+
     // Determine new status
     let newStatus: string | null = null
     
-    if (currentStatus === 'planned' && hasStartedManifest) {
-      // Move to in_progress when first manifest is started
+    if ((currentStatus === 'planned' || currentStatus === 'awaiting_manifests') && hasStartedManifest) {
+      // Move to in_progress when the first manifest is started, including trips
+      // that were waiting on the driver to bring the paperwork in.
       newStatus = 'in_progress'
-    } else if (allManifestsDelivered && (!hasReturns || allReturnsDelivered)) {
+    }
+
+    if (allManifestsDelivered && (!hasReturns || allReturnsDelivered)) {
       // Move to completed only if ALL manifests are delivered
       // AND (no returns exist OR all returns are delivered)
-      if (currentStatus !== 'completed') {
+      if (currentStatus !== 'completed' && (!hasFieldCapturedManifest || allStopsCovered)) {
         newStatus = 'completed'
       }
     }
