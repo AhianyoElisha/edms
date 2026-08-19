@@ -92,7 +92,9 @@ export async function getUserPermissions(userId: string) {
         const rolePermissions = await databases.listDocuments(
           appwriteConfig.database,
           appwriteConfig.rolePermissions,
-          [Query.equal('role', user.role), Query.limit(40)]
+          // The driver role already carries 34 rows; a 40-row cap would silently
+          // drop permissions off the end as roles grow rather than failing loudly.
+          [Query.equal('role', user.role), Query.limit(200)]
         );
 
         

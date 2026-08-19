@@ -49,7 +49,7 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
-  const { hasPermission: hookHasPermission, hasAnyPermission: hookHasAnyPermission, isAdmin, isLoading: isLoadingPermissions } = usePermissions()
+  const { hasPermission: hookHasPermission, hasAnyPermission: hookHasAnyPermission, isAdmin, isDriver, isLoading: isLoadingPermissions } = usePermissions()
 
   // Navigation helper function
   const handleNavigation = (path: string) => {
@@ -141,6 +141,13 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
               <SubMenu label="Manifests" icon={<i className='ri-file-list-3-line' />}>
                 {hasAnyPermission(['manifests.view', 'manifests.manage']) && (
                   <MenuItem onClick={() => handleNavigation('/delivery/manifests')}>All Manifests</MenuItem>
+                )}
+                {/* Deliveries drivers logged in the field with a photo, still missing their package
+                    figures. Explicitly not for drivers: the driver role carries manifests.edit in
+                    the live rolePermissions data, and the whole point of the queue is that data
+                    entry is the office's job, not the driver's. */}
+                {!isDriver && hasAnyPermission(['manifests.edit', 'manifests.manage']) && (
+                  <MenuItem onClick={() => handleNavigation('/edms/manifests/review')}>Needs Review</MenuItem>
                 )}
                 {/* {hasAnyPermission(['manifests.view']) && (
                   <MenuItem onClick={() => handleNavigation('/delivery/manifests/active')}>Active Manifests</MenuItem>

@@ -52,7 +52,9 @@ export const FALLBACK_PERMISSIONS: Record<string, string[]> = {
   driver: [
     'dashboard.view',
     'packages.view',
-    'manifests.view', 'manifests.load', 'manifests.complete',
+    // Drivers log deliveries from the field, which creates the manifest from a
+    // single photo - the office fills in the figures afterwards.
+    'manifests.view', 'manifests.create', 'manifests.load', 'manifests.complete',
     'deliveries.view', 'deliveries.complete', 'deliveries.tracking', 'deliveries.proof',
     'trips.view', 'trips.tracking',
     'expenses.view', 'expenses.create',

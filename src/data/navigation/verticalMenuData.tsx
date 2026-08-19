@@ -234,7 +234,12 @@ const verticalMenuData = (dictionary: Awaited<ReturnType<typeof getDictionary>>)
           },
           {
             label: 'Manifests',
-            href: '/edms/manifests'
+            children: [
+              {
+                label: 'Needs Review',
+                href: '/edms/manifests/review'
+              }
+            ]
           },
           {
             label: 'Return Waybills',
