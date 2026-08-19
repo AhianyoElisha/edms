@@ -5,12 +5,44 @@
 
 const { Client, Databases, ID } = require('node-appwrite');
 
-// ⚠️ CONFIGURE THESE VALUES BEFORE RUNNING ⚠️
+// Configuration comes from the environment - never hard-code an API key here.
+// The key is read from APPWRITE_API_KEY, either exported in your shell or set in
+// .env.local (which is gitignored). A key committed to this file ends up in every
+// commit of the repo's history and has to be treated as compromised.
+//
+//   APPWRITE_API_KEY=standard_... node run-population.js
+//
+const fs = require('fs');
+const path = require('path');
+
+// Load .env.local if present, without overriding anything already in the environment.
+const loadEnvLocal = () => {
+  const envPath = path.join(__dirname, '.env.local');
+
+  if (!fs.existsSync(envPath)) return;
+
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const eq = trimmed.indexOf('=');
+
+    if (eq === -1) continue;
+
+    const key = trimmed.slice(0, eq).trim();
+
+    if (!(key in process.env)) process.env[key] = trimmed.slice(eq + 1).trim();
+  }
+};
+
+loadEnvLocal();
+
 const CONFIG = {
-  APPWRITE_ENDPOINT: 'https://cloud.appwrite.io/v1', // Replace with your endpoint
-  PROJECT_ID: '68c8989000381e194776', // Replace with your project ID
-  DATABASE_ID: '68d5e82e00304125c0ae', // Replace with your database ID
-  API_KEY: 'standard_d66eacaf9cc16d0614716c5e6d9451e1d17230bd5bdf343f6a1544e8ac79bff9238d57512830ea11a4ec4b2d5dd1d9d7962f8e8eb9c2fcff76c2d05d46fe61f6a789f81f7d6a4efb10c33c448640a4648289216fdd3001642375d7d053c76c1c56241a0b2c453d80f05941a7602ba5a9a51a72ddf0a843f4f90cc0cff3cdc194' // Replace with your API key (with database write permissions)
+  APPWRITE_ENDPOINT: process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1',
+  PROJECT_ID: process.env.NEXT_PUBLIC_APPWRITE_PROJECT,
+  DATABASE_ID: process.env.NEXT_PUBLIC_DATABASE_ID,
+  API_KEY: process.env.APPWRITE_API_KEY
 };
 
 // Initialize Appwrite
@@ -217,10 +249,15 @@ async function createRoles() {
 
 async function main() {
   // Validate configuration
-  if (CONFIG.PROJECT_ID === 'YOUR_PROJECT_ID' || 
-      CONFIG.DATABASE_ID === 'YOUR_DATABASE_ID' ||
-      CONFIG.API_KEY === 'YOUR_API_KEY') {
-    console.error('❌ Please configure the CONFIG object with your Appwrite details!');
+  const missing = [
+    ['NEXT_PUBLIC_APPWRITE_PROJECT', CONFIG.PROJECT_ID],
+    ['NEXT_PUBLIC_DATABASE_ID', CONFIG.DATABASE_ID],
+    ['APPWRITE_API_KEY', CONFIG.API_KEY]
+  ].filter(([, value]) => !value).map(([name]) => name);
+
+  if (missing.length) {
+    console.error(`❌ Missing required environment variable(s): ${missing.join(', ')}`);
+    console.error('   Set them in .env.local or export them before running this script.');
     process.exit(1);
   }
 
