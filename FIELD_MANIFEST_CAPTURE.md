@@ -1,0 +1,197 @@
+# Field Manifest Capture — Driver One-Touch Delivery Logging
+
+## The problem this solves
+
+Trucks are loaded at dawn. The admin isn't on the ground at that hour, so trips are
+created without manifests (`status: awaiting_manifests`) — the admin has no manifest
+details to enter yet. The drivers are the ones who physically receive the manifests,
+but the only route into the system was `/edms/trips/[id]/add-manifests`, which:
+
+- required `manifests.create` / `trips.edit` — permissions **drivers don't hold**, so
+  drivers could not use it at all;
+- demanded manifest number, package size, package count ≥ 1, estimated arrival and
+  notes for **every** manifest, and hard-blocked submit if any were missing;
+- and at delivery time, `ManifestView` refused to submit until the driver had also
+  opened "Update Count" and typed a delivered figure.
+
+Drivers were being asked to do the back office's data entry, standing at a dropoff.
+
+## The new flow
+
+**Driver — one touch, at the dropoff.**
+
+1. Opens the trip, taps **Log Delivery** (a green, thumb-sized target both in the
+   header and as a dedicated card).
+2. Picks the stop from the route's dropoff list — stops already logged are marked.
+3. Takes one photo of the signed manifest (camera-first, gallery as fallback).
+4. Submits.
+
+That single action creates the manifest **and** closes it out as `delivered`, with the
+photo stored as both `manifestImage` and `proofOfDeliveryImage`. No manifest number, no
+package size, no counts. The trip checkpoint is written and the trip status advances.
+
+**Admin — catches up later, never blocks the driver.**
+
+- `/edms/manifests/review` lists every field-captured manifest awaiting figures, newest
+  first, with the photo beside the fields. Filterable by trip, searchable by trip
+  number, driver, vehicle or stop.
+- The admin reads the paper off the photo, enters manifest number, package size, total
+  packages and (optionally) a delivered count, then hits **Save & Verify**.
+- Verifying syncs the trip checkpoint figures and recomputes the trip's `totalPackages`.
+- Trip detail pages show an amber banner with a direct link when any of their manifests
+  are awaiting review.
+
+## Appwrite schema changes — APPLIED 2026-08-19
+
+These were applied to the live **`manifests`** collection (`68e79442002f72bd0769`) and
+verified as `available`. Kept here as the record of what changed.
+
+### Add these attributes
+
+| Attribute         | Type     | Required | Default | Size |
+| ----------------- | -------- | -------- | ------- | ---- |
+| `detailsVerified` | boolean  | No       | `false` | —    |
+| `verifiedAt`      | datetime | No       | —       | —    |
+| `verifiedBy`      | string   | No       | —       | 200  |
+
+### Make these attributes optional
+
+Both are currently required, which would reject a manifest captured in the field:
+
+| Attribute      | Change                                     |
+| -------------- | ------------------------------------------ |
+| `packageSize`  | required → **optional** (nullable)         |
+| `packageCount` | required → **optional**, default `0`       |
+
+### Note on existing data — verified against the live database
+
+The concern was that Appwrite would backfill `detailsVerified = false` on documents
+predating the attribute and sweep every historical manifest into the review queue. It
+does **not**: all 638 existing manifests were left `null`, so the queue's server-side
+`Query.equal('detailsVerified', false)` returns none of them. Field-captured manifests
+set `detailsVerified: false` explicitly, so they still match.
+
+The queue applies a second condition anyway — `isManifestAwaitingVerification()` in
+`src/libs/actions/manifest.actions.ts` — which also requires the package figures to be
+missing. Both conditions were checked against all 638 rows: none has a falsy
+`packageCount` or a missing `packageSize`, so nothing historical is misread as
+field-captured, in the queue or in `checkAndUpdateTripStatus()`.
+
+Post-change verification: review queue returns **0** rows, as expected until a driver
+logs the first field delivery.
+
+## What changed in code
+
+**Actions** — `src/libs/actions/manifest.actions.ts`
+
+- `logManifestDelivery()` — creates + completes a manifest from a stop and a photo.
+- `verifyManifestDetails()` — admin fills the figures, marks verified, syncs checkpoint
+  and the trip's package total. The trip id is read from a fresh `getDocument`, **not**
+  from the `updateDocument` response: Appwrite omits the `trip` relationship from that
+  response, so taking it from there left `tripId` undefined and skipped the entire
+  checkpoint/totals sync without throwing — the admin saw a success toast while the trip
+  kept the driver's temporary manifest number and a zero package total. Caught in
+  end-to-end testing, 2026-08-19. `markManifestAsDelivered()` already guarded against
+  this (`existingManifest.trip || manifest.trip`); this function now follows suit.
+- `getManifestsAwaitingVerification()` — the review queue's data source.
+- `isManifestAwaitingVerification()` — the shared "needs review" predicate.
+- `markManifestAsDelivered()` — no longer requires a delivered count. Where the office
+  planned a package count and the driver reported no shortfall, the manifest is taken
+  as fully delivered.
+
+**Trip status** — `src/libs/actions/trip.actions.ts`
+
+- `awaiting_manifests` now advances to `in_progress` once the driver logs a stop.
+- Field-captured trips no longer auto-complete after the first stop. Because their
+  manifests appear one at a time, "all manifests delivered" is trivially true early on;
+  completion now also requires every dropoff stop on the route to be covered
+  (`countRouteDropoffStops()`). A manifest counts as field-captured only when it is
+  unverified **and** carries no package figures — keying on `detailsVerified` alone would
+  match every admin-created manifest (Appwrite backfills the attribute as `false`) and
+  stop ordinary trips auto-completing whenever they serve fewer stops than their route lists.
+- Trip package totals tolerate a missing `packageCount`, which otherwise made
+  `totalPackages` `NaN` when an admin edited a trip holding a field-captured manifest.
+
+**UI**
+
+- `src/views/edms/trips/LogDeliveryDialog.tsx` (new) — the driver capture flow,
+  full-screen on phones.
+- `src/views/edms/manifests/ManifestReviewQueue.tsx` (new) — the admin queue.
+- `src/app/(dashboard)/(apps)/edms/manifests/review/page.tsx` (new) — its route.
+- `src/views/edms/trips/view/index.tsx` — Log Delivery entry points, admin review
+  banner, "Needs review" chips, and "Pending office entry" instead of a misleading
+  `0 packages`.
+- `src/views/edms/manifests/view/index.tsx` — submit gated on the photo alone; the
+  package figures card is replaced by a "Package details pending" panel while
+  unverified; "Update Count" reads "Report Shortage" for drivers and is optional.
+- `src/components/layout/vertical/VerticalMenu.tsx` — Manifests → **Needs Review**, gated
+  on `manifests.edit` / `manifests.manage`, so the queue has a home in the sidebar. (This
+  is the menu the app actually renders; `src/data/navigation/verticalMenuData.tsx` is not
+  imported anywhere, so editing it alone changes nothing on screen.)
+- `src/views/edms/manifests/ManifestOverviewTable.tsx` — "Needs review" chip and
+  "Packages: pending" instead of a misleading `0 Small`.
+- `src/views/edms/trips/edit/StepEditReview.tsx` — a field-captured manifest has no
+  `packageSize`, which crashed the edit wizard's review step on `.charAt()`; it now shows
+  a "Pending review" chip.
+- `src/hooks/usePermissions.ts` — drivers gain `manifests.create` in the role fallback.
+
+## Permissions
+
+The driver capture UI is gated on `isDriver || deliveries.proof || manifests.create`, so
+it works whether permissions come from the database or the role fallback. The live
+`rolePermissions` records **already grant the driver role `manifests.create`** (verified
+against the database), so no data change is needed.
+
+The review queue requires `manifests.edit` or `manifests.manage` **and** a non-driver
+role. The extra `!isDriver` check is not belt-and-braces: the driver role in the live
+data holds `manifests.edit`, `manifests.manage` and `manifests.delete`, so permissions
+alone would have put the office's data-entry queue in every driver's sidebar — the exact
+thing this feature exists to take away from them.
+
+### Worth a separate look
+
+The driver role currently holds 34 permissions including `manifests.delete`,
+`manifests.manage`, `trips.edit`, `trips.manage`, `deliveries.delete` and
+`dropofflocations.manage`. That is far wider than field work needs, and the UI is now
+compensating for it with `!isDriver` checks in several places. Trimming the role in
+`rolePermissions` would be the real fix.
+
+The `operations`, `pickupagent` and `partners` roles have **zero** `rolePermissions`
+rows, so those users depend entirely on `FALLBACK_PERMISSIONS` in `usePermissions.ts`.
+
+## End-to-end test — 2026-08-19
+
+Run against the live database as admin, on trip `TRP-260819-0005` (route ROUTE K,
+14 dropoff stops). Test manifest, uploaded photo and all trip mutations were deleted
+afterwards and the trip verified back to its exact pre-test state.
+
+What passed:
+
+- Capture dialog listed all 14 stops, marked the last "Final", and kept **Submit
+  disabled** until both a stop and a photo were provided.
+- Submitting created the manifest with `packageSize: null`, `packageCount: 0`,
+  `detailsVerified: false`, status `delivered` — the exact writes the pre-change schema
+  would have rejected.
+- One photo stored, referenced as both `manifestImage` and `proofOfDeliveryImage`.
+- Checkpoint written with the correct stop name and sequence; `currentCheckpoint` 0 → 1.
+- Trip advanced `awaiting_manifests` → `in_progress` and **did not** auto-complete with
+  1 of 14 stops covered, confirming `countRouteDropoffStops()`.
+- Trip page updated in place: amber review banner, "Needs review" chip, "Pending office
+  entry" in the Packages column.
+- Review queue showed the manifest with photo, driver and vehicle; saving the figures
+  cleared it from the queue.
+
+What failed, and was fixed: the checkpoint/totals sync described above. Re-tested after
+the fix — checkpoint picked up the real manifest number, `medium`, `packagesDelivered:
+12`, and the trip's `totalPackages` synced to 12.
+
+Still untested: a **real driver account**. Admin bypasses Appwrite's document-level
+permissions, so a driver's ability to create a manifest document and upload to the
+storage bucket has not been proven.
+
+### Known cosmetic wrinkle
+
+The trip header's "Trip Progress (Manifests)" read `1/1 manifests` at 100% while 13 of
+14 stops were still outstanding. For field-captured trips the denominator is however
+many manifests exist so far, not the route's stop count, so the bar reads as complete
+from the first stop. Worth switching to the route stop count for these trips.
