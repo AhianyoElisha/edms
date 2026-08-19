@@ -39,8 +39,7 @@ import {
   getAllManifests, 
   deleteManifest,
   updateManifestStatus,
-  getManifestStatistics 
-} from '@/libs/actions/manifest.actions'
+  getManifestStatistics, isManifestAwaitingVerification } from '@/libs/actions/manifest.actions'
 
 // Component Imports
 import CustomAvatar from '@core/components/mui/Avatar'
@@ -417,20 +416,38 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
                     <Typography variant="body2">
                       Sequence: {manifest.dropoffSequence}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Packages: {manifest.packageCount || 0}
-                    </Typography>
+                    {/* A manifest captured in the field has no figures yet - printing
+                        "Packages: 0" there reads as an empty delivery. */}
+                    {isManifestAwaitingVerification(manifest) ? (
+                      <Typography variant="body2" color="text.secondary">
+                        Packages: pending
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        Packages: {manifest.packageCount || 0}
+                      </Typography>
+                    )}
                   </Box>
                 </TableCell>
                 <TableCell>
-                  <Box>
-                    <Typography variant="subtitle2">
-                      {manifest.packageCount || 0} {getPackageSizeLabel(manifest.packageSize || 'small')}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Delivered: {manifest.deliveredCount || 0}
-                    </Typography>
-                  </Box>
+                  {isManifestAwaitingVerification(manifest) ? (
+                    <Chip
+                      label="Needs review"
+                      size="small"
+                      color="warning"
+                      variant="tonal"
+                      icon={<i className='ri-error-warning-line' />}
+                    />
+                  ) : (
+                    <Box>
+                      <Typography variant="subtitle2">
+                        {manifest.packageCount || 0} {getPackageSizeLabel(manifest.packageSize || 'small')}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Delivered: {manifest.deliveredCount || 0}
+                      </Typography>
+                    </Box>
+                  )}
                 </TableCell>
                 <TableCell>
                   {getStatusChip(manifest.status)}
