@@ -35,10 +35,12 @@ import { toast } from 'react-toastify'
 // Component Imports
 import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
 import DeleteConfirmationDialog from '@/components/dialogs/delete-confirmation-dialog'
+import LogDeliveryDialog from '@/views/edms/trips/LogDeliveryDialog'
 
 // Action Imports
 import { getReturnWaybillsByTrip } from '@/libs/actions/returnwaybill.actions'
 import { deleteTrip } from '@/libs/actions/trip.actions'
+import { isManifestAwaitingVerification } from '@/libs/actions/manifest.actions'
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
@@ -96,8 +98,9 @@ const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | '
   }
 }
 
-const TripView = ({ tripData }: { tripData: any }) => {
+const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => void }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'manifests' | 'checkpoints' | 'returns'>('manifests')
+  const [logDeliveryOpen, setLogDeliveryOpen] = useState(false)
   const [returnWaybills, setReturnWaybills] = useState<any[]>([])
   const [loadingReturns, setLoadingReturns] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -105,7 +108,7 @@ const TripView = ({ tripData }: { tripData: any }) => {
   const tabsRef = useRef<HTMLDivElement>(null)
 
   const router = useRouter()
-  const { hasPermission, canViewFinancials, isAdmin } = usePermissions()
+  const { hasPermission, canViewFinancials, isAdmin, isDriver } = usePermissions()
 
   const handleConfirmDelete = async (deletedBy: string) => {
     try {
@@ -134,6 +137,14 @@ const TripView = ({ tripData }: { tripData: any }) => {
   const completedManifests = manifests.filter((m: any) => 
     m.status === 'delivered' || m.status === 'completed'
   ).length
+
+  // Manifests the driver captured in the field that the office has not priced up yet.
+  const awaitingReviewCount = manifests.filter(isManifestAwaitingVerification).length
+
+  // Field staff log deliveries straight from the trip while it is still running.
+  const tripIsClosed = ['completed', 'cancelled', 'canceled', 'deleted'].includes(tripData.status)
+  const canLogDelivery =
+    !tripIsClosed && (isDriver || hasPermission('deliveries.proof') || hasPermission('manifests.create'))
   
   // Calculate return waybills progress
   const completedReturns = returnWaybills.filter((rw: any) => 
@@ -233,6 +244,17 @@ const TripView = ({ tripData }: { tripData: any }) => {
               )}
             </div>
             <div className='flex flex-wrap gap-2'>
+              {canLogDelivery && (
+                <Button
+                  variant='contained'
+                  size='small'
+                  color='success'
+                  startIcon={<i className='ri-camera-line' />}
+                  onClick={() => setLogDeliveryOpen(true)}
+                >
+                  Log Delivery
+                </Button>
+              )}
               {tripData.status === 'awaiting_manifests' && hasPermission('manifests.create') && (
                 <Button
                   variant='contained'
@@ -309,6 +331,63 @@ const TripView = ({ tripData }: { tripData: any }) => {
           )}
         </CardContent>
       </Card>
+
+      {/* Office prompt: the driver has logged stops that still need their figures. */}
+      {!isDriver && awaitingReviewCount > 0 && (
+        <Card className='mb-6 border border-warning'>
+          <CardContent className='flex flex-col sm:flex-row sm:items-center gap-4'>
+            <Avatar variant='rounded' sx={{ width: 48, height: 48, bgcolor: 'warning.main', color: 'common.white' }}>
+              <i className='ri-file-search-line text-2xl' />
+            </Avatar>
+            <div className='flex-1'>
+              <Typography variant='h6'>
+                {awaitingReviewCount} manifest{awaitingReviewCount === 1 ? '' : 's'} awaiting your details
+              </Typography>
+              <Typography variant='body2' color='text.secondary'>
+                The driver logged {awaitingReviewCount === 1 ? 'this delivery' : 'these deliveries'} with a photo. Enter
+                the manifest number, package size and quantity to finish the record.
+              </Typography>
+            </div>
+            <Button
+              variant='contained'
+              color='warning'
+              startIcon={<i className='ri-edit-box-line' />}
+              onClick={() => router.push(`/edms/manifests/review?tripId=${tripData.$id}`)}
+              className='max-sm:is-full'
+            >
+              Review Manifests
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Field capture call-to-action. Drivers land here with paperwork in hand and
+          need one obvious, thumb-sized target - not a form. */}
+      {canLogDelivery && (
+        <Card className='mb-6 border border-success'>
+          <CardContent className='flex flex-col sm:flex-row sm:items-center gap-4'>
+            <Avatar variant='rounded' sx={{ width: 48, height: 48, bgcolor: 'success.main', color: 'common.white' }}>
+              <i className='ri-camera-line text-2xl' />
+            </Avatar>
+            <div className='flex-1'>
+              <Typography variant='h6'>Delivered a stop?</Typography>
+              <Typography variant='body2' color='text.secondary'>
+                Pick the stop and snap the manifest. No package counts needed &mdash; the office fills those in.
+              </Typography>
+            </div>
+            <Button
+              variant='contained'
+              color='success'
+              size='large'
+              startIcon={<i className='ri-camera-line' />}
+              onClick={() => setLogDeliveryOpen(true)}
+              className='max-sm:is-full'
+            >
+              Log Delivery
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs */}
       <Card>
@@ -575,6 +654,7 @@ const TripView = ({ tripData }: { tripData: any }) => {
                         const manifestStatus = manifest.status || 'pending'
                         const pickupLocation = manifest.pickupLocation || manifest.pickuplocation
                         const dropoffLocation = manifest.dropoffLocation || manifest.dropofflocation
+                        const needsReview = isManifestAwaitingVerification(manifest)
 
                         return (
                           <TableRow key={manifest.$id} hover>
@@ -587,6 +667,16 @@ const TripView = ({ tripData }: { tripData: any }) => {
                               <Typography className='font-medium'>
                                 {manifest.manifestNumber}
                               </Typography>
+                              {needsReview && (
+                                <Chip
+                                  label='Needs review'
+                                  size='small'
+                                  color='warning'
+                                  variant='tonal'
+                                  className='mt-1'
+                                  icon={<i className='ri-error-warning-line' />}
+                                />
+                              )}
                               {manifest.manifestDate && (
                                 <Typography variant='caption' color='text.secondary' className='block'>
                                   {new Date(manifest.manifestDate).toLocaleDateString()}
@@ -602,14 +692,22 @@ const TripView = ({ tripData }: { tripData: any }) => {
                               />
                             </TableCell>
                             <TableCell>
-                              <Typography>{manifest.packageCount} packages</Typography>
-                              {manifest.packageSize && (
-                              <Chip
-                                label={manifest.packageSize.charAt(0).toUpperCase() + manifest.packageSize.slice(1)}
-                                variant='outlined'
-                                color="primary"
-                                size='small'
-                              />
+                              {needsReview ? (
+                                <Typography variant='body2' color='text.secondary'>
+                                  Pending office entry
+                                </Typography>
+                              ) : (
+                                <>
+                                  <Typography>{manifest.packageCount || 0} packages</Typography>
+                                  {manifest.packageSize && (
+                                    <Chip
+                                      label={manifest.packageSize.charAt(0).toUpperCase() + manifest.packageSize.slice(1)}
+                                      variant='outlined'
+                                      color='primary'
+                                      size='small'
+                                    />
+                                  )}
+                                </>
                               )}
                             </TableCell>
                             <TableCell>
@@ -928,6 +1026,13 @@ const TripView = ({ tripData }: { tripData: any }) => {
           )}
         </CardContent>
       </Card>
+
+      <LogDeliveryDialog
+        open={logDeliveryOpen}
+        onClose={() => setLogDeliveryOpen(false)}
+        tripData={tripData}
+        onLogged={onRefresh}
+      />
 
       <DeleteConfirmationDialog
         open={deleteDialogOpen}

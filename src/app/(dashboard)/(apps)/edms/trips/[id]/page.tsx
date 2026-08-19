@@ -50,6 +50,18 @@ export default function TripViewPage() {
     }
   }
 
+  // Silent reload used after a driver logs a delivery, so the page updates in
+  // place instead of flashing the full-page loader on a phone.
+  const refreshTripData = async () => {
+    try {
+      const tripContent = await getTripById(params.id as string)
+
+      if (tripContent) setTripData(tripContent)
+    } catch (error) {
+      console.error('Error refreshing trip data:', error)
+    }
+  }
+
   useEffect(() => {
     if (params.id) {
       fetchTripData()
@@ -82,7 +94,7 @@ export default function TripViewPage() {
     <PermissionGuard permissions={['trips.view', 'trips.manage']}>
       <Grid container spacing={6}>
         <Grid item xs={12}>
-          <TripView tripData={tripData} />
+          <TripView tripData={tripData} onRefresh={refreshTripData} />
         </Grid>
       </Grid>
     </PermissionGuard>

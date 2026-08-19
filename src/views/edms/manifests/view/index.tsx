@@ -30,6 +30,12 @@ import LinearProgress from '@mui/material/LinearProgress'
 // Component Imports
 import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
 
+// Action Imports
+import { isManifestAwaitingVerification } from '@/libs/actions/manifest.actions'
+
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
 // Toast Imports
 import { toast } from 'react-toastify'
 
@@ -86,6 +92,10 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
   
   const router = useRouter()
   const [refreshKey, setRefreshKey] = useState(0)
+  const { isDriver, hasPermission } = usePermissions()
+
+  // Only the back office fills in the figures a driver skipped in the field.
+  const canVerify = !isDriver && hasPermission('manifests.edit')
 
   // Get related data
   const trip = manifestData.trip
@@ -95,16 +105,22 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
   // Package tracking (now count-based on manifest)
   const packageCount = manifestData.packageCount || 0
   const deliveredCount = manifestData.deliveredCount || 0
-  const pendingCount = packageCount - deliveredCount
+  const pendingCount = Math.max(0, packageCount - deliveredCount)
   const deliveryProgress = packageCount > 0 ? (deliveredCount / packageCount) * 100 : 0
+
+  // Manifests captured in the field carry no figures yet - the office supplies
+  // them afterwards, so the driver is never asked to tally packages.
+  const needsReview = isManifestAwaitingVerification(manifestData)
 
   // Check if manifest can be submitted
   const hasProofImage = Boolean(manifestData.proofOfDeliveryImage)
   const isDelivered = manifestData.status === 'delivered' || manifestData.status === 'completed'
-  const hasDeliveredPackages = deliveredCount > 0
-  
-  // Can only submit if: has proof, has at least one delivered package, and not already delivered
-  const canSubmit = hasProofImage && hasDeliveredPackages && !isDelivered
+
+  // Proof of delivery is the only thing standing between a driver and submitting.
+  // Counting packages is optional and never blocks the road; where the office
+  // planned a package count, submitting takes it as fully delivered unless the
+  // driver reported a shortfall.
+  const canSubmit = hasProofImage && !isDelivered
   
   // Handle proof of delivery image upload
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -341,15 +357,7 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                       onChange={handleImageUpload}
                     />
                   </Button>
-                  <Tooltip 
-                    title={
-                      !hasProofImage 
-                        ? "Upload proof of delivery first" 
-                        : !hasDeliveredPackages 
-                        ? "Update delivered count first" 
-                        : "Ready to submit"
-                    }
-                  >
+                  <Tooltip title={!hasProofImage ? 'Take a photo of the manifest first' : 'Ready to submit'}>
                     <span>
                       <Button
                         variant='contained'
@@ -387,7 +395,36 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
         </CardContent>
       </Card>
 
-      {/* Package Delivery Progress Card */}
+      {/* Package figures. A manifest captured in the field has none yet - showing
+          zeros there would read as "nothing delivered", so we say plainly that the
+          office still has to enter them. */}
+      {needsReview ? (
+        <Card className='mb-6'>
+          <CardContent className='flex flex-col sm:flex-row sm:items-center gap-4'>
+            <Avatar variant='rounded' sx={{ width: 48, height: 48, bgcolor: 'warning.main', color: 'common.white' }}>
+              <i className='ri-file-search-line text-2xl' />
+            </Avatar>
+            <div className='flex-1'>
+              <Typography variant='h6'>Package details pending</Typography>
+              <Typography variant='body2' color='text.secondary'>
+                This delivery was logged in the field with a photo. The office will enter the manifest number, package
+                size and quantity from the photo below.
+              </Typography>
+            </div>
+            {canVerify && (
+              <Button
+                variant='contained'
+                color='warning'
+                startIcon={<i className='ri-edit-box-line' />}
+                onClick={() => router.push('/edms/manifests/review')}
+                className='max-sm:is-full'
+              >
+                Enter Details
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
       <Card className='mb-6'>
         <CardContent>
           <Typography variant='h6' className='mb-4'>Package Delivery Progress</Typography>
@@ -460,7 +497,7 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                     }}
                     fullWidth
                   >
-                    Update Count
+                    {isDriver ? 'Report Shortage' : 'Update Count'}
                   </Button>
                 )}
                 {isDelivered && pendingCount === 0 && (
@@ -491,6 +528,7 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
           </Grid>
         </CardContent>
       </Card>
+      )}
 
       {/* Proof of Delivery Image Preview */}
       {hasProofImage && (
