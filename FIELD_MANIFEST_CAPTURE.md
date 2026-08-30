@@ -309,3 +309,27 @@ writes it (`packageCount: 0`, `packageDetails: null`, `detailsVerified: false`,
 `status: in_transit`) was accepted; the queue query returned only that row; the
 verify update (count 7, breakdown, reason, `verifiedBy`) cleared it from the queue;
 the row was deleted and the collection confirmed back at its original 2 rows.
+
+### Verified in the browser — 2026-08-30
+
+Checked as admin on a throwaway trip with one field-captured manifest on a 20-stop
+route: the header read **Trip Progress (Stops) — 1/20 stops** at 5%, where it used to
+read `1/1 manifests` at 100%. Test trip and manifest deleted afterwards.
+
+## Gotcha: stale bundles from a leftover service worker on localhost:3000
+
+During that check the page kept serving the *old* trip view after every reload — the
+served `page.js` chunk contained the component but none of the new code, and the
+dev server log showed a repeated `GET /sw.js 404`. The cause was a service worker
+registered by a **different app** that had previously run on `localhost:3000`
+(cache name `amaneebo-offline-v2`); it was intercepting Next's chunk requests and
+answering from its cache. This project registers no service worker of its own.
+
+If dev changes ever seem not to apply, run this in the page console and reload:
+
+```js
+(await navigator.serviceWorker.getRegistrations()).forEach(r => r.unregister())
+;(await caches.keys()).forEach(k => caches.delete(k))
+```
+
+or clear site data for `localhost:3000` in DevTools → Application.
