@@ -227,6 +227,11 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
                 {hasAnyPermission(['deliveries.view', 'trips.view']) && (
                   <MenuItem onClick={() => handleNavigation('/edms/returns/waybills')}>All Returns</MenuItem>
                 )}
+                {/* Returns drivers logged from the field with only a photo. Entering the
+                    figures is the office's job, not the driver's. */}
+                {!isDriver && hasAnyPermission(['deliveries.edit', 'deliveries.manage']) && (
+                  <MenuItem onClick={() => handleNavigation('/edms/returns/waybills/review')}>Needs Review</MenuItem>
+                )}
                 {/* {hasAnyPermission(['deliveries.view', 'trips.create']) && (
                   <MenuItem onClick={() => handleNavigation('/edms/returns/waybills/create')}>Create Return</MenuItem>
                 )} */}

@@ -205,6 +205,150 @@ export async function getPendingReturnWaybills(): Promise<ReturnWaybillType[]> {
   }
 }
 
+// ============================================
+// FIELD CAPTURE - driver logs a return with a photo, the office fills in the rest
+// ============================================
+
+/**
+ * A return waybill still waiting on the back office is one the driver captured
+ * in the field: it was never verified and carries no package count.
+ *
+ * Rows predating the detailsVerified attribute are left null by Appwrite, and
+ * every one of them already has a count, so none of them is misread as pending.
+ */
+export const isReturnWaybillAwaitingVerification = (waybill: any): boolean =>
+  waybill?.detailsVerified !== true && !waybill?.packageCount
+
+/**
+ * Log a return from the field in a single step.
+ *
+ * At the dropoff the driver picks the stop and takes one photo of the paper
+ * return waybill. That creates the waybill and puts it straight into transit,
+ * since the goods are on the truck heading back. Package count, breakdown and
+ * the real reason are left for an admin to read off the photo in the review
+ * queue, so the driver is never held up on data entry.
+ *
+ * The waybill is closed out later with markReturnWaybillDelivered() when the
+ * driver hands the goods over at the pickup location.
+ */
+export async function logFieldReturn(params: {
+  tripId: string
+  dropoffLocationId: string
+  pickupLocationId: string
+  photoUrl: string
+  returnReason?: ReturnWaybillInput['returnReason']
+  notes?: string
+}): Promise<ReturnWaybillType> {
+  const { tripId, dropoffLocationId, pickupLocationId, photoUrl, returnReason, notes } = params
+
+  try {
+    const waybill = await databases.createDocument(
+      appwriteConfig.database,
+      appwriteConfig.returnwaybills,
+      ID.unique(),
+      {
+        waybillNumber: generateWaybillNumber(),
+        trip: tripId,
+        dropofflocation: dropoffLocationId,
+        pickuplocation: pickupLocationId,
+        returnDate: new Date().toISOString(),
+        // The reason is required by the schema; the office corrects it on review.
+        returnReason: returnReason || 'customer_return',
+        reasonNotes: null,
+        // Figures are unknown in the field - the admin supplies them on review.
+        packageCount: 0,
+        packageDetails: null,
+        status: 'in_transit',
+        waybillImage: photoUrl,
+        detailsVerified: false,
+        notes: notes || null
+      }
+    )
+
+    // A return in transit keeps the trip open until it is handed back, so make
+    // sure the trip status reflects that straight away.
+    try {
+      const { checkAndUpdateTripStatus } = await import('./trip.actions')
+
+      await checkAndUpdateTripStatus(tripId)
+    } catch (error) {
+      console.warn('Could not update trip status after field return capture:', error)
+    }
+
+    return waybill as unknown as ReturnWaybillType
+  } catch (error) {
+    console.error('Error logging field return:', error)
+    throw new Error('Failed to log the return. Please try again.')
+  }
+}
+
+/**
+ * Fill in the details a driver could not capture in the field and mark the
+ * return waybill verified.
+ */
+export async function verifyReturnWaybillDetails(
+  waybillId: string,
+  details: {
+    packageCount: number
+    packageDetails?: PackageBreakdown
+    returnReason?: ReturnWaybillInput['returnReason']
+    reasonNotes?: string
+    notes?: string
+  },
+  verifiedBy?: string
+): Promise<ReturnWaybillType> {
+  try {
+    const packageCount = Math.max(0, details.packageCount)
+
+    const updateData: Record<string, unknown> = {
+      packageCount,
+      packageDetails: details.packageDetails ? JSON.stringify(details.packageDetails) : null,
+      detailsVerified: true,
+      verifiedAt: new Date().toISOString()
+    }
+
+    if (details.returnReason) updateData.returnReason = details.returnReason
+    if (details.reasonNotes !== undefined) updateData.reasonNotes = details.reasonNotes || null
+    if (details.notes !== undefined) updateData.notes = details.notes || null
+    if (verifiedBy) updateData.verifiedBy = verifiedBy
+
+    const waybill = await databases.updateDocument(
+      appwriteConfig.database,
+      appwriteConfig.returnwaybills,
+      waybillId,
+      updateData
+    )
+
+    return waybill as unknown as ReturnWaybillType
+  } catch (error) {
+    console.error('Error verifying return waybill details:', error)
+    throw new Error('Failed to save return waybill details')
+  }
+}
+
+/**
+ * Every return waybill waiting on the back office to supply its figures, newest first.
+ */
+export async function getReturnWaybillsAwaitingVerification(): Promise<ReturnWaybillType[]> {
+  try {
+    const response = await tablesDB.listRows(
+      appwriteConfig.database,
+      appwriteConfig.returnwaybills,
+      [
+        Query.equal('detailsVerified', false),
+        Query.orderDesc('$createdAt'),
+        Query.select(['*', 'trip.*', 'trip.driver.*', 'trip.vehicle.*', 'dropofflocation.*', 'pickuplocation.*']),
+        Query.limit(500)
+      ]
+    )
+
+    return (response.rows as any[]).filter(isReturnWaybillAwaitingVerification) as ReturnWaybillType[]
+  } catch (error) {
+    console.error('Error fetching return waybills awaiting verification:', error)
+    throw new Error('Failed to fetch return waybills awaiting verification')
+  }
+}
+
 /**
  * Check if all return waybills for a trip have been delivered
  * This is crucial for determining trip completion
@@ -259,9 +403,10 @@ export async function createReturnWaybill(
         returnDate: waybillData.returnDate,
         returnReason: waybillData.returnReason,
         reasonNotes: waybillData.reasonNotes || null,
-        packageCount: waybillData.packageCount,
+        packageCount: waybillData.packageCount ?? 0,
         packageDetails: packageDetailsString,
         status: 'pending',
+        detailsVerified: true,
         notes: waybillData.notes || null
       }
     )
@@ -346,31 +491,38 @@ export async function markReturnWaybillInTransit(waybillId: string): Promise<Ret
 }
 
 /**
- * Mark a return waybill as delivered
+ * Mark a return waybill as delivered (handed back at the pickup location).
+ *
+ * The receiver's name and the handover photo are both optional: a driver closing
+ * the return out at the depot should not be blocked on typing a name, and the
+ * office can add it later if it matters.
+ *
  * @param waybillId - The waybill ID
- * @param receivedBy - Name of person who received the return
- * @param signatureFileId - File ID of receiver's signature (optional)
- * @param podFileId - File ID of proof of delivery (optional)
+ * @param receivedBy - Name of person who received the return (optional)
+ * @param proofOfDeliveryUrl - URL of the handover photo, stored as proofOfDelivery (optional)
  */
 export async function markReturnWaybillDelivered(
   waybillId: string,
-  receivedBy: string,
-  signatureFileId?: string,
-  podFileId?: string
+  receivedBy?: string,
+  proofOfDeliveryUrl?: string
 ): Promise<ReturnWaybillType> {
   try {
     // Get waybill first to get trip ID
     const existingWaybill = await getReturnWaybillById(waybillId)
-    
+
+    const updateData: Record<string, unknown> = {
+      status: 'delivered',
+      deliveredAt: new Date().toISOString()
+    }
+
+    if (receivedBy && receivedBy.trim()) updateData.receivedBy = receivedBy.trim()
+    if (proofOfDeliveryUrl) updateData.proofOfDelivery = proofOfDeliveryUrl
+
     const waybill = await databases.updateDocument(
       appwriteConfig.database,
       appwriteConfig.returnwaybills,
       waybillId,
-      {
-        status: 'delivered',
-        deliveredAt: new Date().toISOString(),
-        receivedBy,
-      }
+      updateData
     )
 
     // Check and update trip status

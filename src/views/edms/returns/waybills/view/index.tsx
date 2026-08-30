@@ -25,12 +25,19 @@ import DialogActions from '@mui/material/DialogActions'
 import TextField from '@mui/material/TextField'
 import CircularProgress from '@mui/material/CircularProgress'
 import Breadcrumbs from '@mui/material/Breadcrumbs'
+import Alert from '@mui/material/Alert'
 
 // Component Imports
 import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
 
 // Toast Imports
 import { toast } from 'react-toastify'
+
+// Hook Imports
+import { usePermissions } from '@/hooks/usePermissions'
+
+// Action Imports
+import { isReturnWaybillAwaitingVerification } from '@/libs/actions/returnwaybill.actions'
 
 // Types
 import type { ReturnWaybillType, ReturnWaybillStatusType } from '@/types/apps/deliveryTypes'
@@ -103,9 +110,18 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
     action: 'in_transit' | 'delivered' | 'processed' | null
   }>({ open: false, action: null })
   const [receivedBy, setReceivedBy] = useState<string>('')
+  const [handoverFile, setHandoverFile] = useState<File | null>(null)
+  const [handoverPreview, setHandoverPreview] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   
   const router = useRouter()
+  const { isDriver, hasAnyPermission } = usePermissions()
+
+  // Entering the package figures is the office's job, never the driver's.
+  const canVerify = !isDriver && hasAnyPermission(['deliveries.edit', 'deliveries.manage'])
+
+  // A return the driver logged in the field with only a photo - no count yet.
+  const needsReview = isReturnWaybillAwaitingVerification(waybillData)
 
   // Get related data
   const trip = waybillData.trip
@@ -127,9 +143,63 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
   const hasWaybillDocument = Boolean(waybillData.waybillImage)
   const hasProofImage = Boolean(waybillData.proofOfDelivery)
   
-  // Validation flags for status changes
+  // A photo of the waybill is what puts a return in transit. Handing it back at
+  // the depot needs nothing up front - the driver can snap the signed copy in the
+  // confirmation step, and the receiver's name is optional.
   const canMarkInTransit = isPending && hasWaybillDocument
-  const canMarkDelivered = isInTransit && hasProofImage
+
+  // Compress and upload a photo, returning its public view URL.
+  const uploadPhoto = async (file: File, prefix: string): Promise<string> => {
+    const { storage, appwriteConfig } = await import('@/libs/appwrite.config')
+    const { ID } = await import('appwrite')
+    const imageCompression = (await import('browser-image-compression')).default
+
+    const bucketId = appwriteConfig.bucket || process.env.NEXT_PUBLIC_BUCKET_ID
+    if (!bucketId) {
+      throw new Error('Storage bucket not configured')
+    }
+
+    const compressedFile = await imageCompression(file, {
+      maxSizeMB: 1,
+      maxWidthOrHeight: 1920,
+      useWebWorker: true,
+      fileType: 'image/jpeg' as const,
+      initialQuality: 0.8
+    })
+
+    const uploadedFile = await storage.createFile(
+      bucketId,
+      ID.unique(),
+      new File([compressedFile], `${prefix}_${Date.now()}.jpg`, { type: 'image/jpeg' })
+    )
+
+    return `${appwriteConfig.endpoint}/storage/buckets/${bucketId}/files/${uploadedFile.$id}/view?project=${appwriteConfig.project}`
+  }
+
+  const handleHandoverPhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a photo')
+      return
+    }
+
+    if (handoverPreview) URL.revokeObjectURL(handoverPreview)
+    setHandoverFile(file)
+    setHandoverPreview(URL.createObjectURL(file))
+    event.target.value = ''
+  }
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog({ open: false, action: null })
+    setReceivedBy('')
+    setHandoverFile(null)
+    setHandoverPreview(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+  }
 
   // Handle image upload
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>, imageType: 'waybill' | 'proof' | 'signature') => {
@@ -153,46 +223,8 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
       setLoadingState(true)
       toast.info('Compressing and uploading image...')
       
-      // Import necessary functions
-      const { storage, appwriteConfig } = await import('@/libs/appwrite.config')
       const { updateReturnWaybill } = await import('@/libs/actions/returnwaybill.actions')
-      const { ID } = await import('appwrite')
-      const imageCompression = (await import('browser-image-compression')).default
-      
-      // Validate bucket ID
-      const bucketId = appwriteConfig.bucket || process.env.NEXT_PUBLIC_BUCKET_ID
-      if (!bucketId) {
-        throw new Error('Storage bucket not configured')
-      }
-      
-      // Compress image options
-      const options = {
-        maxSizeMB: 1,
-        maxWidthOrHeight: 1920,
-        useWebWorker: true,
-        fileType: 'image/jpeg' as const,
-        initialQuality: 0.8
-      }
-      
-      // Compress the image
-      const compressedFile = await imageCompression(file, options)
-      
-      // Create a new File object with the compressed blob
-      const compressedImageFile = new File(
-        [compressedFile], 
-        `${imageType}_${Date.now()}.jpg`, 
-        { type: 'image/jpeg' }
-      )
-      
-      // Upload to Appwrite storage
-      const uploadedFile = await storage.createFile(
-        bucketId,
-        ID.unique(),
-        compressedImageFile
-      )
-      
-      // Build the file view URL
-      const fileUrl = `${appwriteConfig.endpoint}/storage/buckets/${bucketId}/files/${uploadedFile.$id}/view?project=${appwriteConfig.project}`
+      const fileUrl = await uploadPhoto(file, imageType)
       
       // Update the waybill with the image URL (not the ID)
       const updateData: any = {}
@@ -242,20 +274,21 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
         await markReturnWaybillInTransit(waybillData.$id)
         toast.success('Return waybill marked as in transit!')
       } else if (newStatus === 'delivered') {
-        if (!receivedBy.trim()) {
-          toast.error('Please enter who received the return')
-          setStatusUpdating(false)
-          return
+        let proofUrl: string | undefined
+
+        if (handoverFile) {
+          toast.info('Uploading handover photo...')
+          proofUrl = await uploadPhoto(handoverFile, 'proof')
         }
-        await markReturnWaybillDelivered(waybillData.$id, receivedBy.trim())
-        toast.success('Return waybill marked as delivered!')
+
+        await markReturnWaybillDelivered(waybillData.$id, receivedBy.trim() || undefined, proofUrl)
+        toast.success(isDriver ? 'Handover confirmed - thanks!' : 'Return waybill marked as delivered!')
       } else if (newStatus === 'processed') {
         await markReturnWaybillProcessed(waybillData.$id)
         toast.success('Return waybill marked as processed!')
       }
       
-      setConfirmDialog({ open: false, action: null })
-      setReceivedBy('')
+      closeConfirmDialog()
       
       // Refetch data to update the UI
       if (onRefetch) {
@@ -344,14 +377,12 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
                   color='success'
                   startIcon={<i className='ri-checkbox-circle-line' />}
                   onClick={() => setConfirmDialog({ open: true, action: 'delivered' })}
-                  disabled={!hasProofImage}
-                  title={!hasProofImage ? 'Upload proof of delivery first' : ''}
                 >
-                  Mark Delivered
+                  {isDriver ? 'Confirm Handover' : 'Mark Delivered'}
                 </Button>
               )}
 
-              {isDelivered && (
+              {isDelivered && !isDriver && (
                 <Button
                   variant='contained'
                   size='small'
@@ -420,11 +451,49 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <Typography color='text.secondary'>Package Count</Typography>
-                  <Typography className='font-medium'>{waybillData.packageCount} packages</Typography>
+                  {needsReview ? (
+                    <Chip
+                      label={isDriver ? 'Pending office entry' : 'Needs review'}
+                      size='small'
+                      color='warning'
+                      variant='tonal'
+                      icon={<i className='ri-error-warning-line' />}
+                    />
+                  ) : (
+                    <Typography className='font-medium'>{waybillData.packageCount || 0} packages</Typography>
+                  )}
                 </Grid>
+
+                {/* Field capture: the figures are not in yet, so say so instead of showing zeros. */}
+                {needsReview && (
+                  <Grid item xs={12}>
+                    <Alert
+                      severity='warning'
+                      icon={<i className='ri-file-search-line' />}
+                      action={
+                        canVerify ? (
+                          <Button
+                            color='warning'
+                            size='small'
+                            variant='contained'
+                            onClick={() => router.push('/edms/returns/waybills/review')}
+                          >
+                            Enter Details
+                          </Button>
+                        ) : undefined
+                      }
+                    >
+                      <Typography variant='subtitle2'>Package details pending</Typography>
+                      <Typography variant='body2'>
+                        This return was logged in the field with a photo of the waybill. The office will enter the
+                        package count and confirm the reason from the photo.
+                      </Typography>
+                    </Alert>
+                  </Grid>
+                )}
                 
                 {/* Package Details Breakdown */}
-                {packageDetails && (
+                {packageDetails && !needsReview && (
                   <>
                     <Grid item xs={12}>
                       <Typography variant='subtitle2' className='mb-2'>Package Breakdown:</Typography>
@@ -574,33 +643,44 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
                 </Box>
               )}
               {!isProcessed && (
-                <Button
-                  component='label'
-                  variant='outlined'
-                  fullWidth
-                  startIcon={uploadingWaybill ? <CircularProgress size={20} /> : <i className='ri-upload-2-line' />}
-                  disabled={uploadingWaybill}
-                  className='mt-4'
-                >
-                  {waybillData.waybillImage ? 'Replace Document' : 'Upload Document'}
-                  <input
-                    type='file'
-                    hidden
-                    accept='image/*'
-                    onChange={(e) => handleImageUpload(e, 'waybill')}
-                  />
-                </Button>
+                <div className='flex flex-wrap gap-2 mt-4'>
+                  {/* Photo-only, camera first: drivers shoot the paper, the office can pick a file. */}
+                  <Button
+                    component='label'
+                    variant='contained'
+                    startIcon={uploadingWaybill ? <CircularProgress size={20} color='inherit' /> : <i className='ri-camera-line' />}
+                    disabled={uploadingWaybill}
+                  >
+                    {waybillData.waybillImage ? 'Retake' : 'Take'} Photo
+                    <input
+                      type='file'
+                      hidden
+                      accept='image/*'
+                      capture='environment'
+                      onChange={(e) => handleImageUpload(e, 'waybill')}
+                    />
+                  </Button>
+                  <Button
+                    component='label'
+                    variant='outlined'
+                    startIcon={<i className='ri-image-add-line' />}
+                    disabled={uploadingWaybill}
+                  >
+                    Choose Photo
+                    <input
+                      type='file'
+                      hidden
+                      accept='image/png,image/jpeg,image/jpg,image/webp,image/heic,image/heif'
+                      onChange={(e) => handleImageUpload(e, 'waybill')}
+                    />
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
 
           {/* Proof of Delivery */}
           <Card className='mb-6'>
-              {isInTransit && !hasProofImage && (
-                <Typography variant='caption' color='warning.main' className='self-center m-4'>
-                  Upload proof of delivery to mark delivered
-                </Typography>
-              )}
             <CardHeader title='Proof of Delivery' />
             <CardContent>
               {waybillData.proofOfDelivery ? (
@@ -619,22 +699,38 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
                 </Box>
               )}
               {!isProcessed && (
-                <Button
-                  component='label'
-                  variant='outlined'
-                  fullWidth
-                  startIcon={uploadingProof ? <CircularProgress size={20} /> : <i className='ri-camera-line' />}
-                  disabled={uploadingProof}
-                  className='mt-4'
-                >
-                  {waybillData.proofOfDelivery ? 'Replace Proof Image' : 'Upload Proof Image'}
-                  <input
-                    type='file'
-                    hidden
-                    accept='image/*'
-                    onChange={(e) => handleImageUpload(e, 'proof')}
-                  />
-                </Button>
+                <div className='flex flex-wrap gap-2 mt-4'>
+                  {/* Photo-only, camera first: drivers shoot the paper, the office can pick a file. */}
+                  <Button
+                    component='label'
+                    variant='contained'
+                    startIcon={uploadingProof ? <CircularProgress size={20} color='inherit' /> : <i className='ri-camera-line' />}
+                    disabled={uploadingProof}
+                  >
+                    {waybillData.proofOfDelivery ? 'Retake' : 'Take'} Photo
+                    <input
+                      type='file'
+                      hidden
+                      accept='image/*'
+                      capture='environment'
+                      onChange={(e) => handleImageUpload(e, 'proof')}
+                    />
+                  </Button>
+                  <Button
+                    component='label'
+                    variant='outlined'
+                    startIcon={<i className='ri-image-add-line' />}
+                    disabled={uploadingProof}
+                  >
+                    Choose Photo
+                    <input
+                      type='file'
+                      hidden
+                      accept='image/png,image/jpeg,image/jpg,image/webp,image/heic,image/heif'
+                      onChange={(e) => handleImageUpload(e, 'proof')}
+                    />
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -711,11 +807,13 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
       {/* Confirmation Dialog */}
       <Dialog 
         open={confirmDialog.open} 
-        onClose={() => setConfirmDialog({ open: false, action: null })}
+        onClose={statusUpdating ? undefined : closeConfirmDialog}
+        fullWidth
+        maxWidth='xs'
       >
         <DialogTitle>
           {confirmDialog.action === 'in_transit' && 'Mark as In Transit?'}
-          {confirmDialog.action === 'delivered' && 'Mark as Delivered?'}
+          {confirmDialog.action === 'delivered' && (isDriver ? 'Confirm Handover?' : 'Mark as Delivered?')}
           {confirmDialog.action === 'processed' && 'Mark as Processed?'}
         </DialogTitle>
         <DialogContent>
@@ -727,18 +825,58 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
           {confirmDialog.action === 'delivered' && (
             <>
               <DialogContentText className='mb-4'>
-                Please enter the name of the person who received the returned packages.
+                The returned packages have been handed over at {getLocationName(pickupLocation)}.
+                {!hasProofImage && ' Snap the signed waybill if you have it - optional.'}
               </DialogContentText>
+
+              {!hasProofImage && (
+                <div className='mb-4'>
+                  {handoverPreview ? (
+                    <img
+                      src={handoverPreview}
+                      alt='Handover'
+                      className='w-full rounded-lg border mb-2'
+                      style={{ maxHeight: 220, objectFit: 'contain' }}
+                    />
+                  ) : null}
+                  <div className='flex flex-wrap gap-2'>
+                    <Button
+                      component='label'
+                      variant={handoverPreview ? 'outlined' : 'contained'}
+                      startIcon={<i className='ri-camera-line' />}
+                      disabled={statusUpdating}
+                    >
+                      {handoverPreview ? 'Retake Photo' : 'Take Photo'}
+                      <input type='file' hidden accept='image/*' capture='environment' onChange={handleHandoverPhotoSelect} />
+                    </Button>
+                    <Button
+                      component='label'
+                      variant='outlined'
+                      startIcon={<i className='ri-image-add-line' />}
+                      disabled={statusUpdating}
+                    >
+                      Choose Photo
+                      <input
+                        type='file'
+                        hidden
+                        accept='image/png,image/jpeg,image/jpg,image/webp,image/heic,image/heif'
+                        onChange={handleHandoverPhotoSelect}
+                      />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <TextField
-                autoFocus
                 margin='dense'
-                label='Received By'
+                label='Received By (optional)'
                 type='text'
                 fullWidth
                 variant='outlined'
                 value={receivedBy}
                 onChange={(e) => setReceivedBy(e.target.value)}
-                placeholder='Enter name of receiver'
+                placeholder='Name of the person who received it'
+                disabled={statusUpdating}
               />
             </>
           )}
@@ -750,7 +888,7 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
         </DialogContent>
         <DialogActions>
           <Button 
-            onClick={() => setConfirmDialog({ open: false, action: null })}
+            onClick={closeConfirmDialog}
             disabled={statusUpdating}
           >
             Cancel

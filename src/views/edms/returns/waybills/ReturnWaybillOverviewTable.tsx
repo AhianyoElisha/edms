@@ -52,7 +52,8 @@ import {
   deleteReturnWaybill, 
   markReturnWaybillInTransit,
   markReturnWaybillDelivered,
-  markReturnWaybillProcessed
+  markReturnWaybillProcessed,
+  isReturnWaybillAwaitingVerification
 } from '@/libs/actions/returnwaybill.actions'
 
 // Hook Imports
@@ -165,13 +166,10 @@ const ReturnWaybillOverviewTable = () => {
   }
 
   const handleConfirmDelivery = async () => {
-    if (!selectedWaybillId || !receivedBy.trim()) {
-      toast.error('Please enter the name of the receiver')
-      return
-    }
+    if (!selectedWaybillId) return
 
     try {
-      await markReturnWaybillDelivered(selectedWaybillId, receivedBy.trim())
+      await markReturnWaybillDelivered(selectedWaybillId, receivedBy.trim() || undefined)
       setWaybillData(prevData =>
         prevData.map(waybill =>
           waybill.$id === selectedWaybillId 
@@ -298,11 +296,18 @@ const ReturnWaybillOverviewTable = () => {
       }),
       columnHelper.accessor('packageCount', {
         header: 'Packages',
-        cell: ({ row }) => (
-          <Typography color='text.primary'>
-            {row.original.packageCount} pkg(s)
-          </Typography>
-        )
+        cell: ({ row }) =>
+          isReturnWaybillAwaitingVerification(row.original) ? (
+            <Chip
+              label='Needs review'
+              size='small'
+              color='warning'
+              variant='tonal'
+              icon={<i className='ri-error-warning-line' />}
+            />
+          ) : (
+            <Typography color='text.primary'>{row.original.packageCount || 0} pkg(s)</Typography>
+          )
       }),
       columnHelper.accessor('returnReason', {
         header: 'Reason',

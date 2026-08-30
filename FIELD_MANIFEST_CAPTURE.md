@@ -195,3 +195,115 @@ The trip header's "Trip Progress (Manifests)" read `1/1 manifests` at 100% while
 14 stops were still outstanding. For field-captured trips the denominator is however
 many manifests exist so far, not the route's stop count, so the bar reads as complete
 from the first stop. Worth switching to the route stop count for these trips.
+
+---
+
+# Return Waybills — the same treatment, 2026-08-30
+
+Returns had been left out of the field-capture work above. The return waybill flow had
+exactly the problems the manifests had:
+
+- `/edms/returns/waybills/create` demanded a **package count ≥ 1**, a reason, a return
+  date and both locations before it would submit, and was gated on `deliveries.create`,
+  which drivers don't hold — so a driver standing at a stop with goods coming back had
+  no way to record it.
+- Marking a return delivered at the depot hard-blocked on a proof-of-delivery upload
+  **and** a typed receiver name.
+
+## The new flow
+
+**Driver — one touch at the stop, one touch at the depot.**
+
+1. On the trip page, taps **Log Return** (amber, beside Log Delivery in the header and
+   as its own card).
+2. Picks the stop the goods are coming from (stops already delivered are marked), and
+   optionally taps a reason chip — defaults to *Customer return*.
+3. Takes one photo of the paper return waybill. Submits.
+
+That creates the return waybill **in transit** with the photo as `waybillImage`, no
+package count, and `detailsVerified: false`. The pickup location is taken from the
+route's start location. The trip stays open until the goods are handed back.
+
+4. Back at the depot, the Returns tab shows **Confirm Handover** on any return still on
+   the truck. The receiver's name is optional; a photo of the signed copy can be taken
+   in the same dialog but is not required. That closes the return as `delivered` and
+   re-runs the trip completion check.
+
+**Admin — catches up later.**
+
+- `/edms/returns/waybills/review` (sidebar: Return Waybills → **Needs Review**) lists
+  every field-captured return, photo beside the fields. The admin enters the package
+  count (or a small/medium/big breakdown — the two are cross-checked), corrects the
+  reason, adds notes, and hits **Save & Verify**.
+- Trip pages show an amber banner with a direct link when any of their returns are
+  awaiting review; the Returns tab, waybill detail page and waybill table show
+  **Needs review** (drivers see *Pending office entry*) instead of a misleading `0
+  packages`.
+- The full create form still exists for the office (Create Return button is now
+  office-only on the trip page; the per-manifest/per-checkpoint "Return" links are
+  hidden from drivers, who use the dialog instead).
+
+## Appwrite schema changes — APPLIED 2026-08-30
+
+Applied to the live **`returnwaybills`** collection (`69849a0100368992529a`) and verified
+`available`:
+
+| Attribute         | Change                                              |
+| ----------------- | --------------------------------------------------- |
+| `packageCount`    | required → **optional**, default `0`, min 0         |
+| `detailsVerified` | **new** boolean, optional, default `false`          |
+| `verifiedAt`      | **new** datetime, optional                          |
+| `verifiedBy`      | **new** string(200), optional                       |
+
+`returnReason` stays required; the driver dialog always sends one (default
+`customer_return`) and the admin corrects it on review.
+
+The collection held only 2 rows. Both were left `null` on `detailsVerified` (verified
+against the live data), so the queue's `Query.equal('detailsVerified', false)` does not
+pick them up; `isReturnWaybillAwaitingVerification()` additionally requires a falsy
+`packageCount`, and both rows have counts.
+
+## What changed in code
+
+**Actions** — `src/libs/actions/returnwaybill.actions.ts`
+
+- `logFieldReturn()` — stop + photo → return waybill created `in_transit`, unverified.
+- `verifyReturnWaybillDetails()` — admin fills count/breakdown/reason, marks verified.
+- `getReturnWaybillsAwaitingVerification()` / `isReturnWaybillAwaitingVerification()` —
+  the queue and its shared predicate.
+- `markReturnWaybillDelivered()` — receiver name now optional; accepts an optional
+  handover photo URL stored as `proofOfDelivery`.
+- `createReturnWaybill()` — office-created waybills are written `detailsVerified: true`.
+
+**UI**
+
+- `src/views/edms/trips/LogReturnDialog.tsx` (new) — the driver capture flow.
+- `src/views/edms/returns/waybills/ReturnWaybillReviewQueue.tsx` (new) and
+  `src/app/(dashboard)/(apps)/edms/returns/waybills/review/page.tsx` (new) — the queue.
+- `src/views/edms/trips/view/index.tsx` — Log Return entry points, handover reminder,
+  admin review banner, Needs-review chips, Confirm Handover in the Returns tab.
+- `src/views/edms/returns/waybills/view/index.tsx` — Mark Delivered no longer needs a
+  prior proof upload or a receiver name (photo optional in the dialog, camera-first);
+  "Package details pending" panel while unverified; camera-first uploads; Mark
+  Processed hidden from drivers.
+- `src/views/edms/returns/waybills/ReturnWaybillOverviewTable.tsx` — Needs-review chip;
+  receiver name optional in the delivery dialog.
+- `src/components/layout/vertical/VerticalMenu.tsx` — Return Waybills → **Needs
+  Review**, gated on `deliveries.edit` / `deliveries.manage` and `!isDriver`.
+- `src/types/apps/deliveryTypes.ts` — `detailsVerified` / `verifiedAt` / `verifiedBy`
+  on `ReturnWaybillType`; `packageCount` optional on `ReturnWaybillInput`.
+
+## Permissions
+
+The driver capture UI uses the same gate as Log Delivery
+(`isDriver || deliveries.proof || manifests.create`). The collection grants
+`create("users")`, so any signed-in user can write the row. As with manifests, a
+**real driver account** has not been exercised end-to-end.
+
+## Smoke test — 2026-08-30
+
+Against the live collection via the API: a row shaped exactly as `logFieldReturn()`
+writes it (`packageCount: 0`, `packageDetails: null`, `detailsVerified: false`,
+`status: in_transit`) was accepted; the queue query returned only that row; the
+verify update (count 7, breakdown, reason, `verifiedBy`) cleared it from the queue;
+the row was deleted and the collection confirmed back at its original 2 rows.

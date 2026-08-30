@@ -583,9 +583,14 @@ export interface ReturnWaybillType {
   returnDate: string // Date the return was initiated
   returnReason: ReturnReasonType
   reasonNotes?: string // Additional details about return reason
-  packageCount: number // Total count of packages being returned
+  packageCount: number // Total count of packages being returned (0 until the office verifies a field capture)
   packageDetails?: string | PackageBreakdown // JSON breakdown by size or parsed object
   status: ReturnWaybillStatusType
+  // Field capture: a driver logs the return with a photo of the paper waybill and
+  // no figures; an admin fills them in later from the review queue.
+  detailsVerified?: boolean
+  verifiedAt?: string | null
+  verifiedBy?: string | null
   deliveredAt?: string // When the return was delivered to pickup location
   receivedBy?: string // Name of person who received the return
   receiverSignature?: string // File ID of signature image
@@ -604,7 +609,7 @@ export interface ReturnWaybillInput {
   returnDate: string
   returnReason: ReturnReasonType
   reasonNotes?: string
-  packageCount: number
+  packageCount?: number
   packageDetails?: PackageBreakdown
   notes?: string
 }

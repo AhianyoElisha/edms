@@ -36,9 +36,10 @@ import { toast } from 'react-toastify'
 import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
 import DeleteConfirmationDialog from '@/components/dialogs/delete-confirmation-dialog'
 import LogDeliveryDialog from '@/views/edms/trips/LogDeliveryDialog'
+import LogReturnDialog from '@/views/edms/trips/LogReturnDialog'
 
 // Action Imports
-import { getReturnWaybillsByTrip } from '@/libs/actions/returnwaybill.actions'
+import { getReturnWaybillsByTrip, isReturnWaybillAwaitingVerification } from '@/libs/actions/returnwaybill.actions'
 import { deleteTrip } from '@/libs/actions/trip.actions'
 import { isManifestAwaitingVerification } from '@/libs/actions/manifest.actions'
 
@@ -101,6 +102,7 @@ const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | '
 const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => void }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'manifests' | 'checkpoints' | 'returns'>('manifests')
   const [logDeliveryOpen, setLogDeliveryOpen] = useState(false)
+  const [logReturnOpen, setLogReturnOpen] = useState(false)
   const [returnWaybills, setReturnWaybills] = useState<any[]>([])
   const [loadingReturns, setLoadingReturns] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -150,6 +152,12 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
   const completedReturns = returnWaybills.filter((rw: any) => 
     rw.status === 'delivered' || rw.status === 'processed'
   ).length
+
+  // Returns the driver logged in the field that the office has not entered figures for.
+  const returnsAwaitingReviewCount = returnWaybills.filter(isReturnWaybillAwaitingVerification).length
+
+  // Returns still on the truck - the trip cannot close until they are handed back.
+  const returnsInTransit = returnWaybills.filter((rw: any) => rw.status === 'in_transit' || rw.status === 'pending')
   
   // Combined progress: manifests + return waybills (if any returns exist)
   // A trip is only complete when all manifests AND all return waybills are done
@@ -157,22 +165,33 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
   const completedItems = completedManifests + completedReturns
   const progressPercentage = totalItems > 0 ? (completedItems / totalItems) * 100 : 0
 
-  // Fetch return waybills on mount and when tab changes
+  // Fetch return waybills on mount and after the driver logs one
+  const loadReturnWaybills = () => {
+    if (!tripData.$id) return
+
+    setLoadingReturns(true)
+    getReturnWaybillsByTrip(tripData.$id)
+      .then(data => {
+        setReturnWaybills(data)
+      })
+      .catch(err => {
+        console.error('Error fetching return waybills:', err)
+      })
+      .finally(() => {
+        setLoadingReturns(false)
+      })
+  }
+
   useEffect(() => {
-    if (tripData.$id) {
-      setLoadingReturns(true)
-      getReturnWaybillsByTrip(tripData.$id)
-        .then(data => {
-          setReturnWaybills(data)
-        })
-        .catch(err => {
-          console.error('Error fetching return waybills:', err)
-        })
-        .finally(() => {
-          setLoadingReturns(false)
-        })
-    }
+    loadReturnWaybills()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripData.$id])
+
+  const handleReturnLogged = () => {
+    loadReturnWaybills()
+    setActiveTab('returns')
+    onRefresh?.()
+  }
 
   // Keep the tab strip pinned to the start when the first tab (Manifests) is
   // active. On narrow screens MUI's scroll-into-view over-scrolls the selected
@@ -255,6 +274,17 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                   Log Delivery
                 </Button>
               )}
+              {canLogDelivery && (
+                <Button
+                  variant='contained'
+                  size='small'
+                  color='warning'
+                  startIcon={<i className='ri-arrow-go-back-line' />}
+                  onClick={() => setLogReturnOpen(true)}
+                >
+                  Log Return
+                </Button>
+              )}
               {tripData.status === 'awaiting_manifests' && hasPermission('manifests.create') && (
                 <Button
                   variant='contained'
@@ -266,12 +296,12 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                   Add Manifests
                 </Button>
               )}
-              {hasPermission('deliveries.create') && (
+              {!isDriver && hasPermission('deliveries.create') && (
                 <Button
                   variant='outlined'
                   size='small'
                   color='warning'
-                  startIcon={<i className='ri-arrow-go-back-line' />}
+                  startIcon={<i className='ri-file-add-line' />}
                   onClick={() => router.push(`/edms/returns/waybills/create?tripId=${tripData.$id}`)}
                 >
                   Create Return
@@ -361,6 +391,35 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
         </Card>
       )}
 
+      {/* Office prompt: the driver has logged returns that still need their figures. */}
+      {!isDriver && returnsAwaitingReviewCount > 0 && (
+        <Card className='mb-6 border border-warning'>
+          <CardContent className='flex flex-col sm:flex-row sm:items-center gap-4'>
+            <Avatar variant='rounded' sx={{ width: 48, height: 48, bgcolor: 'warning.main', color: 'common.white' }}>
+              <i className='ri-arrow-go-back-line text-2xl' />
+            </Avatar>
+            <div className='flex-1'>
+              <Typography variant='h6'>
+                {returnsAwaitingReviewCount} return{returnsAwaitingReviewCount === 1 ? '' : 's'} awaiting your details
+              </Typography>
+              <Typography variant='body2' color='text.secondary'>
+                The driver logged {returnsAwaitingReviewCount === 1 ? 'this return' : 'these returns'} with a photo of
+                the waybill. Enter the package count and reason to finish the record.
+              </Typography>
+            </div>
+            <Button
+              variant='contained'
+              color='warning'
+              startIcon={<i className='ri-edit-box-line' />}
+              onClick={() => router.push(`/edms/returns/waybills/review?tripId=${tripData.$id}`)}
+              className='max-sm:is-full'
+            >
+              Review Returns
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Field capture call-to-action. Drivers land here with paperwork in hand and
           need one obvious, thumb-sized target - not a form. */}
       {canLogDelivery && (
@@ -384,6 +443,40 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
               className='max-sm:is-full'
             >
               Log Delivery
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Same idea for goods coming back: one photo of the return waybill at the stop. */}
+      {canLogDelivery && (
+        <Card className='mb-6 border border-warning'>
+          <CardContent className='flex flex-col sm:flex-row sm:items-center gap-4'>
+            <Avatar variant='rounded' sx={{ width: 48, height: 48, bgcolor: 'warning.main', color: 'common.white' }}>
+              <i className='ri-arrow-go-back-line text-2xl' />
+            </Avatar>
+            <div className='flex-1'>
+              <Typography variant='h6'>Taking goods back?</Typography>
+              <Typography variant='body2' color='text.secondary'>
+                Pick the stop and snap the return waybill. Hand it over at the depot when you get back &mdash; the office
+                enters the counts.
+              </Typography>
+              {returnsInTransit.length > 0 && (
+                <Typography variant='body2' color='warning.main' className='mt-1 font-medium'>
+                  {returnsInTransit.length} return{returnsInTransit.length === 1 ? '' : 's'} on the truck &mdash; open the
+                  Returns tab to confirm handover when you are back.
+                </Typography>
+              )}
+            </div>
+            <Button
+              variant='contained'
+              color='warning'
+              size='large'
+              startIcon={<i className='ri-camera-line' />}
+              onClick={() => setLogReturnOpen(true)}
+              className='max-sm:is-full'
+            >
+              Log Return
             </Button>
           </CardContent>
         </Card>
@@ -734,7 +827,7 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                             </TableCell>
                             <TableCell align='right'>
                               <div className='flex items-center justify-end gap-2'>
-                                {(manifestStatus === 'delivered' || manifestStatus === 'completed' || manifestStatus === 'in-progress') && (
+                                {!isDriver && (manifestStatus === 'delivered' || manifestStatus === 'completed' || manifestStatus === 'in-progress') && (
                                   <Button 
                                     size='small' 
                                     variant='outlined'
@@ -830,7 +923,7 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                                     />
                                 </div>
                                 {/* Add Return Waybill Button - visible when checkpoint is completed or in-progress */}
-                                {(isCompleted || isInProgress) && (
+                                {!isDriver && (isCompleted || isInProgress) && (
                                   <Button
                                     variant='outlined'
                                     size='small'
@@ -976,9 +1069,19 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant='body2'>
-                                {waybill.packageCount || 0} packages
-                              </Typography>
+                              {isReturnWaybillAwaitingVerification(waybill) ? (
+                                <Chip
+                                  label={isDriver ? 'Pending office entry' : 'Needs review'}
+                                  size='small'
+                                  color='warning'
+                                  variant='tonal'
+                                  icon={<i className='ri-error-warning-line' />}
+                                />
+                              ) : (
+                                <Typography variant='body2'>
+                                  {waybill.packageCount || 0} packages
+                                </Typography>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Typography variant='body2'>
@@ -990,10 +1093,11 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                             <TableCell align='right'>
                               <Button 
                                 size='small' 
-                                variant='outlined'
+                                variant={waybill.status === 'in_transit' && canLogDelivery ? 'contained' : 'outlined'}
+                                color={waybill.status === 'in_transit' && canLogDelivery ? 'success' : 'primary'}
                                 onClick={() => router.push(`/edms/returns/waybills/${waybill.$id}`)}
                               >
-                                View
+                                {waybill.status === 'in_transit' && canLogDelivery ? 'Confirm Handover' : 'View'}
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -1011,7 +1115,16 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                   <Typography variant='body2' color='text.secondary' className='mb-4'>
                     This trip doesn't have any return waybills yet
                   </Typography>
-                  {hasPermission('deliveries.create') && (
+                  {canLogDelivery ? (
+                    <Button
+                      variant='contained'
+                      color='warning'
+                      startIcon={<i className='ri-camera-line' />}
+                      onClick={() => setLogReturnOpen(true)}
+                    >
+                      Log Return
+                    </Button>
+                  ) : hasPermission('deliveries.create') ? (
                     <Button
                       variant='contained'
                       startIcon={<i className='ri-add-line' />}
@@ -1019,7 +1132,7 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                     >
                       Create Return Waybill
                     </Button>
-                  )}
+                  ) : null}
                 </div>
               )}
             </div>
@@ -1032,6 +1145,13 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
         onClose={() => setLogDeliveryOpen(false)}
         tripData={tripData}
         onLogged={onRefresh}
+      />
+
+      <LogReturnDialog
+        open={logReturnOpen}
+        onClose={() => setLogReturnOpen(false)}
+        tripData={tripData}
+        onLogged={handleReturnLogged}
       />
 
       <DeleteConfirmationDialog
