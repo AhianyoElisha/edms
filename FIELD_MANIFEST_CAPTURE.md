@@ -189,12 +189,14 @@ Still untested: a **real driver account**. Admin bypasses Appwrite's document-le
 permissions, so a driver's ability to create a manifest document and upload to the
 storage bucket has not been proven.
 
-### Known cosmetic wrinkle
+### Progress bar on field-captured trips — fixed 2026-08-30
 
-The trip header's "Trip Progress (Manifests)" read `1/1 manifests` at 100% while 13 of
-14 stops were still outstanding. For field-captured trips the denominator is however
-many manifests exist so far, not the route's stop count, so the bar reads as complete
-from the first stop. Worth switching to the route stop count for these trips.
+The trip header's "Trip Progress (Manifests)" used to read `1/1 manifests` at 100%
+while 13 of 14 stops were still outstanding, because a field-captured trip only has as
+many manifests as stops logged so far. The trip view now detects a field-captured trip
+(any manifest matching `isManifestAwaitingVerification()`), fetches the route's dropoff
+stops, and shows `covered stops / route stops` — the same rule `checkAndUpdateTripStatus()`
+uses for completion. Ordinary admin-created trips keep the manifest-based bar.
 
 ---
 

@@ -40,6 +40,7 @@ import LogReturnDialog from '@/views/edms/trips/LogReturnDialog'
 
 // Action Imports
 import { getReturnWaybillsByTrip, isReturnWaybillAwaitingVerification } from '@/libs/actions/returnwaybill.actions'
+import { getRouteDropoffLocations } from '@/libs/actions/route.actions'
 import { deleteTrip } from '@/libs/actions/trip.actions'
 import { isManifestAwaitingVerification } from '@/libs/actions/manifest.actions'
 
@@ -105,6 +106,7 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
   const [logReturnOpen, setLogReturnOpen] = useState(false)
   const [returnWaybills, setReturnWaybills] = useState<any[]>([])
   const [loadingReturns, setLoadingReturns] = useState(false)
+  const [routeStopCount, setRouteStopCount] = useState<number | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const tabsRef = useRef<HTMLDivElement>(null)
@@ -143,6 +145,18 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
   // Manifests the driver captured in the field that the office has not priced up yet.
   const awaitingReviewCount = manifests.filter(isManifestAwaitingVerification).length
 
+  // A field-captured trip grows its manifests one stop at a time, so "manifests
+  // delivered / manifests" reads 100% from the first stop. Measure those trips
+  // against the route's dropoff stops instead - the same rule trip completion uses.
+  const isFieldCapturedTrip = manifests.some(isManifestAwaitingVerification)
+  const coveredStopCount = new Set(
+    manifests
+      .filter((m: any) => m.status === 'delivered' || m.status === 'completed')
+      .map((m: any) => (typeof m.dropofflocation === 'object' && m.dropofflocation !== null ? m.dropofflocation.$id : m.dropofflocation))
+      .filter(Boolean)
+  ).size
+  const useStopProgress = isFieldCapturedTrip && routeStopCount !== null && routeStopCount > 0
+
   // Field staff log deliveries straight from the trip while it is still running.
   const tripIsClosed = ['completed', 'cancelled', 'canceled', 'deleted'].includes(tripData.status)
   const canLogDelivery =
@@ -161,8 +175,10 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
   
   // Combined progress: manifests + return waybills (if any returns exist)
   // A trip is only complete when all manifests AND all return waybills are done
-  const totalItems = manifests.length + (returnWaybills.length > 0 ? returnWaybills.length : 0)
-  const completedItems = completedManifests + completedReturns
+  const deliveryTotal = useStopProgress ? (routeStopCount as number) : manifests.length
+  const deliveryDone = useStopProgress ? Math.min(coveredStopCount, deliveryTotal) : completedManifests
+  const totalItems = deliveryTotal + (returnWaybills.length > 0 ? returnWaybills.length : 0)
+  const completedItems = deliveryDone + completedReturns
   const progressPercentage = totalItems > 0 ? (completedItems / totalItems) * 100 : 0
 
   // Fetch return waybills on mount and after the driver logs one
@@ -186,6 +202,25 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
     loadReturnWaybills()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripData.$id])
+
+  // Only field-captured trips need the route's stop count for their progress bar.
+  const routeId = typeof tripData.route === 'object' && tripData.route !== null ? tripData.route.$id : tripData.route
+
+  useEffect(() => {
+    if (!isFieldCapturedTrip || !routeId) return
+
+    let cancelled = false
+
+    getRouteDropoffLocations(routeId)
+      .then(stops => {
+        if (!cancelled) setRouteStopCount(stops.length || null)
+      })
+      .catch(err => console.warn('Could not count route stops for progress:', err))
+
+    return () => {
+      cancelled = true
+    }
+  }, [isFieldCapturedTrip, routeId])
 
   const handleReturnLogged = () => {
     loadReturnWaybills()
@@ -345,10 +380,11 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
             <Box className='mt-6'>
               <div className='flex items-center justify-between mb-2'>
                 <Typography variant='body2'>
-                  Trip Progress {returnWaybills.length > 0 ? '(Manifests + Returns)' : '(Manifests)'}
+                  Trip Progress {useStopProgress ? '(Stops' : '(Manifests'}
+                  {returnWaybills.length > 0 ? ' + Returns)' : ')'}
                 </Typography>
                 <Typography variant='body2' color='text.secondary'>
-                  {completedManifests}/{manifests.length} manifests
+                  {useStopProgress ? `${deliveryDone}/${deliveryTotal} stops` : `${completedManifests}/${manifests.length} manifests`}
                   {returnWaybills.length > 0 && ` • ${completedReturns}/${returnWaybills.length} returns`}
                 </Typography>
               </div>
