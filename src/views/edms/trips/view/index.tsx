@@ -285,7 +285,8 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                   Log Return
                 </Button>
               )}
-              {tripData.status === 'awaiting_manifests' && hasPermission('manifests.create') && (
+              {/* The full manifest form is the office's tool; drivers use Log Delivery instead. */}
+              {!isDriver && tripData.status === 'awaiting_manifests' && hasPermission('manifests.create') && (
                 <Button
                   variant='contained'
                   size='small'
