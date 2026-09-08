@@ -31,6 +31,18 @@ Based on the rate card matrix:
 | | 50 | 50 | 10 tons |
 | | 55 | 55 | 12 tons |
 | | 60 | 60 | 15 tons |
+| | 65 | 65 | 18 tons |
+| | 70 | 70 | 20 tons |
+| | 75 | 75 | 23 tons |
+
+> The tiers above are defined once, in `VOLUME_TIERS` (`src/types/apps/deliveryTypes.ts`).
+> The rate card create/edit tables and the trip wizard's tonnage dropdown all read
+> from it — do not re-declare tier lists in a component.
+>
+> Rates are looked up by **tonnage first, volume second**
+> (`findVolumePriceForTier`). Rate cards saved before 23 tons moved from 70 CBM to
+> 75 CBM still hold that rate under `volume: 70`, and matching on volume alone
+> would hand it to the new 70 CBM / 20 ton tier.
 
 ### Sample Rate Card Matrix (JUMIA)
 

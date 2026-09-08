@@ -23,7 +23,7 @@ LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz0wLEU9MzI0NzIxNDQwM
 // Type Imports
 import type { WizardStepProps } from './types'
 import type { VehicleType, RouteType } from '@/types/apps/deliveryTypes'
-import { VOLUME_TIERS } from '@/types/apps/deliveryTypes'
+import { VOLUME_TIERS, getVolumeTierByTonnage, findVolumePriceForTier } from '@/types/apps/deliveryTypes'
 
 // Actions
 import { getAllVehicles } from '@/libs/actions/vehicle.actions'
@@ -102,7 +102,7 @@ const StepTripDetails = ({
 
     // Find the volume tier that matches the selected tonnage
     const selectedTonnage = parseFloat(tonnage)
-    const matchedTier = VOLUME_TIERS.find(t => t.tonnage === selectedTonnage)
+    const matchedTier = getVolumeTierByTonnage(selectedTonnage)
     if (!matchedTier) {
       setCostError('No volume tier found for selected tonnage')
       setTripCost(undefined)
@@ -127,7 +127,7 @@ const StepTripDetails = ({
       ? JSON.parse(matchingRateCard.volumePrices)
       : matchingRateCard.volumePrices
 
-    const volumePrice = volumePrices.find((vp: any) => vp.volume === matchedTier.volume)
+    const volumePrice = findVolumePriceForTier(volumePrices, matchedTier)
 
     if (!volumePrice || !volumePrice.rate || volumePrice.rate === 0) {
       setCostError(`No rate set for ${matchedTier.volume} CBM (${selectedTonnage} tons) on this route`)

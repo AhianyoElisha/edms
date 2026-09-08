@@ -11,6 +11,7 @@ import type {
   VolumePrice,
   TruckCategoryType 
 } from '@/types/apps/deliveryTypes'
+import { VOLUME_TIERS, findVolumePriceForTier } from '@/types/apps/deliveryTypes'
 
 // Helper to parse volume prices from string (stored in DB) to array
 function parseVolumePrices(volumePrices: string | VolumePrice[]): VolumePrice[] {
@@ -231,9 +232,14 @@ export async function findApplicableRate(
       volumePrices: parseVolumePrices(validCards[0].volumePrices)
     } as unknown as RateCardType
 
-    // Find the rate for the specific volume
+    // Find the rate for the specific volume. Resolving through the tier keeps rate
+    // cards saved under an older CBM figure (23 tons used to sit on 70 CBM) pointing
+    // at the tonnage they were priced for.
     const volumePrices = rateCard.volumePrices as VolumePrice[]
-    const volumePrice = volumePrices.find(vp => vp.volume === volumeCBM)
+    const tier = VOLUME_TIERS.find(t => t.volume === volumeCBM)
+    const volumePrice = tier
+      ? findVolumePriceForTier(volumePrices, tier)
+      : volumePrices.find(vp => vp.volume === volumeCBM)
 
     if (!volumePrice) {
       // If exact volume not found, find closest available

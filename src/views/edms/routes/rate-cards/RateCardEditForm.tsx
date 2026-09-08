@@ -38,6 +38,13 @@ import { toast } from 'react-toastify'
 
 // Type Imports
 import type { RateCardType, VolumePrice } from '@/types/apps/deliveryTypes'
+import {
+  VOLUME_TIERS,
+  SMALL_TRUCK_TIERS,
+  BIG_TRUCK_TIERS,
+  createEmptyVolumePriceMap,
+  findVolumePriceForTier
+} from '@/types/apps/deliveryTypes'
 
 // Actions Imports
 import { updateRateCard } from '@/libs/actions/ratecard.actions'
@@ -47,23 +54,6 @@ interface RateCardEditFormProps {
   userId: string
 }
 
-// Volume tier configuration
-const SMALL_TRUCK_VOLUMES = [
-  { volume: 10, revisedVolume: 10, tonnage: 3 },
-  { volume: 14, revisedVolume: 15, tonnage: 3.5 },
-  { volume: 18, revisedVolume: 18, tonnage: 5 }
-]
-
-const BIG_TRUCK_VOLUMES = [
-  { volume: 37, revisedVolume: 37, tonnage: 7 },
-  { volume: 41, revisedVolume: 41, tonnage: 8 },
-  { volume: 50, revisedVolume: 50, tonnage: 10 },
-  { volume: 55, revisedVolume: 55, tonnage: 12 },
-  { volume: 60, revisedVolume: 60, tonnage: 15 },
-  { volume: 65, revisedVolume: 65, tonnage: 18 },
-  { volume: 75, revisedVolume: 75, tonnage: 23 }
-]
-
 const RateCardEditForm = ({ rateCard, userId }: RateCardEditFormProps) => {
   const router = useRouter()
 
@@ -72,10 +62,10 @@ const RateCardEditForm = ({ rateCard, userId }: RateCardEditFormProps) => {
     ? JSON.parse(rateCard.volumePrices)
     : rateCard.volumePrices
 
-  // Create initial volume price map
-  const initialPriceMap: Record<number, number> = { 10: 0, 14: 0, 18: 0, 37: 0, 41: 0, 50: 0, 55: 0, 60: 0, 65: 0, 75: 0 }
-  existingVolumePrices.forEach(vp => {
-    initialPriceMap[vp.volume] = vp.rate
+  // Create initial volume price map, keyed by the tier the stored rate belongs to
+  const initialPriceMap = createEmptyVolumePriceMap()
+  VOLUME_TIERS.forEach(tier => {
+    initialPriceMap[tier.volume] = findVolumePriceForTier(existingVolumePrices, tier)?.rate || 0
   })
 
   // States
@@ -137,15 +127,7 @@ const RateCardEditForm = ({ rateCard, userId }: RateCardEditFormProps) => {
       // Convert volume prices map to array format
       const volumePricesArray: VolumePrice[] = []
       
-      SMALL_TRUCK_VOLUMES.forEach(tier => {
-        volumePricesArray.push({
-          volume: tier.volume,
-          tonnage: tier.tonnage,
-          rate: volumePrices[tier.volume] || 0
-        })
-      })
-      
-      BIG_TRUCK_VOLUMES.forEach(tier => {
+      VOLUME_TIERS.forEach(tier => {
         volumePricesArray.push({
           volume: tier.volume,
           tonnage: tier.tonnage,
@@ -284,7 +266,7 @@ const RateCardEditForm = ({ rateCard, userId }: RateCardEditFormProps) => {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {SMALL_TRUCK_VOLUMES.map(tier => (
+                          {SMALL_TRUCK_TIERS.map(tier => (
                             <TableRow key={tier.volume}>
                               <TableCell>
                                 <Typography variant='body2'>{tier.volume}</Typography>
@@ -332,7 +314,7 @@ const RateCardEditForm = ({ rateCard, userId }: RateCardEditFormProps) => {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {BIG_TRUCK_VOLUMES.map(tier => (
+                          {BIG_TRUCK_TIERS.map(tier => (
                             <TableRow key={tier.volume}>
                               <TableCell>
                                 <Typography variant='body2'>{tier.volume}</Typography>

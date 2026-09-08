@@ -474,16 +474,16 @@ export type TruckCategoryType = 'small' | 'big'
 
 // Volume tiers in CBM (Cubic Meters) based on truck category
 // Small truck volumes: 10, 14, 18 CBM
-// Big truck volumes: 37, 41, 50, 55, 60, 65, 70 CBM
+// Big truck volumes: 37, 41, 50, 55, 60, 65, 70, 75 CBM
 export type SmallTruckVolumeType = 10 | 14 | 18
-export type BigTruckVolumeType = 37 | 41 | 50 | 55 | 60 | 65 | 70
+export type BigTruckVolumeType = 37 | 41 | 50 | 55 | 60 | 65 | 70 | 75
 export type TruckVolumeType = SmallTruckVolumeType | BigTruckVolumeType
 
 // Tonnage corresponding to volume tiers
 // Small truck: 3, 3.5, 5 tons
-// Big truck: 7, 8, 10, 12, 15, 18, 23 tons
+// Big truck: 7, 8, 10, 12, 15, 18, 20, 23 tons
 export type SmallTruckTonnageType = 3 | 3.5 | 5
-export type BigTruckTonnageType = 7 | 8 | 10 | 12 | 15 | 18 | 23
+export type BigTruckTonnageType = 7 | 8 | 10 | 12 | 15 | 18 | 20 | 23
 export type TruckTonnageType = SmallTruckTonnageType | BigTruckTonnageType
 
 // Volume tier configuration for display purposes
@@ -507,15 +507,44 @@ export const VOLUME_TIERS: VolumeTierConfig[] = [
   { volume: 55, revisedVolume: 55, tonnage: 12, truckCategory: 'big' },
   { volume: 60, revisedVolume: 60, tonnage: 15, truckCategory: 'big' },
   { volume: 65, revisedVolume: 65, tonnage: 18, truckCategory: 'big' },
-  { volume: 70, revisedVolume: 70, tonnage: 23, truckCategory: 'big' },
+  { volume: 70, revisedVolume: 70, tonnage: 20, truckCategory: 'big' },
+  { volume: 75, revisedVolume: 75, tonnage: 23, truckCategory: 'big' },
 ]
+
+// Tiers split by category — the rate card tables render one table per category
+export const SMALL_TRUCK_TIERS = VOLUME_TIERS.filter(tier => tier.truckCategory === 'small')
+export const BIG_TRUCK_TIERS = VOLUME_TIERS.filter(tier => tier.truckCategory === 'big')
+
+// Look a tier up by the tonnage the user picked on a trip
+export const getVolumeTierByTonnage = (tonnage: number): VolumeTierConfig | undefined =>
+  VOLUME_TIERS.find(tier => tier.tonnage === tonnage)
+
+// A rate map keyed by volume, every tier starting at 0
+export const createEmptyVolumePriceMap = (): Record<number, number> =>
+  Object.fromEntries(VOLUME_TIERS.map(tier => [tier.volume, 0]))
 
 // Price entry for a specific volume tier
 export interface VolumePrice {
-  volume: number // CBM (10, 14, 18, 37, 41, 50, 55, 60, 65, 70)
+  volume: number // CBM (10, 14, 18, 37, 41, 50, 55, 60, 65, 70, 75)
   tonnage: number // Corresponding tonnage
   rate: number // Price in local currency (GH₵)
 }
+
+/**
+ * Resolve the stored price for a volume tier.
+ *
+ * Tonnage is what the tier actually means, so it wins over the CBM figure: rate
+ * cards saved before 23 tons moved from 70 CBM to 75 CBM still carry that rate
+ * under `volume: 70`, and matching on volume alone would hand it to the new
+ * 70 CBM / 20 ton tier. Volume is only used when the entry has no tonnage.
+ */
+export const findVolumePriceForTier = (
+  volumePrices: VolumePrice[],
+  tier: VolumeTierConfig
+): VolumePrice | undefined =>
+  volumePrices.find(vp => vp.volume === tier.volume && vp.tonnage === tier.tonnage) ||
+  volumePrices.find(vp => vp.tonnage === tier.tonnage) ||
+  volumePrices.find(vp => vp.volume === tier.volume && vp.tonnage == null)
 
 // Rate Card Type - Now route-based with volume tiers
 export interface RateCardType {
