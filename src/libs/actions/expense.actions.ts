@@ -12,6 +12,7 @@ import type {
   PaymentMethodType,
   PaymentStatusType
 } from '@/types/apps/deliveryTypes'
+import { listAllDocuments } from './paginate'
 
 /**
  * Get all expenses with optional filtering
@@ -47,16 +48,13 @@ export async function getAllExpenses(filters?: ExpenseFilters): Promise<ExpenseT
     }
 
     queries.push(Query.orderDesc('expenseDate'))
-    queries.push(Query.limit(600))
 
-    const response = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.expenses,
-      queries
-    )
+    // Paged: a flat limit dropped everything past the first page with no error,
+    // so lists and their totals were quietly missing most of the collection
+    const documents = await listAllDocuments<any>(appwriteConfig.expenses, queries, 'expenses')
 
     // Parse additionalImages if stored as JSON string
-    const expenses = response.documents.map((doc: any) => ({
+    const expenses = documents.map((doc: any) => ({
       ...doc,
       additionalImages: doc.additionalImages 
         ? (typeof doc.additionalImages === 'string' ? JSON.parse(doc.additionalImages) : doc.additionalImages)
@@ -534,15 +532,8 @@ export async function getExpenseStats(dateRange?: {
       }
     }
 
-    queries.push(Query.limit(1000))
-
-    const response = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.expenses,
-      queries
-    )
-
-    const expenses = response.documents
+    // Paged: these figures are summed, so a truncated page understates every total
+    const expenses = await listAllDocuments<any>(appwriteConfig.expenses, queries, 'expense stats')
 
     // Calculate totals
     const totalExpenses = expenses.reduce((sum, exp: any) => sum + (exp.amount || exp.totalAmount || 0), 0)

@@ -1,6 +1,7 @@
 import { ID, Query } from 'appwrite'
 import { databases, appwriteConfig, tablesDB } from '@/libs/appwrite.config'
 import type { ManifestType, ManifestFilters, ManifestStats } from '@/types/apps/deliveryTypes'
+import { listAllDocuments } from './paginate'
 
 // Database and Collection IDs
 const DATABASE_ID = appwriteConfig.database
@@ -33,13 +34,11 @@ export const getAllManifests = async (filters?: ManifestFilters): Promise<Manife
     // Add ordering
     queries.push(Query.orderDesc('$createdAt'))
     
-    const response = await databases.listDocuments(
-      DATABASE_ID,
-      MANIFESTS_COLLECTION_ID,
-      [...queries, Query.select(['*', 'trip.*']), Query.limit(1000)]
-    )
-    
-    return response.documents as unknown as ManifestType[]
+    queries.push(Query.select(['*', 'trip.*']))
+
+    // Paged: expanding `trip` caps a page at 500 rows once the manifests span more
+    // than 500 distinct trips, and a flat limit would silently truncate before then
+    return await listAllDocuments<any>(MANIFESTS_COLLECTION_ID, queries, 'manifests') as unknown as ManifestType[]
   } catch (error) {
     console.error('Error fetching manifests:', error)
     throw new Error('Failed to fetch manifests')
@@ -68,15 +67,13 @@ export const getDeliveredManifests = async (
     }
     
     queries.push(Query.orderDesc('deliveryTime'))
-    queries.push(Query.limit(1000))
-    
-    const response = await databases.listDocuments(
-      DATABASE_ID,
+
+    // Paged: reports total these, so a truncated page would understate the figures
+    return await listAllDocuments<any>(
       MANIFESTS_COLLECTION_ID,
-      queries
-    )
-    
-    return response.documents as unknown as ManifestType[]
+      queries,
+      'delivered manifests'
+    ) as unknown as ManifestType[]
   } catch (error) {
     console.error('Error fetching delivered manifests:', error)
     throw new Error('Failed to fetch delivered manifests')

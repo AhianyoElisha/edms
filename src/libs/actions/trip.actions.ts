@@ -3,6 +3,7 @@
 import { databases, tablesDB } from '@/libs/appwrite.config'
 import { appwriteConfig } from '@/libs/appwrite.config'
 import { ID, Query } from 'node-appwrite'
+import { listAllRows } from './paginate'
 
 // Type Imports
 import type { TripWizardData } from '@/views/edms/trips/types'
@@ -548,17 +549,11 @@ export async function getAllTrips(filters?: {
 
     queries.push(Query.orderDesc('$createdAt'))
 
-    console.log('Trip query filters:', queries)
+    queries.push(Query.select(['*', 'driver.*', 'vehicle.*', 'route.*', 'manifests.length']))
 
-    const response = await tablesDB.listRows(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      [...queries, Query.select(['*', 'driver.*', 'vehicle.*', 'route.*', 'manifests.length']), Query.limit(1000)]
-    )
-
-    console.log('Fetched trips:', response)
-
-    return response.rows as unknown as TripType[]
+    // Paged: expanding `manifests` caps a page at 500 rows, and the collection is
+    // past that — a single limit(1000) call fails the whole query outright
+    return await listAllRows<any>(appwriteConfig.trips, queries, 'trips') as unknown as TripType[]
   } catch (error) {
     console.error('Error fetching trips:', error)
     throw new Error('Failed to fetch trips')
