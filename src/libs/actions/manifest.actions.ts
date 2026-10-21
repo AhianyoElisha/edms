@@ -25,11 +25,10 @@ export const getAllManifests = async (filters?: ManifestFilters): Promise<Manife
       queries.push(Query.lessThanEqual('manifestDate', filters.dateRange.end))
     }
     
-    // Add search functionality
-    if (filters?.search) {
-      queries.push(Query.search('manifestNumber', filters.search))
-    }
-    
+    // Search is applied client-side (substring match) - Query.search needs a
+    // fulltext index on manifestNumber, which the collection doesn't have, so it
+    // failed every request and the table showed no manifests.
+
     // Add ordering
     queries.push(Query.orderDesc('$createdAt'))
     

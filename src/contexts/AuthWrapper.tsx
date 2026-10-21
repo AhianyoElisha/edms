@@ -10,11 +10,12 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
 
+    // Only bounce signed-out users to the login page. Re-pushing the current
+    // pathname while the session loads used to strip the query string, which
+    // dropped filters (?status=, ?tripId=...) on every page load.
     useEffect(() => {
       if (!isLoading && !user && pathname !== '/') {
         router.push('/');
-      } else if (isLoading || user && pathname === '/') {
-        router.push(`${pathname}`);
       }
   }, [user, isLoading, router, pathname]);
 
