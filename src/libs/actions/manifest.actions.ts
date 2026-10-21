@@ -254,57 +254,128 @@ export const updateManifestStatus = async (
   }
 ): Promise<ManifestType> => {
   try {
-    // Build update object with ONLY scalar fields
-    const updateData: Record<string, string> = { status }
-    
-    // Add timestamp based on status (only scalar datetime fields)
-    switch (status) {
-      case 'loaded':
-        updateData.departureTime = additionalData?.departureTime || new Date().toISOString()
-        break
-      case 'in_transit':
-        updateData.departureTime = additionalData?.departureTime || new Date().toISOString()
-        break
-      case 'delivered':
-        updateData.arrivalTime = additionalData?.arrivalTime || new Date().toISOString()
-        break
-      case 'completed':
-        updateData.deliveryTime = additionalData?.deliveryTime || new Date().toISOString()
-        break
-    }
-    
-    // Get the manifest first to retrieve the trip ID
-    const existingManifest = await databases.getDocument(
-      DATABASE_ID,
-      MANIFESTS_COLLECTION_ID,
-      manifestId
-    ) as any
-    
-    // Perform the update - Appwrite will preserve all other fields including relationships
-    const manifest = await databases.updateDocument(
-      DATABASE_ID,
-      MANIFESTS_COLLECTION_ID,
-      manifestId,
-      updateData
-    )
-    
+    const { manifest, tripId } = await applyManifestStatus(manifestId, status, additionalData)
+
     // Update trip status based on manifest progress
-    if (existingManifest.trip) {
-      const tripId = typeof existingManifest.trip === 'string' ? existingManifest.trip : existingManifest.trip.$id
-      try {
-        const { checkAndUpdateTripStatus } = await import('./trip.actions')
-        await checkAndUpdateTripStatus(tripId)
-      } catch (error) {
-        console.warn('Could not update trip status:', error)
-        // Don't fail the manifest update if trip update fails
-      }
+    if (tripId) {
+      await refreshTripStatus(tripId)
     }
-    
-    return manifest as unknown as ManifestType
+
+    return manifest
   } catch (error) {
     console.error('Error updating manifest status:', error)
     throw new Error('Failed to update manifest status')
   }
+}
+
+/**
+ * Write a status change onto one manifest without touching its trip.
+ * Returns the trip id so callers can refresh the trip once per batch.
+ */
+const applyManifestStatus = async (
+  manifestId: string,
+  status: ManifestType['status'],
+  additionalData?: {
+    departureTime?: string
+    arrivalTime?: string
+    deliveryTime?: string
+  }
+): Promise<{ manifest: ManifestType; tripId: string | null }> => {
+  // Get the manifest first to retrieve the trip ID
+  const existingManifest = await databases.getDocument(
+    DATABASE_ID,
+    MANIFESTS_COLLECTION_ID,
+    manifestId
+  ) as any
+
+  // Build update object with ONLY scalar fields
+  const updateData: Record<string, string> = { status }
+
+  // Add timestamp based on status (only scalar datetime fields)
+  switch (status) {
+    case 'loaded':
+      updateData.departureTime = additionalData?.departureTime || new Date().toISOString()
+      break
+    case 'in_transit':
+      updateData.departureTime = additionalData?.departureTime || new Date().toISOString()
+      break
+    case 'delivered':
+      updateData.arrivalTime = additionalData?.arrivalTime || new Date().toISOString()
+      break
+    case 'completed':
+      // deliveryTime is when the goods reached the stop (set on delivery or field
+      // capture). Completing is an office step, often done in a batch days later -
+      // overwriting it would stamp every manifest in the batch with the same time.
+      updateData.deliveryTime =
+        additionalData?.deliveryTime || existingManifest.deliveryTime || new Date().toISOString()
+      break
+  }
+
+  // Perform the update - Appwrite will preserve all other fields including relationships
+  const manifest = await databases.updateDocument(
+    DATABASE_ID,
+    MANIFESTS_COLLECTION_ID,
+    manifestId,
+    updateData
+  )
+
+  const trip = existingManifest.trip
+  const tripId = trip ? (typeof trip === 'string' ? trip : trip.$id) : null
+
+  return { manifest: manifest as unknown as ManifestType, tripId }
+}
+
+const refreshTripStatus = async (tripId: string) => {
+  try {
+    const { checkAndUpdateTripStatus } = await import('./trip.actions')
+    await checkAndUpdateTripStatus(tripId)
+  } catch (error) {
+    console.warn('Could not update trip status:', error)
+    // Don't fail the manifest update if trip update fails
+  }
+}
+
+/**
+ * Move many manifests to the same status in one go.
+ *
+ * Each manifest is updated independently, so one failure does not stop the
+ * rest - the caller gets back which ids went through and which did not.
+ * Trip status is re-checked once per affected trip rather than once per
+ * manifest, since that check reloads the whole trip.
+ */
+export const bulkUpdateManifestStatus = async (
+  manifestIds: string[],
+  status: ManifestType['status']
+): Promise<{ succeeded: string[]; failed: { id: string; error: string }[] }> => {
+  const succeeded: string[] = []
+  const failed: { id: string; error: string }[] = []
+  const tripIds = new Set<string>()
+
+  // Small batches keep a large selection from tripping Appwrite's rate limit.
+  const BATCH_SIZE = 5
+
+  for (let i = 0; i < manifestIds.length; i += BATCH_SIZE) {
+    const batch = manifestIds.slice(i, i + BATCH_SIZE)
+    const results = await Promise.allSettled(batch.map(id => applyManifestStatus(id, status)))
+
+    results.forEach((result, index) => {
+      const id = batch[index]
+
+      if (result.status === 'fulfilled') {
+        succeeded.push(id)
+        if (result.value.tripId) tripIds.add(result.value.tripId)
+      } else {
+        console.error(`Error updating manifest ${id} status:`, result.reason)
+        failed.push({ id, error: result.reason?.message || 'Update failed' })
+      }
+    })
+  }
+
+  for (const tripId of tripIds) {
+    await refreshTripStatus(tripId)
+  }
+
+  return { succeeded, failed }
 }
 
 /**

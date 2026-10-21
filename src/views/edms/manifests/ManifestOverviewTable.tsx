@@ -22,8 +22,13 @@ import {
   DialogActions,
   Grid,
   LinearProgress,
-  TextField
+  TextField,
+  MenuItem,
+  Checkbox,
+  Tooltip,
+  CircularProgress
 } from '@mui/material'
+import { toast } from 'react-toastify'
 import { DatePicker } from '@mui/x-date-pickers-pro'
 import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs'
 import { LocalizationProvider } from '@mui/x-date-pickers-pro'
@@ -39,6 +44,7 @@ import {
   getAllManifests, 
   deleteManifest,
   updateManifestStatus,
+  bulkUpdateManifestStatus,
   getManifestStatistics, isManifestAwaitingVerification } from '@/libs/actions/manifest.actions'
 
 // Component Imports
@@ -55,12 +61,32 @@ import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-t
 
 LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz03MTc0MCxFPTE3MjI1MzA1NTIwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
 
+// A manifest can be completed once it is delivered and the office has entered
+// its figures - completing a field capture before review would lock in zeros.
+const isReadyToComplete = (manifest: ManifestType) =>
+  manifest.status === 'delivered' && !isManifestAwaitingVerification(manifest)
+
+const STATUS_FILTERS = [
+  { value: '', label: 'All Statuses' },
+  { value: 'ready', label: 'Ready to Complete' },
+  { value: 'review', label: 'Needs Review' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'loaded', label: 'Loaded' },
+  { value: 'in_transit', label: 'In Transit' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'completed', label: 'Completed' }
+]
+
 interface ManifestOverviewTableProps {
   onEditManifest?: (manifest: ManifestType) => void
 }
 
 const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) => {
-  const { hasPermission } = usePermissions()
+  const { hasPermission, isDriver } = usePermissions()
+
+  // Same gate the review queue uses: drivers hold manifests.edit, but closing
+  // out manifests is the office's job.
+  const canBulkComplete = !isDriver && hasPermission('manifests.edit')
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -72,6 +98,9 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
   const [viewDialogOpen, setViewDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [manifestToDelete, setManifestToDelete] = useState<ManifestType | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
+  const [bulkUpdating, setBulkUpdating] = useState(false)
 
   // URL param helper
   const updateParam = useCallback((key: string, value: string) => {
@@ -102,10 +131,12 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
   const searchValue = searchParams.get('search') || ''
   const dateFrom = searchParams.get('dateFrom') ? dayjs(searchParams.get('dateFrom')) : null
   const dateTo = searchParams.get('dateTo') ? dayjs(searchParams.get('dateTo')) : null
+  const statusFilter = searchParams.get('status') || ''
 
   const setSearchValue = useCallback((value: string) => updateParam('search', value), [updateParam])
   const setDateFrom = useCallback((value: Dayjs | null) => updateParam('dateFrom', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
   const setDateTo = useCallback((value: Dayjs | null) => updateParam('dateTo', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
+  const setStatusFilter = useCallback((value: string) => updateParam('status', value), [updateParam])
 
   // Filters object for API call
   const filters: ManifestFilters = useMemo(() => ({
@@ -149,8 +180,17 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
       filtered = filtered.filter(manifest => dayjs(manifest.manifestDate).isBefore(dateTo.endOf('day').add(1, 'ms')))
     }
 
+    // Status filter
+    if (statusFilter === 'ready') {
+      filtered = filtered.filter(isReadyToComplete)
+    } else if (statusFilter === 'review') {
+      filtered = filtered.filter(isManifestAwaitingVerification)
+    } else if (statusFilter) {
+      filtered = filtered.filter(manifest => manifest.status === statusFilter)
+    }
+
     return filtered
-  }, [manifests, filters, dateFrom, dateTo])
+  }, [manifests, filters, dateFrom, dateTo, statusFilter])
 
   // Export configuration
   const exportColumns: ExportColumn[] = useMemo(() => [
@@ -177,6 +217,11 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
   useEffect(() => {
     setFilteredManifests(applyFilters)
     setPage(0) // Reset to first page when filters change
+    // Keep only selections still visible and still completable - drops rows hidden
+    // by a filter and rows a refresh shows as completed, keeps failed ones for retry
+    const stillReady = new Set(applyFilters.filter(isReadyToComplete).map(m => m.$id))
+
+    setSelectedIds(prev => new Set(Array.from(prev).filter(id => stillReady.has(id))))
   }, [applyFilters])
 
   // Pagination
@@ -184,6 +229,63 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   )
+
+  // Selection - only manifests that can actually be completed are selectable
+  const selectableOnPage = paginatedManifests.filter(isReadyToComplete)
+  const readyInView = filteredManifests.filter(isReadyToComplete)
+  const selectedOnPage = selectableOnPage.filter(m => selectedIds.has(m.$id)).length
+  const allOnPageSelected = selectableOnPage.length > 0 && selectedOnPage === selectableOnPage.length
+
+  const toggleSelected = (manifestId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+
+      if (next.has(manifestId)) {
+        next.delete(manifestId)
+      } else {
+        next.add(manifestId)
+      }
+
+      return next
+    })
+  }
+
+  const toggleSelectPage = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+
+      selectableOnPage.forEach(m => (allOnPageSelected ? next.delete(m.$id) : next.add(m.$id)))
+
+      return next
+    })
+  }
+
+  const handleBulkComplete = async () => {
+    const ids = Array.from(selectedIds)
+
+    try {
+      setBulkUpdating(true)
+      const { succeeded, failed } = await bulkUpdateManifestStatus(ids, 'completed')
+
+      if (succeeded.length > 0) {
+        toast.success(`${succeeded.length} manifest${succeeded.length === 1 ? '' : 's'} marked as completed`)
+      }
+
+      if (failed.length > 0) {
+        toast.error(`${failed.length} manifest${failed.length === 1 ? '' : 's'} could not be completed - still selected, try again`)
+      }
+
+      setBulkDialogOpen(false)
+      await fetchManifests()
+      // Leave the failures selected so a retry is one click away
+      setSelectedIds(new Set(failed.map(f => f.id)))
+    } catch (error) {
+      console.error('Error completing manifests:', error)
+      toast.error('Could not complete the selected manifests')
+    } finally {
+      setBulkUpdating(false)
+    }
+  }
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage)
@@ -296,6 +398,8 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
         })
         break
       case 'delivered':
+        // Same rule as the bulk checkboxes - an unreviewed field capture would complete with zero packages
+        if (!isReadyToComplete(manifest)) break
         options.push({
           text: 'Mark as Completed',
           icon: 'ri-check-double-line',
@@ -382,12 +486,79 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
             Clear Dates
           </Button>
         )}
+        <TextField
+          select
+          size='small'
+          label='Status'
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          sx={{ minWidth: 180 }}
+        >
+          {STATUS_FILTERS.map(option => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
       </Box>
+
+      {canBulkComplete && selectedIds.size > 0 && (
+        <Box
+          sx={{
+            mx: 3,
+            mb: 2,
+            px: 3,
+            py: 1.5,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 2,
+            alignItems: 'center',
+            borderRadius: 1,
+            bgcolor: 'action.selected'
+          }}
+        >
+          <Typography variant='subtitle2'>
+            {selectedIds.size} selected
+          </Typography>
+          {selectedIds.size < readyInView.length && (
+            <Button size='small' variant='text' onClick={() => setSelectedIds(new Set(readyInView.map(m => m.$id)))}>
+              Select all {readyInView.length} ready to complete
+            </Button>
+          )}
+          <Button size='small' variant='text' onClick={() => setSelectedIds(new Set())}>
+            Clear
+          </Button>
+          <Box sx={{ flexGrow: 1 }} />
+          <Button
+            size='small'
+            variant='contained'
+            color='success'
+            startIcon={<i className='ri-check-double-line' />}
+            onClick={() => setBulkDialogOpen(true)}
+          >
+            Mark as Completed
+          </Button>
+        </Box>
+      )}
       
       <TableContainer>
         <Table>
           <TableHead>
             <TableRow>
+              {canBulkComplete && (
+                <TableCell padding='checkbox'>
+                  <Tooltip title={selectableOnPage.length === 0 ? 'No manifests on this page are ready to complete' : 'Select all ready to complete on this page'}>
+                    <span>
+                      <Checkbox
+                        checked={allOnPageSelected}
+                        indeterminate={selectedOnPage > 0 && !allOnPageSelected}
+                        disabled={selectableOnPage.length === 0}
+                        onChange={toggleSelectPage}
+                      />
+                    </span>
+                  </Tooltip>
+                </TableCell>
+              )}
               <TableCell>Manifest Details</TableCell>
               <TableCell>Route</TableCell>
               <TableCell>Packages</TableCell>
@@ -398,7 +569,31 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
           </TableHead>
           <TableBody>
             {paginatedManifests.map((manifest) => (
-              <TableRow key={manifest.$id} hover>
+              <TableRow key={manifest.$id} hover selected={selectedIds.has(manifest.$id)}>
+                {canBulkComplete && (
+                  <TableCell padding='checkbox'>
+                    {isReadyToComplete(manifest) ? (
+                      <Checkbox
+                        checked={selectedIds.has(manifest.$id)}
+                        onChange={() => toggleSelected(manifest.$id)}
+                      />
+                    ) : (
+                      <Tooltip
+                        title={
+                          manifest.status === 'completed'
+                            ? 'Already completed'
+                            : isManifestAwaitingVerification(manifest)
+                              ? 'Enter package details before completing'
+                              : 'Only delivered manifests can be completed'
+                        }
+                      >
+                        <span>
+                          <Checkbox disabled />
+                        </span>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                )}
                 <TableCell>
                   <Box>
                     <Typography variant="subtitle2" fontWeight="bold">
@@ -468,7 +663,7 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
             ))}
             {paginatedManifests.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={canBulkComplete ? 7 : 6} align="center">
                   <Typography color="text.secondary">
                     No manifests found
                   </Typography>
@@ -582,6 +777,33 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
         <DialogActions>
           <Button onClick={() => setViewDialogOpen(false)}>
             Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Bulk Complete Confirmation Dialog */}
+      <Dialog
+        open={bulkDialogOpen}
+        onClose={() => !bulkUpdating && setBulkDialogOpen(false)}
+      >
+        <DialogTitle>Mark Manifests as Completed</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Mark {selectedIds.size} manifest{selectedIds.size === 1 ? '' : 's'} as completed?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkDialogOpen(false)} disabled={bulkUpdating}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleBulkComplete}
+            color="success"
+            variant="contained"
+            disabled={bulkUpdating}
+            startIcon={bulkUpdating ? <CircularProgress size={16} color="inherit" /> : <i className='ri-check-double-line' />}
+          >
+            {bulkUpdating ? 'Completing…' : 'Mark as Completed'}
           </Button>
         </DialogActions>
       </Dialog>
