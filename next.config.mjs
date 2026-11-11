@@ -4,7 +4,7 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'cloud.appwrite.io',
+        hostname: 'api.edsghana.com',
         pathname: '/v1/storage/buckets/**',
       },
     ],
