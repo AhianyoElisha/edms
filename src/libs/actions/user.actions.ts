@@ -5,6 +5,8 @@ import { appwriteConfig } from './../appwrite.config';
 import { Users } from "@/types/apps/ecommerceTypes";
 import { Client, Databases, Users as UsersAPI, Query, ID } from 'node-appwrite';
 import { emailKey, personNameKey, phoneKey } from '@/utils/fleetIdentity';
+import { withTextCase } from '../textCaseGuard';
+import { toNameCase } from '@/utils/textCase';
 
 // Initialize server-side Appwrite client with API key
 const serverClient = new Client()
@@ -12,7 +14,7 @@ const serverClient = new Client()
   .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT!)
   .setKey(process.env.APPWRITE_API_KEY!);
 
-const serverDatabases = new Databases(serverClient);
+const serverDatabases = withTextCase(new Databases(serverClient));
 const usersAPI = new UsersAPI(serverClient);
 
 export type SimilarUser = {
@@ -119,7 +121,7 @@ export async function createUserAccount(
       authEmail,
       undefined, // phone (optional)
       userData.password,
-      userData.name
+      toNameCase(userData.name)
     );
 
     console.log('Auth account created successfully:', {
