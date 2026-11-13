@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { account } from '@/libs/appwrite.config';
 import { getCurrentUser, signInAccount } from '@/libs/actions/auth.actions';
+import { clearPortalToken } from '@/libs/portalClient';
 
 interface AuthContextType {
     user: any | null;
@@ -44,6 +45,7 @@ export const AppwriteProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const logout = async () => {
         try {
             await account.deleteSession('current');
+            clearPortalToken();
             setUser(null);
         } catch (error) {
             console.error('Logout failed', error);

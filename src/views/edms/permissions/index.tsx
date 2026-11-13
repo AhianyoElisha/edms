@@ -49,6 +49,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 
 // Style Imports
 import tableStyles from '@core/styles/table.module.css'
+import Alert from '@mui/material/Alert'
 
 declare module '@tanstack/table-core' {
   interface FilterFns {
@@ -236,6 +237,16 @@ const Permissions = ({ permissions }: any) => {
 
   return (
     <>
+      <Alert severity='info' icon={<i className='ri-building-line' />} className='mbe-6'>
+        <Typography className='font-medium' color='inherit'>
+          Company logins are not controlled from this list.
+        </Typography>
+        <Typography variant='body2' color='inherit'>
+          These permissions apply to staff roles. A company login (role: Company) always sees only its own company&apos;s
+          trips and manifests, and cannot be given any of the permissions below. Which company a login belongs to is
+          chosen when the user is added.
+        </Typography>
+      </Alert>
       <Card>
         <CardContent className='flex flex-col sm:flex-row items-start sm:items-center justify-between max-sm:gap-4'>
           <DebouncedInput

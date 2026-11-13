@@ -27,6 +27,8 @@ import { getRolesList } from '@/libs/actions/roles.actions'
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
+import Alert from '@mui/material/Alert'
+import { isCompanyRoleName } from '@/utils/companyAccess'
 
 type CardDataType = {
   $id?: string
@@ -127,21 +129,29 @@ const RoleCards = ({ usersData }: { usersData: Users[] }) => {
                     />
                   </div>
                 </div>
-                <div className='flex gap-2'>
-                  <Button
-                    variant='outlined'
-                    size='small'
-                    startIcon={<i className='ri-settings-4-line' />}
-                    onClick={() => handleManagePermissions({
-                      $id: item.$id,
-                      name: item.role,
-                      displayName: item.title
-                    })}
-                    className='flex-1'
-                  >
-                    Manage Permissions
-                  </Button>
-                </div>
+                {isCompanyRoleName(item.role) ? (
+                  // The company role has no permissions to tick: what it can see is fixed
+                  <Alert severity='info' icon={<i className='ri-building-line' />}>
+                    For company logins. Each one sees only its own company&apos;s trips and manifests. This cannot be
+                    widened here; pick the company when adding the user.
+                  </Alert>
+                ) : (
+                  <div className='flex gap-2'>
+                    <Button
+                      variant='outlined'
+                      size='small'
+                      startIcon={<i className='ri-settings-4-line' />}
+                      onClick={() => handleManagePermissions({
+                        $id: item.$id,
+                        name: item.role,
+                        displayName: item.title
+                      })}
+                      className='flex-1'
+                    >
+                      Manage Permissions
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </Grid>
