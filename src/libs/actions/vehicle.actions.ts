@@ -76,7 +76,12 @@ export async function createVehicle(vehicleData: CreateVehicleData, userId?: str
 // Get all vehicles with optional filtering
 export async function getAllVehicles(filters?: VehicleFilters): Promise<VehicleType[]> {
   try {
-    const queries = [Query.orderDesc('$createdAt'), Query.limit(300)]
+    // The assigned driver is needed wherever a vehicle is picked (trip form, expenses)
+    const queries = [
+      Query.orderDesc('$createdAt'),
+      Query.select(['*', 'driver.$id', 'driver.name', 'driver.status']),
+      Query.limit(300)
+    ]
     
     // Add filters if provided
     if (filters?.status) {

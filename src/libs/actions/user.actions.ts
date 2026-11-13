@@ -4,6 +4,7 @@ import { databases, account, tablesDB } from "../appwrite.config";
 import { appwriteConfig } from './../appwrite.config';
 import { Users } from "@/types/apps/ecommerceTypes";
 import { Client, Databases, Users as UsersAPI, Query, ID } from 'node-appwrite';
+import { emailKey, personNameKey, phoneKey } from '@/utils/fleetIdentity';
 
 // Initialize server-side Appwrite client with API key
 const serverClient = new Client()
@@ -14,19 +15,89 @@ const serverClient = new Client()
 const serverDatabases = new Databases(serverClient);
 const usersAPI = new UsersAPI(serverClient);
 
+export type SimilarUser = {
+  $id: string;
+  name: string;
+  phone: string;
+  email: string;
+  role: string;
+  matchedOn: Array<'name' | 'phone' | 'email'>;
+};
+
+/**
+ * Active users who look like the person about to be added: same name (in any
+ * word order or letter case), same phone number, or same email.
+ */
+export async function findSimilarUsers(candidate: { name: string; phone: string; email: string }): Promise<SimilarUser[]> {
+  const name = personNameKey(candidate.name);
+  const phone = phoneKey(candidate.phone);
+  const email = emailKey(candidate.email);
+  const matches: SimilarUser[] = [];
+  let cursor: string | undefined;
+
+  for (;;) {
+    const page = await serverDatabases.listDocuments(appwriteConfig.database, appwriteConfig.users, [
+      Query.notEqual('status', 'deleted'),
+      Query.select(['$id', 'name', 'phone', 'email', 'role.name', 'role.displayName']),
+      Query.limit(500),
+      ...(cursor ? [Query.cursorAfter(cursor)] : [])
+    ]);
+
+    for (const user of page.documents as any[]) {
+      const matchedOn: SimilarUser['matchedOn'] = [];
+
+      if (name && personNameKey(user.name) === name) matchedOn.push('name');
+      if (phone && phoneKey(user.phone) === phone) matchedOn.push('phone');
+      if (email && emailKey(user.email) === email) matchedOn.push('email');
+
+      if (matchedOn.length) {
+        matches.push({
+          $id: user.$id,
+          name: user.name,
+          phone: user.phone,
+          email: user.email,
+          role: user.role?.displayName || user.role?.name || '',
+          matchedOn
+        });
+      }
+    }
+
+    if (page.documents.length < 500) break;
+    cursor = page.documents[page.documents.length - 1].$id;
+  }
+
+  return matches;
+}
+
 /**
  * Create user account using server-side SDK with admin privileges
  * This is the recommended way for admins to create users
+ *
+ * Refuses to create a second record for someone who is already in the system
+ * and returns the look-alikes instead (`duplicates`). A match on name and phone,
+ * or on email, is never allowed. A match on only the name or only the phone can
+ * be two different people, so the caller may retry with `allowSimilar`.
  */
-export async function createUserAccount(userData: {
-  name: string;
-  username: string;
-  email: string;
-  password: string;
-  phone: string;
-  role: string;
-  avatar: string;
-}) {
+export async function createUserAccount(
+  userData: {
+    name: string;
+    username: string;
+    email: string;
+    password: string;
+    phone: string;
+    role: string;
+    avatar: string;
+  },
+  options: { allowSimilar?: boolean } = {}
+): Promise<{ success: true; user: any } | { success: false; duplicates: SimilarUser[]; canOverride: boolean }> {
+  const similar = await findSimilarUsers(userData);
+  const certain = similar.filter(
+    u => u.matchedOn.includes('email') || (u.matchedOn.includes('name') && u.matchedOn.includes('phone'))
+  );
+
+  if (certain.length) return { success: false, duplicates: certain, canOverride: false };
+  if (similar.length && !options.allowSimilar) return { success: false, duplicates: similar, canOverride: true };
+
   try {
     // Create account with @eds.com email for authentication
     const authEmail = `${userData.username}@eds.com`;
@@ -73,7 +144,7 @@ export async function createUserAccount(userData: {
     );
 
     console.log('User document created successfully:', user.$id);
-    return { success: true, user };
+    return { success: true as const, user };
   } catch (error: any) {
     console.error('=== Error Creating User ===');
     console.error('Error details:', error);
@@ -263,6 +334,22 @@ export async function deleteUser(userId: string) {
     );
 
     console.log('User marked as deleted:', userId);
+
+    // A removed driver must not stay as the assigned driver of a vehicle
+    // (best-effort - the user is already deactivated at this point).
+    try {
+      const vehicles = await serverDatabases.listDocuments(appwriteConfig.database, appwriteConfig.vehicles, [
+        Query.equal('driver', userId),
+        Query.select(['$id']),
+        Query.limit(100)
+      ]);
+
+      for (const vehicle of vehicles.documents) {
+        await serverDatabases.updateDocument(appwriteConfig.database, appwriteConfig.vehicles, vehicle.$id, { driver: null });
+      }
+    } catch (vehicleError: any) {
+      console.error('Failed to unassign vehicles (continuing):', vehicleError?.message);
+    }
 
     // Remove the underlying auth account so the user can no longer sign in
     // (best-effort — a missing account shouldn't fail the whole operation).

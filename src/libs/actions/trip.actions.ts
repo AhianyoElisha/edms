@@ -4,10 +4,25 @@ import { databases, tablesDB } from '@/libs/appwrite.config'
 import { appwriteConfig } from '@/libs/appwrite.config'
 import { ID, Query } from 'node-appwrite'
 import { listAllRows } from './paginate'
+import { setVehicleDriver } from './customer.action'
 
 // Type Imports
 import type { TripWizardData } from '@/views/edms/trips/types'
 import type { TripType } from '@/types/apps/deliveryTypes'
+
+/**
+ * When the planner ticked "make this the vehicle's driver", record the change on the
+ * vehicle. The trip is already saved by now, so a failure here must not undo it.
+ */
+async function syncVehicleDriver(tripDetails: TripWizardData['tripDetails']) {
+  if (!tripDetails.assignDriverToVehicle || !tripDetails.vehicleId || !tripDetails.driverId) return
+
+  try {
+    await setVehicleDriver(tripDetails.vehicleId, tripDetails.driverId)
+  } catch (error) {
+    console.error('Trip saved, but the vehicle driver could not be updated:', error)
+  }
+}
 
 /**
  * Create a complete trip with all manifests
@@ -176,6 +191,8 @@ export async function createTripWithManifests(wizardData: TripWizardData): Promi
         }
       )
     }
+
+    await syncVehicleDriver(tripDetails)
 
     return {
       success: true,
@@ -479,6 +496,8 @@ export async function updateTripWithManifests(
       tripCost: tripDetails.tripCost || 0,
       checkpoints: JSON.stringify(checkpoints)
     })
+
+    await syncVehicleDriver(tripDetails)
 
     return { success: true }
   } catch (error) {

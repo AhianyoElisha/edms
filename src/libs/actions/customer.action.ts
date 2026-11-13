@@ -2,6 +2,8 @@ import { ID, Query } from "appwrite";
 import { account, databases, tablesDB } from "../appwrite.config";
 import { appwriteConfig } from './../appwrite.config';
 import { Customer, Logistics, Supplier, Worker } from "@/types/apps/ecommerceTypes";
+import { listAllDocuments } from './paginate'
+import { formatVehicleNumber, vehicleKey } from '@/utils/fleetIdentity'
 
 
 export async function saveCustomerToDB(Customer: Customer) {
@@ -31,16 +33,72 @@ export async function saveCustomerToDB(Customer: Customer) {
 }
 
 
+/**
+ * The vehicle that already carries this number plate, if any.
+ * Plates are compared ignoring case, spaces and dashes.
+ */
+export async function findVehicleByNumber(vehicleNumber: string, excludeVehicleId?: string) {
+  const key = vehicleKey(vehicleNumber)
+
+  if (!key) return null
+
+  const vehicles = await listAllDocuments<any>(appwriteConfig.vehicles, [Query.select(['$id', 'vehicleNumber', 'status'])])
+
+  return vehicles.find((v: any) => v.$id !== excludeVehicleId && vehicleKey(v.vehicleNumber) === key) || null
+}
+
+const assertVehicleNumberIsFree = async (vehicleNumber: string, excludeVehicleId?: string) => {
+  const existing = await findVehicleByNumber(vehicleNumber, excludeVehicleId)
+
+  if (existing) {
+    throw new Error(
+      `Vehicle ${existing.vehicleNumber} is already registered${existing.status && existing.status !== 'active' ? ` (status: ${existing.status})` : ''}. Open it from the vehicle list instead of adding it again.`
+    )
+  }
+}
+
+/**
+ * A driver is linked to one vehicle at a time. Before linking them to a vehicle,
+ * take them off any other vehicle they are still on; otherwise the save is rejected
+ * and the only way round it was to register the same vehicle a second time.
+ */
+async function releaseDriverFromOtherVehicles(driverId: string, keepVehicleId?: string) {
+  const current = await databases.listDocuments(appwriteConfig.database, appwriteConfig.vehicles, [
+    Query.equal('driver', driverId),
+    Query.select(['$id']),
+    Query.limit(100)
+  ])
+
+  for (const vehicle of current.documents) {
+    if (vehicle.$id === keepVehicleId) continue
+    await databases.updateDocument(appwriteConfig.database, appwriteConfig.vehicles, vehicle.$id, { driver: null })
+  }
+}
+
+/**
+ * Make `driverId` the assigned driver of a vehicle (or clear it with null),
+ * moving the driver over from whichever vehicle they were on before.
+ */
+export async function setVehicleDriver(vehicleId: string, driverId: string | null) {
+  if (driverId) await releaseDriverFromOtherVehicles(driverId, vehicleId)
+
+  return databases.updateDocument(appwriteConfig.database, appwriteConfig.vehicles, vehicleId, {
+    driver: driverId || null
+  })
+}
+
 // Save vehicle to database (Delivery Service)
 export async function saveTruckOrTricycleToDB(vehicle: Logistics) {
   try {
-    console.log('Creating vehicle:', vehicle)
+    await assertVehicleNumberIsFree(vehicle.vehicleNumber)
+    if (vehicle.driver) await releaseDriverFromOtherVehicles(vehicle.driver as string)
+
     const newVehicle = await databases.createDocument(
       appwriteConfig.database,
       appwriteConfig.vehicles,
       ID.unique(),
         {
-          vehicleNumber: vehicle.vehicleNumber,
+          vehicleNumber: formatVehicleNumber(vehicle.vehicleNumber),
           vehicleType: vehicle.vehicleType,
           brand: vehicle.brand || null,
           model: vehicle.model || null,
@@ -63,13 +121,15 @@ export async function saveTruckOrTricycleToDB(vehicle: Logistics) {
 // Update vehicle in database (Delivery Service)
 export async function updateTruckOrTricycleInDB(vehicle: Logistics & { id: string}) {
   try {
-    console.log('Updating vehicle:', vehicle)
+    await assertVehicleNumberIsFree(vehicle.vehicleNumber, vehicle.id)
+    if (vehicle.driver) await releaseDriverFromOtherVehicles(vehicle.driver as string, vehicle.id)
+
     const updatedVehicle = await databases.updateDocument(
       appwriteConfig.database,
       appwriteConfig.vehicles,
       vehicle.id,
         {
-          vehicleNumber: vehicle.vehicleNumber,
+          vehicleNumber: formatVehicleNumber(vehicle.vehicleNumber),
           vehicleType: vehicle.vehicleType,
           brand: vehicle.brand || null,
           model: vehicle.model || null,

@@ -12,7 +12,7 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import FormControl from '@mui/material/FormControl'
 import FormHelperText from '@mui/material/FormHelperText'
-import { Alert, InputLabel, MenuItem, Select, Autocomplete } from '@mui/material'
+import { Alert, InputLabel, MenuItem, Select } from '@mui/material'
 import { toast } from 'react-toastify'
 
 // Components
@@ -21,8 +21,8 @@ import PerfectScrollbar from 'react-perfect-scrollbar'
 // Types
 import type { Logistics } from '@/types/apps/ecommerceTypes'
 import { updateTruckOrTricycleInDB } from '@/libs/actions/customer.action'
-import { getAllRoutes } from '@/libs/actions/route.actions'
-import { getAllUsers } from '@/libs/actions/auth.actions'
+import VehicleDriverField from './VehicleDriverField'
+import { vehicleDriverId } from '@/utils/fleetIdentity'
 
 type Props = {
   open: boolean
@@ -49,10 +49,6 @@ const EditLogisticsDrawer = (props: Props) => {
   const { open, handleClose,vehicleData, onSuccess } = props
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [drivers, setDrivers] = useState<any[]>([])
-  const [routes, setRoutes] = useState<any[]>([])
-  const [loadingDrivers, setLoadingDrivers] = useState(false)
-  const [loadingRoutes, setLoadingRoutes] = useState(false)
 
   const {
     control,
@@ -71,44 +67,12 @@ const EditLogisticsDrawer = (props: Props) => {
       ownership: vehicleData?.ownership || 'owned',
       cbmVolume: vehicleData?.cbmVolume || undefined,
       monthlyRentalCost: vehicleData?.monthlyRentalCost || 0,
-      driver: vehicleData?.driver || '',
+      driver: vehicleDriverId(vehicleData) || '',
       status: vehicleData?.status || 'active',
     }
   })
 
   const ownership = watch('ownership')
-
-  // Fetch drivers and routes
-  useEffect(() => {
-    if (open) {
-      fetchDrivers()
-      fetchRoutes()
-    }
-  }, [open])
-
-  const fetchDrivers = async () => {
-    try {
-      setLoadingDrivers(true)
-      const response = await getAllUsers('driver')
-      setDrivers(response || [])
-    } catch (error) {
-      console.error('Error fetching drivers:', error)
-    } finally {
-      setLoadingDrivers(false)
-    }
-  }
-
-  const fetchRoutes = async () => {
-    try {
-      setLoadingRoutes(true)
-      const response = await getAllRoutes()
-      setRoutes(response || [])
-    } catch (error) {
-      console.error('Error fetching routes:', error)
-    } finally {
-      setLoadingRoutes(false)
-    }
-  }
 
   const onSubmit = async (data: Logistics) => {
     try {
@@ -140,7 +104,7 @@ const EditLogisticsDrawer = (props: Props) => {
     } catch (error) {
       console.error('Error updating vehicle:', error)
       setError(error instanceof Error ? error.message : 'Failed to update vehicle')
-      toast.error('Failed to update vehicle')
+      toast.error(error instanceof Error ? error.message : 'Failed to update vehicle')
     } finally {
       setIsSubmitting(false)
     }
@@ -156,7 +120,7 @@ const EditLogisticsDrawer = (props: Props) => {
       ownership: vehicleData?.ownership || 'owned',
       cbmVolume: vehicleData?.cbmVolume || undefined,
       monthlyRentalCost: vehicleData?.monthlyRentalCost || 0,
-      driver: vehicleData?.driver || '',
+      driver: vehicleDriverId(vehicleData) || '',
       status: vehicleData?.status || 'active',
     })
     setError(null)
@@ -169,6 +133,25 @@ const EditLogisticsDrawer = (props: Props) => {
       setError(null)
     }
   }, [open])
+
+  // The drawer stays mounted while the vehicle behind it changes, so load the
+  // chosen vehicle's values each time it opens
+  useEffect(() => {
+    if (!open || !vehicleData) return
+
+    resetForm({
+      vehicleNumber: vehicleData.vehicleNumber || '',
+      vehicleType: vehicleData.vehicleType || 'truck',
+      brand: vehicleData.brand || '',
+      model: vehicleData.model || '',
+      year: vehicleData.year || undefined,
+      ownership: vehicleData.ownership || 'owned',
+      cbmVolume: vehicleData.cbmVolume || undefined,
+      monthlyRentalCost: vehicleData.monthlyRentalCost || 0,
+      driver: vehicleDriverId(vehicleData) || '',
+      status: vehicleData.status || 'active'
+    })
+  }, [open, vehicleData, resetForm])
 
   return (
     <Drawer
@@ -385,21 +368,11 @@ const EditLogisticsDrawer = (props: Props) => {
               name='driver'
               control={control}
               render={({ field: { onChange, value } }) => (
-                <Autocomplete
-                  value={drivers.find((d) => d.$id === value) || null}
-                  onChange={(_, newValue) => onChange(newValue?.$id || '')}
-                  options={drivers}
-                  getOptionLabel={(option) => `${option.name || 'Unnamed Driver'} `}
-                  loading={loadingDrivers}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label='Assign Driver (Optional)'
-                      placeholder='Select a driver'
-                      error={!!errors.driver}
-                      helperText={errors.driver?.message || 'Assign a driver to this vehicle'}
-                    />
-                  )}
+                <VehicleDriverField
+                  value={(value as string) || ''}
+                  onChange={onChange}
+                  open={open}
+                  vehicleId={vehicleData?.$id} error={errors.driver?.message}
                 />
               )}
             />
