@@ -6,8 +6,8 @@ import DeliveredPackagesTable from '@/views/edms/packages/delivered/DeliveredPac
 import PermissionGuard from '@/components/PermissionGuard'
 
 export const metadata: Metadata = {
-  title: 'Delivered Packages - Delivery Management',
-  description: 'View all delivered packages with date range filtering'
+  title: 'Completed Deliveries - Delivery Management',
+  description: 'Completed deliveries grouped by driver and route'
 }
 
 const DeliveredPackagesPage = () => {

@@ -1,3 +1,6 @@
+// Next Imports
+import type { Metadata, Viewport } from 'next'
+
 // Font Imports
 import { Inter } from 'next/font/google'
 
@@ -31,6 +34,7 @@ import '@assets/iconify-icons/generated-icons.css'
 
 import { AppwriteProvider } from '@/contexts/AppwriteProvider'
 import MaintenanceBanner from './MaintenanceBanner'
+import PwaRegister from '@components/PwaRegister'
 
 // Configure Inter font
 const inter = Inter({
@@ -42,9 +46,27 @@ import AuthWrapper from '@/contexts/AuthWrapper'
 import AttentionBanner from './AttentionBanner'
 import DynamicAttentionBanner from './DynamicAttentionBanner'
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Ezar Delivery Services',
-  description: 'Your Trusted Logistics Partner'
+  description: 'Your Trusted Logistics Partner',
+  applicationName: 'Ezar Delivery Services',
+  // Installable app: Next serves src/app/manifest.ts at /manifest.webmanifest.
+  appleWebApp: {
+    capable: true,
+    title: 'Ezar EDMS',
+    statusBarStyle: 'black-translucent'
+  },
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }
+    ],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180' }]
+  }
+}
+
+export const viewport: Viewport = {
+  themeColor: '#12233f'
 }
 
 const Layout = ({ children }: ChildrenType) => {
@@ -57,6 +79,7 @@ const Layout = ({ children }: ChildrenType) => {
         <link rel="icon" href="/favicon.ico" />
       </head>
       <body className={`flex is-full min-bs-full flex-auto flex-col ${inter.className}`} style={{ fontFamily: 'var(--font-inter)' }}>
+        <PwaRegister />
         <Providers direction='ltr'>
           <AppwriteProvider>
               <BlankLayout systemMode={systemMode}>

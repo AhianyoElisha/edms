@@ -14,8 +14,19 @@ import type {
 } from '@/types/apps/deliveryTypes'
 import { listAllDocuments } from './paginate'
 
+const relationId = (value: any): string | undefined =>
+  value && typeof value === 'object' ? value.$id : value || undefined
+
 /**
- * Get all expenses with optional filtering
+ * Get all expenses with optional filtering.
+ *
+ * Two things the list screen depends on:
+ *
+ * - Every matching expense is returned, a page at a time, so searching and
+ *   filtering cover the whole collection rather than the newest page.
+ * - `vehicleId` and `tripId` are relationship attributes, which Appwrite leaves
+ *   out of a plain list. They are requested explicitly and flattened into
+ *   `vehicleId` / `vehicleNumber` / `tripId` / `tripNumber` / `driverName`.
  */
 export async function getAllExpenses(filters?: ExpenseFilters): Promise<ExpenseType[]> {
   try {
@@ -48,18 +59,31 @@ export async function getAllExpenses(filters?: ExpenseFilters): Promise<ExpenseT
     }
 
     queries.push(Query.orderDesc('expenseDate'))
+    queries.push(
+      Query.select(['*', 'vehicleId.vehicleNumber', 'tripId.tripNumber', 'tripId.driver.name'])
+    )
 
-    // Paged: a flat limit dropped everything past the first page with no error,
-    // so lists and their totals were quietly missing most of the collection
+    // Paged with the shared helper: a flat limit dropped everything past the first
+    // page with no error, and expanding a relationship caps a page at 500 rows.
     const documents = await listAllDocuments<any>(appwriteConfig.expenses, queries, 'expenses')
 
-    // Parse additionalImages if stored as JSON string
-    const expenses = documents.map((doc: any) => ({
-      ...doc,
-      additionalImages: doc.additionalImages 
-        ? (typeof doc.additionalImages === 'string' ? JSON.parse(doc.additionalImages) : doc.additionalImages)
-        : []
-    }))
+    const expenses = documents.map((doc: any) => {
+      const vehicle = doc.vehicleId && typeof doc.vehicleId === 'object' ? doc.vehicleId : null
+      const trip = doc.tripId && typeof doc.tripId === 'object' ? doc.tripId : null
+
+      return {
+        ...doc,
+        vehicleId: relationId(doc.vehicleId),
+        vehicleNumber: vehicle?.vehicleNumber || undefined,
+        tripId: relationId(doc.tripId),
+        tripNumber: trip?.tripNumber || undefined,
+        driverName: trip?.driver?.name || undefined,
+        // Parse additionalImages if stored as JSON string
+        additionalImages: doc.additionalImages
+          ? (typeof doc.additionalImages === 'string' ? JSON.parse(doc.additionalImages) : doc.additionalImages)
+          : []
+      }
+    })
 
     return expenses as ExpenseType[]
   } catch (error) {

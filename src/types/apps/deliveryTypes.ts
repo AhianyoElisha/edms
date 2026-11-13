@@ -350,6 +350,12 @@ export interface ManifestType {
   packageSize?: PackageSizeType | null // 'small' | 'medium' | 'big' - the type of packages in this manifest
   packageCount?: number // total head count of packages in this manifest
   deliveredCount?: number // number of packages successfully delivered
+  // Packages that did not arrive. Recorded on its own - it does not need a
+  // packageCount to subtract from, because not every client's manifest has one.
+  shortageCount?: number | null
+  // The company the goods belong to (JUMIA, CENTRAL POINT, ...). Manifests are no
+  // longer assumed to be Jumia's.
+  clientName?: string | null
 
   // Back-office verification. Manifests captured by a driver in the field land with
   // detailsVerified = false and no counts; an admin reviews the manifest photo later,
@@ -693,6 +699,10 @@ export interface ExpenseType {
   additionalImages?: string | string[] // JSON array of additional image File IDs or parsed array
   vehicleId?: string // Relationship with vehicles (if expense is vehicle-related)
   tripId?: string // Relationship with trips (if expense is trip-related)
+  // Filled in by getAllExpenses() from the linked vehicle / trip, when there is one
+  vehicleNumber?: string
+  tripNumber?: string
+  driverName?: string
   paymentMethod?: PaymentMethodType
   paymentStatus: PaymentStatusType
   approvedBy?: string // User ID who approved the expense

@@ -241,6 +241,13 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
       
       // Mark manifest as delivered (uses deliveredCount already on manifest)
       const updatedManifest = await markManifestAsDelivered(manifestData.$id)
+
+      // A driver closing out a manifest is an upload the office wants to hear about.
+      if (isDriver) {
+        const { notifyOffice } = await import('@/libs/notifications/client')
+
+        notifyOffice({ kind: 'manifest_delivered', manifestId: manifestData.$id })
+      }
       
       // Update local manifest data
       Object.assign(manifestData, {
@@ -410,6 +417,19 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                 This delivery was logged in the field with a photo. The office will enter the manifest number, package
                 size and quantity from the photo below.
               </Typography>
+              {(manifestData.clientName || manifestData.packageCount > 0 || manifestData.shortageCount > 0) && (
+                <div className='flex flex-wrap gap-2 mt-2'>
+                  {manifestData.clientName && (
+                    <Chip size='small' variant='tonal' color='primary' label={manifestData.clientName} />
+                  )}
+                  {manifestData.packageCount > 0 && (
+                    <Chip size='small' variant='tonal' label={`${manifestData.packageCount} packages (driver)`} />
+                  )}
+                  {manifestData.shortageCount > 0 && (
+                    <Chip size='small' variant='tonal' color='error' label={`${manifestData.shortageCount} short`} />
+                  )}
+                </div>
+              )}
             </div>
             {canVerify && (
               <Button
@@ -427,7 +447,15 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
       ) : (
       <Card className='mb-6'>
         <CardContent>
-          <Typography variant='h6' className='mb-4'>Package Delivery Progress</Typography>
+          <div className='flex flex-wrap items-center gap-2 mb-4'>
+            <Typography variant='h6'>Package Delivery Progress</Typography>
+            {manifestData.clientName && (
+              <Chip size='small' variant='tonal' color='primary' label={manifestData.clientName} />
+            )}
+            {manifestData.shortageCount > 0 && (
+              <Chip size='small' variant='tonal' color='error' label={`${manifestData.shortageCount} short`} />
+            )}
+          </div>
           
           <Grid container spacing={4}>
             {/* Package Size Type */}

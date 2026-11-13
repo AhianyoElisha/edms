@@ -169,10 +169,7 @@ const StepEditManifests = ({
         toast.error('Please select a package size for all manifests')
         return
       }
-      if (manifest.packageCount === undefined || manifest.packageCount < 1) {
-        toast.error('Please enter a valid package count (at least 1) for all manifests')
-        return
-      }
+      // Package count is optional: not every client's manifest carries one.
     }
 
     const manifestData: ManifestData[] = manifests.map(m => ({
@@ -268,10 +265,9 @@ const StepEditManifests = ({
             type='number'
             value={manifest.packageCount || ''}
             onChange={e => updateManifest(manifest.id, 'packageCount', parseInt(e.target.value) || 0)}
-            required
             size='small'
-            inputProps={{ min: 1 }}
-            helperText='Total packages'
+            inputProps={{ min: 0 }}
+            helperText='Optional'
             disabled={manifest.locked}
           />
         </Grid>

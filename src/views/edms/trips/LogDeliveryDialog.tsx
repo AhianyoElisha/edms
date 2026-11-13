@@ -15,18 +15,26 @@ import Chip from '@mui/material/Chip'
 import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
 import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import Grid from '@mui/material/Grid'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import type { Theme } from '@mui/material/styles'
 
 // Third-party Imports
 import { toast } from 'react-toastify'
 
+// Component Imports
+import CompanyField from '@/components/edms/CompanyField'
+
 // Type Imports
 import type { RouteStopType } from '@/types/apps/deliveryTypes'
 
 // Action Imports
 import { getRouteDropoffLocations } from '@/libs/actions/route.actions'
-import { logManifestDelivery } from '@/libs/actions/manifest.actions'
+import { getManifestClientOptions, logManifestDelivery } from '@/libs/actions/manifest.actions'
+
+// Lib Imports
+import { notifyOffice } from '@/libs/notifications/client'
 
 interface LogDeliveryDialogProps {
   open: boolean
@@ -42,6 +50,9 @@ interface LogDeliveryDialogProps {
  * else. That single action creates the manifest and closes it out as delivered.
  * Manifest number, package size and counts are left for an admin to fill in from
  * the review queue, so paperwork never holds up the road.
+ *
+ * The company, package count and shortages can be added when the driver has
+ * them to hand, but every one of them is optional and none blocks Submit.
  */
 const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDialogProps) => {
   const fullScreen = useMediaQuery((theme: Theme) => theme.breakpoints.down('sm'))
@@ -52,6 +63,16 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // Optional extras
+  const [clientOptions, setClientOptions] = useState<string[]>([])
+  const [clientName, setClientName] = useState('')
+  const [packageCount, setPackageCount] = useState('')
+  const [shortageCount, setShortageCount] = useState('')
+
+  // The company this trip was priced for is the sensible default.
+  const tripClientName: string =
+    (typeof tripData?.rateCard === 'object' && tripData?.rateCard?.clientName) || ''
 
   const routeId = typeof tripData?.route === 'object' ? tripData?.route?.$id : tripData?.route
   const manifests = tripData?.manifests || []
@@ -92,10 +113,22 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
     }
   }, [open, routeId])
 
+  useEffect(() => {
+    if (!open || clientOptions.length > 0) return
+
+    getManifestClientOptions().then(setClientOptions)
+  }, [open, clientOptions.length])
+
   // Clear the form whenever the dialog is reopened for the next stop.
   useEffect(() => {
-    if (open) return
+    if (open) {
+      setClientName(tripClientName)
 
+      return
+    }
+
+    setPackageCount('')
+    setShortageCount('')
     setSelectedStop(null)
     setPhotoFile(null)
     setPhotoPreview(prev => {
@@ -103,7 +136,19 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
 
       return null
     })
-  }, [open])
+  }, [open, tripClientName])
+
+  const parsedPackageCount = packageCount.trim() === '' ? 0 : parseInt(packageCount, 10)
+  const parsedShortage = shortageCount.trim() === '' ? 0 : parseInt(shortageCount, 10)
+
+  const figuresError =
+    !Number.isFinite(parsedPackageCount) || parsedPackageCount < 0
+      ? 'Package count must be a whole number'
+      : !Number.isFinite(parsedShortage) || parsedShortage < 0
+        ? 'Shortages must be a whole number'
+        : parsedPackageCount > 0 && parsedShortage > parsedPackageCount
+          ? 'Shortages cannot be more than the package count'
+          : null
 
   const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -126,7 +171,7 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
   }
 
   const handleSubmit = async () => {
-    if (!selectedStop || !photoFile) return
+    if (!selectedStop || !photoFile || figuresError) return
 
     try {
       setSubmitting(true)
@@ -155,13 +200,20 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
 
       const photoUrl = `${appwriteConfig.endpoint}/storage/buckets/${bucketId}/files/${uploaded.$id}/view?project=${appwriteConfig.project}`
 
-      await logManifestDelivery({
+      const manifest = await logManifestDelivery({
         tripId: tripData.$id,
         dropoffLocationId: selectedStop.locationId,
         dropoffLocationName: selectedStop.locationName,
         dropoffSequence: selectedStop.sequence,
-        photoUrl
+        photoUrl,
+        clientName: clientName.trim() || undefined,
+        packageCount: parsedPackageCount || undefined,
+        shortageCount: parsedShortage || undefined
       })
+
+      // Ring the office. Not awaited: the delivery is saved either way and the
+      // driver should not wait on it.
+      notifyOffice({ kind: 'manifest_delivered', manifestId: manifest.$id })
 
       toast.success(`Delivery logged for ${selectedStop.locationName || 'this stop'}`)
       onLogged?.()
@@ -187,7 +239,7 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
         <Alert severity='info' icon={<i className='ri-information-line' />} className='mb-5'>
           <Typography variant='body2'>
             Pick the stop and take a photo of the manifest. That&apos;s all &mdash; the office fills in the manifest
-            number and package figures later.
+            number and package figures later. The details at the bottom are optional.
           </Typography>
         </Alert>
 
@@ -305,6 +357,56 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
             />
           </Button>
         </Box>
+
+        {/* Step 3 - optional extras */}
+        <Typography variant='subtitle2' className='mt-6 mb-1 font-medium'>
+          3. Details <span className='font-normal text-textSecondary'>(optional)</span>
+        </Typography>
+        <Typography variant='caption' color='text.secondary' className='block mb-3'>
+          Skip these if you don&apos;t have them. Only enter shortages if packages were missing.
+        </Typography>
+
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <CompanyField
+              options={clientOptions}
+              value={clientName}
+              onChange={setClientName}
+              disabled={submitting}
+              placeholder='Whose goods are these?'
+            />
+          </Grid>
+          <Grid item xs={6}>
+            <TextField
+              fullWidth
+              size='small'
+              type='number'
+              label='Package count'
+              value={packageCount}
+              onChange={e => setPackageCount(e.target.value)}
+              inputProps={{ min: 0, inputMode: 'numeric' }}
+              disabled={submitting}
+            />
+          </Grid>
+          <Grid item xs={6}>
+            <TextField
+              fullWidth
+              size='small'
+              type='number'
+              label='Shortages'
+              value={shortageCount}
+              onChange={e => setShortageCount(e.target.value)}
+              inputProps={{ min: 0, inputMode: 'numeric' }}
+              disabled={submitting}
+            />
+          </Grid>
+        </Grid>
+
+        {figuresError && (
+          <Alert severity='error' className='mt-3'>
+            {figuresError}
+          </Alert>
+        )}
       </DialogContent>
 
       <DialogActions className='gap-2'>
@@ -316,7 +418,7 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
           color='success'
           size='large'
           onClick={handleSubmit}
-          disabled={!selectedStop || !photoFile || submitting}
+          disabled={!selectedStop || !photoFile || submitting || Boolean(figuresError)}
           startIcon={submitting ? <CircularProgress size={18} color='inherit' /> : <i className='ri-check-double-line' />}
         >
           {submitting ? 'Submitting…' : 'Submit Delivery'}

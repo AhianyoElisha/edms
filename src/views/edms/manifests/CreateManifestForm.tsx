@@ -95,7 +95,7 @@ const CreateManifestForm = () => {
     if (!formData.dropoffLocation) return 'Dropoff location is required'
     if (!formData.manifestDate) return 'Manifest date is required'
     if (!formData.packageSize) return 'Package size is required'
-    if (formData.packageCount < 1) return 'Package count must be at least 1'
+    if (formData.packageCount < 0) return 'Package count cannot be negative'
     
     return null
   }
@@ -119,6 +119,8 @@ const CreateManifestForm = () => {
         manifestDate: formData.manifestDate.toISOString(),
         packageSize: formData.packageSize, // 'small' | 'medium' | 'big'
         packageCount: formData.packageCount, // Head count
+        // Entered by the office, so there is nothing left for the review queue to ask for.
+        detailsVerified: true,
         deliveredCount: 0, // Start with 0 delivered
         status: 'pending',
         notes: formData.notes
@@ -346,9 +348,8 @@ const CreateManifestForm = () => {
                 label="Package Count (Head Count)"
                 value={formData.packageCount}
                 onChange={(e) => handleInputChange('packageCount', parseInt(e.target.value) || 0)}
-                InputProps={{ inputProps: { min: 1 } }}
-                required
-                helperText="Total number of packages in this manifest"
+                InputProps={{ inputProps: { min: 0 } }}
+                helperText="Optional - total number of packages in this manifest"
               />
             </Grid>
 

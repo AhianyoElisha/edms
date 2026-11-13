@@ -67,6 +67,21 @@ export const getDeliveredManifests = async (
     
     queries.push(Query.orderDesc('deliveryTime'))
 
+    // The completed-deliveries screen groups by driver and route, so the trip's
+    // driver, vehicle and route and the stop itself have to come with each row.
+    queries.push(
+      Query.select([
+        '*',
+        'trip.tripNumber',
+        'trip.tripDate',
+        'trip.driver.name',
+        'trip.vehicle.vehicleNumber',
+        'trip.route.routeName',
+        'trip.route.routeCode',
+        'dropofflocation.locationName'
+      ])
+    )
+
     // Paged: reports total these, so a truncated page would understate the figures
     return await listAllDocuments<any>(
       MANIFESTS_COLLECTION_ID,
@@ -716,8 +731,11 @@ export const markManifestAsDelivered = async (
     // report a shortfall, treat the whole manifest as delivered; if the driver
     // did enter a count, that figure stands.
     const reportedCount = existingManifest.deliveredCount || 0
-    const deliveredCount = reportedCount > 0 ? reportedCount : packageCount
-    const missingCount = Math.max(0, packageCount - deliveredCount)
+    const shortageCount = existingManifest.shortageCount || 0
+    const deliveredCount = reportedCount > 0 ? reportedCount : Math.max(0, packageCount - shortageCount)
+
+    // A shortage can be recorded on its own, without a package total to subtract from.
+    const missingCount = Math.max(shortageCount, packageCount - deliveredCount, 0)
 
     // Build update object with all delivery tracking fields
     const updateData: Record<string, string | number> = {
@@ -939,6 +957,11 @@ export const logManifestDelivery = async (params: {
   photoUrl: string
   gpsCoordinates?: string
   notes?: string
+  // All three are optional extras. The driver may know them at the stop; if not,
+  // the office fills them in on review.
+  clientName?: string
+  packageCount?: number
+  shortageCount?: number
 }): Promise<ManifestType> => {
   const {
     tripId,
@@ -949,6 +972,11 @@ export const logManifestDelivery = async (params: {
     gpsCoordinates,
     notes
   } = params
+
+  const clientName = params.clientName?.trim() || ''
+  const packageCount = Math.max(0, Math.floor(params.packageCount || 0))
+  const shortageCount = Math.max(0, Math.floor(params.shortageCount || 0))
+  const deliveredCount = packageCount > 0 ? Math.max(0, packageCount - shortageCount) : 0
 
   try {
     const now = new Date().toISOString()
@@ -971,10 +999,14 @@ export const logManifestDelivery = async (params: {
         dropofflocation: dropoffLocationId,
         dropoffSequence: sequence,
         manifestDate: trip.tripDate || now,
-        // Figures are unknown in the field - the admin supplies them on review.
+        // Figures are optional in the field - whatever the driver left blank the
+        // admin supplies on review.
         packageSize: null,
-        packageCount: 0,
-        deliveredCount: 0,
+        packageCount,
+        deliveredCount,
+        // Only sent when the driver actually entered them.
+        ...(shortageCount > 0 ? { shortageCount } : {}),
+        ...(clientName ? { clientName } : {}),
         status: 'delivered',
         notes: notes || '',
         arrivalTime: now,
@@ -1005,8 +1037,8 @@ export const logManifestDelivery = async (params: {
       completionTime: now,
       gpsCoordinates: gpsCoordinates || null,
       gpsVerified: false,
-      packagesDelivered: 0,
-      packagesMissing: 0
+      packagesDelivered: deliveredCount,
+      packagesMissing: shortageCount
     }
 
     if (checkpointIndex !== -1) {
@@ -1019,6 +1051,9 @@ export const logManifestDelivery = async (params: {
       checkpoints: JSON.stringify(existingCheckpoints),
       currentCheckpoint: existingCheckpoints.filter((cp: any) => cp.status === 'completed').length
     }
+
+    // A count entered at the stop belongs in the trip's headline total straight away.
+    if (packageCount > 0) tripUpdate.totalPackages = (trip.totalPackages || 0) + packageCount
 
     await databases.updateDocument(DATABASE_ID, appwriteConfig.trips, tripId, tripUpdate)
 
@@ -1041,21 +1076,36 @@ export const logManifestDelivery = async (params: {
 /**
  * Fill in the details a driver could not capture in the field and mark the
  * manifest verified. Keeps the trip checkpoint figures in step.
+ *
+ * Nothing here is compulsory. Not every client's paperwork carries a package
+ * count, so a manifest can be verified with a shortage alone, a count alone,
+ * both, or neither.
  */
 export const verifyManifestDetails = async (
   manifestId: string,
   details: {
     manifestNumber?: string
+    clientName?: string | null
     packageSize?: string | null
-    packageCount?: number
+    packageCount?: number | null
+    // Packages that did not arrive. Stands on its own when no count is given.
+    shortageCount?: number | null
+    // Legacy: callers that still think in "delivered" rather than "short".
     deliveredCount?: number
     notes?: string
   },
   verifiedBy?: string
 ): Promise<ManifestType> => {
   try {
-    const packageCount = details.packageCount ?? 0
-    const deliveredCount = Math.min(Math.max(0, details.deliveredCount ?? packageCount), packageCount)
+    const packageCount = Math.max(0, details.packageCount ?? 0)
+
+    const shortageCount = Math.max(
+      0,
+      details.shortageCount ??
+        (details.deliveredCount !== undefined && packageCount > 0 ? packageCount - details.deliveredCount : 0)
+    )
+
+    const deliveredCount = packageCount > 0 ? Math.max(0, packageCount - shortageCount) : 0
 
     // Appwrite's updateDocument response does NOT carry the `trip` relationship, so the
     // trip id has to be read from the stored document first. Taking it off the update
@@ -1070,6 +1120,13 @@ export const verifyManifestDetails = async (
       deliveredCount,
       detailsVerified: true,
       verifiedAt: new Date().toISOString()
+    }
+
+    // Written only when there is something to record or something to clear.
+    if (shortageCount > 0 || stored.shortageCount) updateData.shortageCount = shortageCount
+
+    if (details.clientName !== undefined && (details.clientName || stored.clientName)) {
+      updateData.clientName = details.clientName?.trim() || null
     }
 
     if (details.manifestNumber) updateData.manifestNumber = details.manifestNumber
@@ -1106,7 +1163,7 @@ export const verifyManifestDetails = async (
               manifestNumber: updateData.manifestNumber || checkpoints[index].manifestNumber,
               packageSize: details.packageSize || null,
               packagesDelivered: deliveredCount,
-              packagesMissing: Math.max(0, packageCount - deliveredCount)
+              packagesMissing: shortageCount
             }
 
             await databases.updateDocument(DATABASE_ID, appwriteConfig.trips, tripIdStr, {
@@ -1150,7 +1207,15 @@ export const getManifestsAwaitingVerification = async (): Promise<any[]> => {
     const response = await tablesDB.listRows(DATABASE_ID, MANIFESTS_COLLECTION_ID, [
       Query.equal('detailsVerified', false),
       Query.orderDesc('$createdAt'),
-      Query.select(['*', 'trip.*', 'trip.driver.*', 'trip.vehicle.*', 'dropofflocation.*']),
+      Query.select([
+        '*',
+        'trip.*',
+        'trip.driver.*',
+        'trip.vehicle.*',
+        'trip.route.routeName',
+        'trip.rateCard.clientName',
+        'dropofflocation.*'
+      ]),
       Query.limit(500)
     ])
 
@@ -1158,5 +1223,35 @@ export const getManifestsAwaitingVerification = async (): Promise<any[]> => {
   } catch (error) {
     console.error('Error fetching manifests awaiting verification:', error)
     throw new Error('Failed to fetch manifests awaiting verification')
+  }
+}
+
+/**
+ * The companies a manifest can belong to, for the Company pickers.
+ *
+ * Clients are already defined where their rates are - on the rate cards - so
+ * that list is reused here rather than kept twice. The pickers also accept free
+ * text, so a company with no rate card yet can still be recorded.
+ */
+export const getManifestClientOptions = async (): Promise<string[]> => {
+  try {
+    const response = await databases.listDocuments(DATABASE_ID, appwriteConfig.ratecards, [
+      Query.select(['clientName']),
+      Query.limit(1000)
+    ])
+
+    const names = new Map<string, string>()
+
+    response.documents.forEach((card: any) => {
+      const name = (card.clientName || '').trim()
+
+      if (name && !names.has(name.toUpperCase())) names.set(name.toUpperCase(), name)
+    })
+
+    return Array.from(names.values()).sort((a, b) => a.localeCompare(b))
+  } catch (error) {
+    console.warn('Could not load the client list:', error)
+
+    return []
   }
 }

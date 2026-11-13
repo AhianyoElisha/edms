@@ -1,7 +1,7 @@
 'use client'
 
 // React Imports
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
 // MUI Imports
@@ -34,6 +34,7 @@ import Tooltip from '@mui/material/Tooltip'
 import Collapse from '@mui/material/Collapse'
 import Snackbar from '@mui/material/Snackbar'
 import Alert from '@mui/material/Alert'
+import Autocomplete from '@mui/material/Autocomplete'
 
 // Date Picker Imports
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers-pro'
@@ -43,7 +44,7 @@ import dayjs, { Dayjs } from 'dayjs'
 // Action Imports
 import { getAllExpenses, markExpenseAsPaid } from '@/libs/actions/expense.actions'
 import { getAllVehicles } from '@/libs/actions/vehicle.actions'
-import { getAllTrips } from '@/libs/actions/trip.actions'
+import { getAllUsers } from '@/libs/actions/auth.actions'
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
@@ -58,7 +59,6 @@ import type {
   ExpenseTypeCategory, 
   PaymentStatusType,
   VehicleType,
-  TripType,
   ExpenseFilters
 } from '@/types/apps/deliveryTypes'
 
@@ -99,6 +99,44 @@ const getExpenseTypeIcon = (type: ExpenseTypeCategory): string => {
   return category?.icon || 'ri-receipt-line'
 }
 
+/*
+ * Matching a driver or a vehicle to an expense.
+ *
+ * Very few expenses are formally linked to a vehicle, and none to a trip: the
+ * office records who and what an expense was for by typing it into the
+ * description ("Richard Frimpong / AW 3773-26 / 055..."). So the Driver and
+ * Vehicle filters look at the linked record when there is one AND at the text.
+ */
+
+// "AW 3773-26", "aw3773 - 26" and "AW-3773-26" are the same plate.
+const normalizePlate = (value: string): string => value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+
+const expenseText = (expense: ExpenseType): string =>
+  [expense.description, expense.vendor, expense.subCategory, expense.receiptNumber, expense.driverName]
+    .filter(Boolean)
+    .join(' ')
+
+const matchesVehicle = (expense: ExpenseType, query: string): boolean => {
+  const plate = normalizePlate(query)
+
+  if (!plate) return true
+
+  return (
+    normalizePlate(expense.vehicleNumber || '').includes(plate) || normalizePlate(expenseText(expense)).includes(plate)
+  )
+}
+
+// Every word typed must appear, in any order: "frimpong richard" finds "Richard Frimpong".
+const matchesDriver = (expense: ExpenseType, query: string): boolean => {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+
+  if (words.length === 0) return true
+
+  const text = expenseText(expense).toLowerCase()
+
+  return words.every(word => text.includes(word))
+}
+
 type Order = 'asc' | 'desc'
 
 interface HeadCell {
@@ -127,8 +165,9 @@ const ExpenseListView = () => {
   // Data State
   const [expenses, setExpenses] = useState<ExpenseType[]>([])
   const [vehicles, setVehicles] = useState<VehicleType[]>([])
-  const [trips, setTrips] = useState<TripType[]>([])
+  const [driverNames, setDriverNames] = useState<string[]>([])
   const [loading, setLoading] = useState<boolean>(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [markingAll, setMarkingAll] = useState<boolean>(false)
 
   // Snackbar State
@@ -161,35 +200,77 @@ const ExpenseListView = () => {
 
   // Helper to update URL search params
   const updateParam = useCallback((key: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
+    const params = new URLSearchParams(window.location.search)
     if (value) {
       params.set(key, value)
     } else {
       params.delete(key)
     }
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [searchParams, pathname, router])
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }, [pathname, router])
 
   // Filter setters that update URL params
-  const setSearchQuery = useCallback((value: string) => updateParam('search', value), [updateParam])
   const setFilterType = useCallback((value: ExpenseTypeCategory | '') => updateParam('type', value), [updateParam])
   const setFilterStatus = useCallback((value: PaymentStatusType | '') => updateParam('status', value), [updateParam])
-  const setFilterVehicle = useCallback((value: string) => updateParam('vehicle', value), [updateParam])
-  const setFilterDriver = useCallback((value: string) => updateParam('driver', value), [updateParam])
-  const setDateFrom = useCallback((value: Dayjs | null) => updateParam('dateFrom', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
-  const setDateTo = useCallback((value: Dayjs | null) => updateParam('dateTo', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
+  // A half-typed date is not a filter yet - ignore it rather than query with "Invalid Date".
+  const setDateFrom = useCallback((value: Dayjs | null) => {
+    if (value && !value.isValid()) return
+    updateParam('dateFrom', value ? value.format('YYYY-MM-DD') : '')
+  }, [updateParam])
+  const setDateTo = useCallback((value: Dayjs | null) => {
+    if (value && !value.isValid()) return
+    updateParam('dateTo', value ? value.format('YYYY-MM-DD') : '')
+  }, [updateParam])
 
-  // Load data on mount and when filters change
+  // Text filters are typed into, so they live in local state and reach the URL
+  // a moment after typing stops - writing the URL on every keystroke re-rendered
+  // the whole page per character and made the boxes feel broken.
+  const [searchInput, setSearchInput] = useState(searchQuery)
+  const [driverInput, setDriverInput] = useState(filterDriver)
+  const [vehicleInput, setVehicleInput] = useState(filterVehicle)
+
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+
+  const updateParamDebounced = useCallback((key: string, value: string) => {
+    clearTimeout(debounceTimers.current[key])
+    debounceTimers.current[key] = setTimeout(() => updateParam(key, value.trim()), 300)
+  }, [updateParam])
+
   useEffect(() => {
+    const timers = debounceTimers.current
+
+    return () => Object.values(timers).forEach(clearTimeout)
+  }, [])
+
+  // Vehicles and drivers only feed the filter suggestions: load them once.
+  useEffect(() => {
+    getAllVehicles()
+      .then(setVehicles)
+      .catch(error => console.error('Error loading vehicles:', error))
+
+    getAllUsers()
+      .then(users => {
+        const names = users
+          .filter((u: any) => u.role?.name?.toLowerCase() === 'driver' && u.status !== 'deleted' && u.name)
+          .map((u: any) => String(u.name).trim())
+
+        setDriverNames(Array.from(new Set<string>(names)).sort((a, b) => a.localeCompare(b)))
+      })
+      .catch(error => console.error('Error loading drivers:', error))
+  }, [])
+
+  // Expenses are reloaded only when the date range changes; every other filter
+  // is applied to what is already in memory, so it responds instantly.
+  useEffect(() => {
+    let cancelled = false
+
     const loadData = async () => {
       try {
         setLoading(true)
-        
-        // Build filters
+        setLoadError(null)
+
         const filters: ExpenseFilters = {}
-        if (filterType) filters.expenseType = filterType
-        if (filterStatus) filters.paymentStatus = filterStatus
-        if (filterVehicle) filters.vehicleId = filterVehicle
         if (dateFromStr || dateToStr) {
           filters.dateRange = {
             start: dateFromStr ? dayjs(dateFromStr).startOf('day').toISOString() : '',
@@ -197,79 +278,52 @@ const ExpenseListView = () => {
           }
         }
 
-        const [expensesData, vehiclesData, tripsData] = await Promise.all([
-          getAllExpenses(Object.keys(filters).length > 0 ? filters : undefined),
-          getAllVehicles(),
-          getAllTrips()
-        ])
+        const expensesData = await getAllExpenses(Object.keys(filters).length > 0 ? filters : undefined)
 
-        setExpenses(expensesData)
-        setVehicles(vehiclesData)
-        setTrips(tripsData)
+        if (!cancelled) setExpenses(expensesData)
       } catch (error) {
         console.error('Error loading expenses:', error)
+        if (!cancelled) setLoadError('Could not load expenses. Check your connection and try again.')
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     loadData()
-  }, [filterType, filterStatus, filterVehicle, dateFromStr, dateToStr])
 
-  // Get vehicle name by ID
-  const getVehicleName = (vehicleId: string | undefined): string => {
-    if (!vehicleId) return '-'
-    const vehicle = vehicles.find(v => v.$id === vehicleId)
-    return vehicle?.vehicleNumber || vehicleId
-  }
+    return () => {
+      cancelled = true
+    }
+  }, [dateFromStr, dateToStr])
 
-  // Extract unique drivers from trips
-  const drivers = useMemo(() => {
-    const driverMap = new Map<string, string>()
-    trips.forEach(trip => {
-      if (trip.driver?.$id && trip.driver?.name) {
-        driverMap.set(trip.driver.$id, trip.driver.name)
-      }
-    })
-    return Array.from(driverMap, ([id, name]) => ({ id, name }))
-  }, [trips])
+  // Links from older versions of this page carried a vehicle document id.
+  useEffect(() => {
+    if (!filterVehicle || vehicles.length === 0) return
 
-  // Build a trip-to-driver lookup and driver-to-tripIds set
-  const tripDriverMap = useMemo(() => {
-    const map = new Map<string, string>()
-    trips.forEach(trip => {
-      if (trip.driver?.name) {
-        map.set(trip.$id, trip.driver.name)
-      }
-    })
-    return map
-  }, [trips])
+    const byId = vehicles.find(v => v.$id === filterVehicle)
 
-  const driverTripIds = useMemo(() => {
-    if (!filterDriver) return null
-    const ids = new Set<string>()
-    trips.forEach(trip => {
-      if (trip.driver?.$id === filterDriver) {
-        ids.add(trip.$id)
-      }
-    })
-    return ids
-  }, [trips, filterDriver])
+    if (byId?.vehicleNumber) {
+      setVehicleInput(byId.vehicleNumber)
+      updateParam('vehicle', byId.vehicleNumber)
+    }
+  }, [filterVehicle, vehicles, updateParam])
 
-  // Get driver name for an expense (via trip)
-  const getDriverName = useCallback((expense: ExpenseType): string => {
-    if (!expense.tripId) return ''
-    return tripDriverMap.get(expense.tripId) || ''
-  }, [tripDriverMap])
+  const vehicleNumbers = useMemo(
+    () => Array.from(new Set(vehicles.map(v => v.vehicleNumber).filter(Boolean))).sort(),
+    [vehicles]
+  )
+
+  const activeFilterCount = [searchQuery, filterType, filterStatus, filterVehicle, filterDriver, dateFromStr, dateToStr]
+    .filter(Boolean).length
 
   // Filter and sort expenses
   const filteredExpenses = useMemo(() => {
     let result = [...expenses]
 
-    // Driver filter
-    if (filterDriver && driverTripIds) {
-      result = result.filter(expense => expense.tripId && driverTripIds.has(expense.tripId))
-    }
+    if (filterType) result = result.filter(expense => expense.expenseType === filterType)
+    if (filterStatus) result = result.filter(expense => expense.paymentStatus === filterStatus)
+    if (filterVehicle) result = result.filter(expense => matchesVehicle(expense, filterVehicle))
+    if (filterDriver) result = result.filter(expense => matchesDriver(expense, filterDriver))
 
     // Search filter
     if (searchQuery) {
@@ -284,8 +338,8 @@ const ExpenseListView = () => {
         getExpenseTypeLabel(expense.expenseType)?.toLowerCase().includes(query) ||
         expense.paymentStatus?.toLowerCase().includes(query) ||
         (PAYMENT_STATUS_CONFIG[expense.paymentStatus]?.label || '').toLowerCase().includes(query) ||
-        getVehicleName(expense.vehicleId)?.toLowerCase().includes(query) ||
-        getDriverName(expense)?.toLowerCase().includes(query) ||
+        expense.vehicleNumber?.toLowerCase().includes(query) ||
+        expense.driverName?.toLowerCase().includes(query) ||
         dayjs(expense.expenseDate).format('DD MMM YYYY').toLowerCase().includes(query)
       )
     }
@@ -317,7 +371,13 @@ const ExpenseListView = () => {
     })
 
     return result
-  }, [expenses, searchQuery, order, orderBy, vehicles, filterDriver, driverTripIds, getDriverName])
+  }, [expenses, searchQuery, filterType, filterStatus, filterVehicle, filterDriver, order, orderBy])
+
+  // A filter change can leave the table on a page that no longer exists, which
+  // showed "No expenses found" even though there were matches on page one.
+  useEffect(() => {
+    setPage(0)
+  }, [searchQuery, filterType, filterStatus, filterVehicle, filterDriver, dateFromStr, dateToStr])
 
   // Paginated expenses
   const paginatedExpenses = useMemo(() => {
@@ -349,6 +409,10 @@ const ExpenseListView = () => {
 
   // Clear all filters
   const clearFilters = () => {
+    Object.values(debounceTimers.current).forEach(clearTimeout)
+    setSearchInput('')
+    setDriverInput('')
+    setVehicleInput('')
     router.replace(pathname, { scroll: false })
   }
 
@@ -546,6 +610,9 @@ const ExpenseListView = () => {
                   <Box display="flex" alignItems="center" gap={1}>
                     <i className="ri-filter-line" />
                     <Typography variant="h6">Filters</Typography>
+                    {activeFilterCount > 0 && (
+                      <Chip size="small" color="primary" variant="outlined" label={`${activeFilterCount} active`} />
+                    )}
                   </Box>
                   <Box display="flex" alignItems="center" gap={2}>
                     <Button
@@ -566,13 +633,16 @@ const ExpenseListView = () => {
               <CardContent>
                 <Grid container spacing={4}>
                   {/* Search */}
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
                       size="small"
                       placeholder="Search expenses..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      value={searchInput}
+                      onChange={(e) => {
+                        setSearchInput(e.target.value)
+                        updateParamDebounced('search', e.target.value)
+                      }}
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
@@ -584,7 +654,7 @@ const ExpenseListView = () => {
                   </Grid>
 
                   {/* Type Filter */}
-                  <Grid item xs={12} sm={6} md={2}>
+                  <Grid item xs={12} sm={6} md={4}>
                     <FormControl fullWidth size="small">
                       <InputLabel>Type</InputLabel>
                       <Select
@@ -602,7 +672,7 @@ const ExpenseListView = () => {
                   </Grid>
 
                   {/* Status Filter */}
-                  <Grid item xs={12} sm={6} md={2}>
+                  <Grid item xs={12} sm={6} md={4}>
                     <FormControl fullWidth size="small">
                       <InputLabel>Status</InputLabel>
                       <Select
@@ -618,50 +688,49 @@ const ExpenseListView = () => {
                     </FormControl>
                   </Grid>
 
-                  {/* Vehicle Filter */}
-                  <Grid item xs={12} sm={6} md={2}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Vehicle</InputLabel>
-                      <Select
-                        value={filterVehicle}
-                        label="Vehicle"
-                        onChange={(e) => setFilterVehicle(e.target.value)}
-                      >
-                        <MenuItem value="">All</MenuItem>
-                        {vehicles.map((v) => (
-                          <MenuItem key={v.$id} value={v.$id}>
-                            {v.vehicleNumber}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                  {/* Driver Filter - pick a driver or type any part of a name */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Autocomplete
+                      freeSolo
+                      size="small"
+                      options={driverNames}
+                      inputValue={driverInput}
+                      onInputChange={(_, value, reason) => {
+                        if (reason === 'reset' && value === '' && driverInput !== '') return
+                        setDriverInput(value)
+                        updateParamDebounced('driver', value)
+                      }}
+                      renderInput={(params) => (
+                        <TextField {...params} label="Driver name" placeholder="e.g. Frimpong" />
+                      )}
+                    />
                   </Grid>
 
-                  {/* Driver Filter
-                  <Grid item xs={12} sm={6} md={2}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Driver</InputLabel>
-                      <Select
-                        value={filterDriver}
-                        label="Driver"
-                        onChange={(e) => setFilterDriver(e.target.value)}
-                      >
-                        <MenuItem value="">All</MenuItem>
-                        {drivers.map((d) => (
-                          <MenuItem key={d.id} value={d.id}>
-                            {d.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid> */}
+                  {/* Vehicle Filter - pick a vehicle or type any part of a number */}
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Autocomplete
+                      freeSolo
+                      size="small"
+                      options={vehicleNumbers}
+                      inputValue={vehicleInput}
+                      onInputChange={(_, value, reason) => {
+                        if (reason === 'reset' && value === '' && vehicleInput !== '') return
+                        setVehicleInput(value)
+                        updateParamDebounced('vehicle', value)
+                      }}
+                      renderInput={(params) => (
+                        <TextField {...params} label="Vehicle number" placeholder="e.g. AW 3773-26" />
+                      )}
+                    />
+                  </Grid>
 
                   {/* Date From */}
-                  <Grid item xs={12} sm={6} md={1.5}>
+                  <Grid item xs={12} sm={6} md={3}>
                     <DatePicker
                       label="From"
                       value={dateFrom}
                       onChange={setDateFrom}
+                      maxDate={dateTo || undefined}
                       slotProps={{
                         textField: { size: 'small', fullWidth: true },
                         field: { clearable: true }
@@ -670,17 +739,27 @@ const ExpenseListView = () => {
                   </Grid>
 
                   {/* Date To */}
-                  <Grid item xs={12} sm={6} md={1.5}>
+                  <Grid item xs={12} sm={6} md={3}>
                     <DatePicker
                       label="To"
                       value={dateTo}
                       onChange={setDateTo}
+                      minDate={dateFrom || undefined}
                       slotProps={{
                         textField: { size: 'small', fullWidth: true },
                         field: { clearable: true }
                       }}
                     />
                   </Grid>
+
+                  {(filterDriver || filterVehicle) && (
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary">
+                        Driver and vehicle filters match the linked vehicle and the text typed into each
+                        expense&apos;s description, since that is where most expenses record them.
+                      </Typography>
+                    </Grid>
+                  )}
                 </Grid>
               </CardContent>
             </Collapse>
@@ -704,6 +783,11 @@ const ExpenseListView = () => {
                     : `Mark All as Paid${pendingExpenses.length > 0 ? ` (${pendingExpenses.length})` : ''}`}
                 </Button>
               </Box>
+            )}
+            {loadError && (
+              <Alert severity="error" sx={{ m: 4, mb: 0 }}>
+                {loadError}
+              </Alert>
             )}
             <TableContainer component={Paper}>
               <Table>
@@ -784,9 +868,14 @@ const ExpenseListView = () => {
                           </Box>
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+                          <Typography variant="body2" noWrap sx={{ maxWidth: 260 }} title={expense.description}>
                             {expense.description}
                           </Typography>
+                          {(expense.vehicleNumber || expense.driverName) && (
+                            <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 260, display: 'block' }}>
+                              {[expense.vehicleNumber, expense.driverName].filter(Boolean).join(' • ')}
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
