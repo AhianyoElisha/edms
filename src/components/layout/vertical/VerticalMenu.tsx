@@ -209,6 +209,12 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
               </SubMenu>
             )}
 
+            {hasAnyPermission(['ratecards.view', 'ratecards.manage']) && (
+              <MenuItem icon={<i className='ri-building-line' />} onClick={() => handleNavigation('/edms/companies')}>
+                Companies
+              </MenuItem>
+            )}
+
             {/* Trips SubMenu */}
             {hasAnyPermission(['trips.view', 'trips.create']) && (
               <SubMenu label="Trips" icon={<i className='ri-map-pin-range-line' />}>

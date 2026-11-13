@@ -58,6 +58,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import OpenDialogOnElementClick from '@/components/dialogs/OpenDialogOnElementClick'
 import GenericTableExportDialog from '@/components/dialogs/generic-table-export-dialog'
 import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-table-export-dialog'
+import CompanyFilterSelect from '@/components/edms/CompanyFilterSelect'
 
 LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz03MTc0MCxFPTE3MjI1MzA1NTIwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
 
@@ -118,6 +119,7 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
   // Read filters from URL params
   const searchValue = searchParams.get('search') || ''
   const statusFilter = searchParams.get('status') || ''
+  const companyFilter = searchParams.get('company') || ''
 
   const setSearchValue = useCallback((value: string) => setParam('search', value), [setParam])
   const setStatusFilter = useCallback((value: string) => setParam('status', value), [setParam])
@@ -165,6 +167,10 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
       )
     }
 
+    if (companyFilter) {
+      filtered = filtered.filter(manifest => (manifest as any).companyId === companyFilter)
+    }
+
     // Date range filter
     if (dateFrom) {
       filtered = filtered.filter(manifest => dayjs(manifest.manifestDate).isAfter(dateFrom.startOf('day').subtract(1, 'ms')))
@@ -183,7 +189,7 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
     }
 
     return filtered
-  }, [manifests, searchValue, dateFrom, dateTo, statusFilter])
+  }, [manifests, searchValue, dateFrom, dateTo, statusFilter, companyFilter])
 
   // Export configuration
   const exportColumns: ExportColumn[] = useMemo(() => [
@@ -493,6 +499,7 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
             </MenuItem>
           ))}
         </TextField>
+        <CompanyFilterSelect value={companyFilter} onChange={value => setParam('company', value)} />
       </Box>
 
       {canBulkComplete && selectedIds.size > 0 && (

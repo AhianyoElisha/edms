@@ -1,7 +1,7 @@
 'use client'
 
 // React Imports
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 // MUI Imports
@@ -48,6 +48,9 @@ import {
 
 // Actions Imports
 import { updateRateCard } from '@/libs/actions/ratecard.actions'
+import CompanyField from '@/components/edms/CompanyField'
+import { getCompanies } from '@/libs/actions/company.actions'
+import type { CompanyType } from '@/libs/actions/company.actions'
 
 interface RateCardEditFormProps {
   rateCard: RateCardType
@@ -74,6 +77,26 @@ const RateCardEditForm = ({ rateCard, userId }: RateCardEditFormProps) => {
   // Form states
   const [clientName, setClientName] = useState(rateCard.clientName)
   const [clientCode, setClientCode] = useState(rateCard.clientCode)
+  const [companies, setCompanies] = useState<CompanyType[]>([])
+
+  const loadCompanies = useCallback(() => {
+    getCompanies({ activeOnly: true })
+      .then(setCompanies)
+      .catch(error => console.error('Error loading companies:', error))
+  }, [])
+
+  useEffect(() => {
+    loadCompanies()
+  }, [loadCompanies])
+
+  // Picking a company starts the client code from the company's own code
+  const handleCompanyChange = (name: string) => {
+    setClientName(name)
+
+    const company = companies.find(c => c.name === name)
+
+    if (company && !clientCode.trim()) setClientCode(company.code)
+  }
   const [routeCode, setRouteCode] = useState(rateCard.routeCode)
   const [routeDescription, setRouteDescription] = useState(rateCard.routeDescription)
   const [effectiveFrom, setEffectiveFrom] = useState<dayjs.Dayjs | null>(
@@ -179,13 +202,16 @@ const RateCardEditForm = ({ rateCard, userId }: RateCardEditFormProps) => {
                 </Typography>
                 <Grid container spacing={4}>
                   <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label='Client Name'
-                      value={clientName}
-                      onChange={e => setClientName(e.target.value)}
-                      placeholder='e.g., JUMIA'
+                    <CompanyField
+                      size='medium'
+                      label='Company'
                       required
+                      allowAdd
+                      options={companies.map(company => company.name)}
+                      value={clientName}
+                      onChange={handleCompanyChange}
+                      onCompanyAdded={loadCompanies}
+                      helperText='Pick the company, or add a new one from the list'
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
@@ -195,7 +221,7 @@ const RateCardEditForm = ({ rateCard, userId }: RateCardEditFormProps) => {
                       value={clientCode}
                       onChange={e => handleClientCodeChange(e.target.value)}
                       placeholder='e.g., JUM'
-                      helperText='Unique identifier for the client (auto-uppercased)'
+                      helperText="This card's own code, e.g. JUM 001 (auto-uppercased)"
                       required
                     />
                   </Grid>

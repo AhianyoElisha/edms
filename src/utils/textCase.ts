@@ -84,6 +84,7 @@ export const TEXT_CASE_RULES = {
   // subCategory is picked from a fixed list, not typed
   expenses: { vendor: 'name', description: 'free' },
   ratecards: { clientName: 'name', routeDescription: 'name' },
+  companies: { name: 'name', contactPerson: 'name', contactEmail: 'email', notes: 'free' },
   trips: { notes: 'free', deletedBy: 'name' },
   manifests: { notes: 'free', verifiedBy: 'name' },
   returnwaybills: { notes: 'free' }

@@ -60,6 +60,7 @@ import OpenDialogOnElementClick from '@/components/dialogs/OpenDialogOnElementCl
 import GenericTableExportDialog from '@/components/dialogs/generic-table-export-dialog'
 import DeleteConfirmationDialog from '@/components/dialogs/delete-confirmation-dialog'
 import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-table-export-dialog'
+import CompanyFilterSelect from '@/components/edms/CompanyFilterSelect'
 
 LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz03MTc0MCxFPTE3MjI1MzA1NTIwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
 
@@ -96,6 +97,7 @@ const TripsOverviewTable = () => {
   // Read filters from URL params
   const globalFilter = searchParams.get('search') || ''
   const statusFilter = searchParams.get('status') || 'all'
+  const companyFilter = searchParams.get('company') || ''
 
 
   const setGlobalFilter = useCallback((value: string) => setParam('search', value), [setParam])
@@ -179,6 +181,9 @@ const TripsOverviewTable = () => {
   // Client-side date filtering
   const filteredTripData = useMemo(() => {
     let filtered = tripData
+    if (companyFilter) {
+      filtered = filtered.filter(trip => (trip as any).companyId === companyFilter)
+    }
     if (dateFrom) {
       filtered = filtered.filter(trip => dayjs(trip.tripDate).isAfter(dateFrom.startOf('day').subtract(1, 'ms')))
     }
@@ -186,7 +191,7 @@ const TripsOverviewTable = () => {
       filtered = filtered.filter(trip => dayjs(trip.tripDate).isBefore(dateTo.endOf('day').add(1, 'ms')))
     }
     return filtered
-  }, [tripData, dateFrom, dateTo])
+  }, [tripData, dateFrom, dateTo, companyFilter])
 
   // Export configuration
   const exportColumns: ExportColumn[] = useMemo(() => [
@@ -399,6 +404,8 @@ const TripsOverviewTable = () => {
               <MenuItem value='completed'>Completed</MenuItem>
               <MenuItem value='cancelled'>Cancelled</MenuItem>
             </TextField>
+            {/* Drivers only ever see their own trips, so the company filter is for the office */}
+            {!isDriver && <CompanyFilterSelect value={companyFilter} onChange={value => setParam('company', value)} />}
             <TextField
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}

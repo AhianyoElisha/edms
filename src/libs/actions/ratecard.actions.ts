@@ -12,6 +12,7 @@ import type {
   TruckCategoryType 
 } from '@/types/apps/deliveryTypes'
 import { VOLUME_TIERS, findVolumePriceForTier } from '@/types/apps/deliveryTypes'
+import { companyIdForName } from './company.actions'
 
 // Helper to parse volume prices from string (stored in DB) to array
 function parseVolumePrices(volumePrices: string | VolumePrice[]): VolumePrice[] {
@@ -339,6 +340,8 @@ export async function createRateCard(
       ID.unique(),
       {
         clientName: rateCardData.clientName,
+        // Which company the card belongs to (see company.actions)
+        companyId: await companyIdForName(rateCardData.clientName),
         clientCode: rateCardData.clientCode.toUpperCase(),
         routeCode: rateCardData.routeCode,
         routeDescription: rateCardData.routeDescription,
@@ -375,6 +378,11 @@ export async function updateRateCard(
     // Convert client code to uppercase if provided
     if (dataToUpdate.clientCode) {
       dataToUpdate.clientCode = dataToUpdate.clientCode.toUpperCase()
+    }
+
+    // A changed client name moves the card to that company
+    if (dataToUpdate.clientName) {
+      dataToUpdate.companyId = await companyIdForName(dataToUpdate.clientName)
     }
 
     // Stringify volume prices if provided
@@ -510,6 +518,7 @@ export async function duplicateRateCard(
       ID.unique(),
       {
         clientName: source.clientName,
+        companyId: (source as any).companyId || (await companyIdForName(source.clientName)),
         clientCode: source.clientCode,
         routeCode: source.routeCode,
         routeDescription: source.routeDescription,
