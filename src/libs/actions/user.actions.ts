@@ -7,6 +7,7 @@ import { Client, Databases, Users as UsersAPI, Query, ID } from 'node-appwrite';
 import { emailKey, personNameKey, phoneKey } from '@/utils/fleetIdentity';
 import { withTextCase } from '../textCaseGuard';
 import { toNameCase } from '@/utils/textCase';
+import { COMPANY_LABEL, STAFF_LABEL, isCompanyRoleName } from '@/utils/companyAccess';
 
 // Initialize server-side Appwrite client with API key
 const serverClient = new Client()
@@ -89,9 +90,36 @@ export async function createUserAccount(
     phone: string;
     role: string;
     avatar: string;
+
+    /** Required when the role is the company role: the company this login belongs to */
+    companyId?: string;
   },
   options: { allowSimilar?: boolean } = {}
-): Promise<{ success: true; user: any } | { success: false; duplicates: SimilarUser[]; canOverride: boolean }> {
+): Promise<
+  | { success: true; user: any }
+  | { success: false; duplicates: SimilarUser[]; canOverride: boolean; message?: string }
+> {
+  // A company login is tied to one company and may only exist once the database
+  // is closed to non-staff accounts; before that it could read everything.
+  const role = (await serverDatabases.getDocument(appwriteConfig.database, appwriteConfig.roles, userData.role)) as any;
+  const isCompanyLogin = isCompanyRoleName(role.name);
+
+  if (isCompanyLogin) {
+    if (!userData.companyId) {
+      return { success: false, duplicates: [], canOverride: false, message: 'Choose the company this login belongs to.' };
+    }
+
+    if (!(await isDatabaseClosedToCompanies())) {
+      return {
+        success: false,
+        duplicates: [],
+        canOverride: false,
+        message:
+          'Company logins are not switched on yet. The database must first be restricted to staff accounts (scripts/apply-company-isolation.js).'
+      };
+    }
+  }
+
   const similar = await findSimilarUsers(userData);
   const certain = similar.filter(
     u => u.matchedOn.includes('email') || (u.matchedOn.includes('name') && u.matchedOn.includes('phone'))
@@ -104,17 +132,6 @@ export async function createUserAccount(
     // Create account with @eds.com email for authentication
     const authEmail = `${userData.username}@eds.com`;
     
-    console.log('=== Creating User Account (Server-side) ===');
-    console.log('Payload being sent:', {
-      name: userData.name,
-      username: userData.username,
-      authEmail: authEmail,
-      personalEmail: userData.email,
-      phone: userData.phone,
-      role: userData.role,
-      avatar: userData.avatar
-    });
-    
     // Create auth account using Users API (admin SDK)
     const newAccount = await usersAPI.create(
       ID.unique(),
@@ -124,10 +141,8 @@ export async function createUserAccount(
       toNameCase(userData.name)
     );
 
-    console.log('Auth account created successfully:', {
-      accountId: newAccount.$id,
-      email: newAccount.email
-    });
+    // The label is what the database permissions are written against
+    await usersAPI.updateLabels(newAccount.$id, [isCompanyLogin ? COMPANY_LABEL : STAFF_LABEL]);
 
     // Create user document with personal email stored
     const user = await serverDatabases.createDocument(
@@ -141,7 +156,8 @@ export async function createUserAccount(
         role: userData.role,
         phone: userData.phone,
         avatar: userData.avatar,
-        status: 'active'
+        status: 'active',
+        companyId: isCompanyLogin ? userData.companyId : null
       }
     );
 
@@ -162,6 +178,37 @@ export async function createUserAccount(
     } else {
       throw error;
     }
+  }
+}
+
+/**
+ * True once the collections are readable by staff accounts only. Company logins
+ * are refused until then (see scripts/apply-company-isolation.js).
+ */
+async function isDatabaseClosedToCompanies(): Promise<boolean> {
+  const trips = await serverDatabases.getCollection(appwriteConfig.database, appwriteConfig.trips);
+
+  return !trips.$permissions.some(permission => permission.includes('"users"') || permission.includes('"any"'));
+}
+
+/**
+ * Make an account's label match its user record: `company` for a company login,
+ * `staff` for everyone else. Call after a user's role changes.
+ */
+export async function syncAccountAccess(userId: string) {
+  const user = (await serverDatabases.getDocument(appwriteConfig.database, appwriteConfig.users, userId, [
+    Query.select(['$id', 'accountId', 'companyId', 'role.name'])
+  ])) as any;
+
+  if (!user.accountId) return;
+
+  const label = user.companyId && isCompanyRoleName(user.role?.name) ? COMPANY_LABEL : STAFF_LABEL;
+
+  try {
+    await usersAPI.updateLabels(user.accountId, [label]);
+  } catch (error: any) {
+    // An account that no longer exists (a removed user) has nothing to label
+    if (error?.code !== 404) throw error;
   }
 }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/contexts/AppwriteProvider'
 import { getUserPermissions } from '@/libs/actions/permissions.actions'
+import { isCompanyUser } from '@/utils/companyAccess'
 
 // Fallback permissions based on role (in case API fails)
 export const FALLBACK_PERMISSIONS: Record<string, string[]> = {
@@ -81,6 +82,15 @@ export function usePermissions() {
 
   useEffect(() => {
     const fetchPermissions = async () => {
+      // A company login has no staff permissions at all; its two pages are served
+      // by the portal, which does its own check on the server
+      if (isCompanyUser(user)) {
+        setPermissions([])
+        setIsLoading(false)
+
+        return
+      }
+
       if (user?.$id) {
         try {
           setIsLoading(true)
@@ -123,6 +133,7 @@ export function usePermissions() {
 
   const isAdmin = user?.role?.name === 'admin'
   const isDriver = user?.role?.name?.toLowerCase() === 'driver'
+  const isCompany = isCompanyUser(user)
 
   // Trip pricing, rates, profit and revenue are back-office figures. Field roles
   // (drivers, pickup/delivery agents) must never see them.
@@ -136,6 +147,7 @@ export function usePermissions() {
     hasAllPermissions,
     isAdmin,
     isDriver,
+    isCompany,
     canViewFinancials,
     user
   }

@@ -49,7 +49,7 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
-  const { hasPermission: hookHasPermission, hasAnyPermission: hookHasAnyPermission, isAdmin, isDriver, isLoading: isLoadingPermissions } = usePermissions()
+  const { hasPermission: hookHasPermission, hasAnyPermission: hookHasAnyPermission, isAdmin, isDriver, isCompany, isLoading: isLoadingPermissions } = usePermissions()
 
   // Navigation helper function
   const handleNavigation = (path: string) => {
@@ -114,6 +114,18 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
         renderExpandedMenuItemIcon={{ icon: <i className='ri-circle-fill' /> }}
         menuSectionStyles={menuSectionStyles(verticalNavOptions, theme)}
       >
+        {/* A company login sees its own trips and manifests, nothing else */}
+        {isCompany && (
+          <MenuItem onClick={() => handleNavigation('/portal/trips')} icon={<i className='ri-truck-line' />}>
+            My Trips
+          </MenuItem>
+        )}
+        {isCompany && (
+          <MenuItem onClick={() => handleNavigation('/portal/manifests')} icon={<i className='ri-file-list-3-line' />}>
+            My Manifests
+          </MenuItem>
+        )}
+
         {/* Dashboard - Always accessible if user has permission */}
         {hasPermission('dashboard.view') && (
           <MenuItem onClick={() => handleNavigation('/dashboard')} icon={<i className='ri-dashboard-line' />}>

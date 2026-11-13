@@ -4,6 +4,8 @@ import { appwriteConfig } from './../appwrite.config';
 import { Customer, Logistics, Supplier, Worker } from "@/types/apps/ecommerceTypes";
 import { listAllDocuments } from './paginate'
 import { formatVehicleNumber, vehicleKey } from '@/utils/fleetIdentity'
+import { isCompanyRoleName } from '@/utils/companyAccess'
+import { syncAccountAccess } from './user.actions'
 
 
 export async function saveCustomerToDB(Customer: Customer) {
@@ -554,12 +556,34 @@ export async function updateUserInDB(userId: string, userData: {
   status?: string;
 }) {
   try {
+    const data: Record<string, unknown> = { ...userData }
+
+    if (userData.role) {
+      const [role, current] = await Promise.all([
+        databases.getDocument(appwriteConfig.database, appwriteConfig.roles, userData.role),
+        databases.getDocument(appwriteConfig.database, appwriteConfig.users, userId)
+      ])
+
+      if (isCompanyRoleName((role as any).name)) {
+        // A company login needs its company; that is chosen when the login is created
+        if (!(current as any).companyId) {
+          throw new Error('A staff user cannot be turned into a company login. Add a new user with the company role instead.')
+        }
+      } else if ((current as any).companyId) {
+        // Moving to a staff role takes the user out of the company
+        data.companyId = null
+      }
+    }
+
     const updatedUser = await databases.updateDocument(
       appwriteConfig.database,
       appwriteConfig.users,
       userId,
-      userData
+      data
     );
+
+    // Keep the account's database access in step with the role
+    if (userData.role) await syncAccountAccess(userId)
 
     return updatedUser;
   } catch (error) {

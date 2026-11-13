@@ -1,5 +1,6 @@
 import { getUserPermissions } from '@/libs/actions/permissions.actions'
 import { FALLBACK_PERMISSIONS } from '@/hooks/usePermissions'
+import { isCompanyUser, PORTAL_HOME } from '@/utils/companyAccess'
 
 /**
  * Ordered priority list mapping a permission to the landing page a non-admin
@@ -68,6 +69,7 @@ export async function resolveUserPermissions(user: any): Promise<string[]> {
  * Convenience helper: resolve permissions for a user and return their landing route.
  */
 export async function getLandingRouteForUser(user: any): Promise<string> {
+  if (isCompanyUser(user)) return PORTAL_HOME
   if (user?.role?.name?.toLowerCase() === 'admin') return '/dashboard'
 
   const permissions = await resolveUserPermissions(user)

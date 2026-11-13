@@ -27,6 +27,9 @@ import { createUserAccount } from '@/libs/actions/user.actions'
 import type { SimilarUser } from '@/libs/actions/user.actions'
 import { getRolesList } from '@/libs/actions/roles.actions'
 import { toast } from 'react-toastify'
+import { getCompanies } from '@/libs/actions/company.actions'
+import type { CompanyType } from '@/libs/actions/company.actions'
+import { isCompanyRoleName } from '@/utils/companyAccess'
 
 type AddUserProps = {
   open: boolean
@@ -57,6 +60,7 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
   const [rolesLoading, setRolesLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [availableRoles, setAvailableRoles] = useState<RoleType[]>([])
+  const [companies, setCompanies] = useState<CompanyType[]>([])
 
   // People already in the system who look like the one being added
   const [similar, setSimilar] = useState<{ users: SimilarUser[]; canOverride: boolean } | null>(null)
@@ -67,6 +71,7 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
     password: '',
     phone: '',
     role: '',
+    companyId: '',
     avatar: availableAvatars[0]
   })
 
@@ -90,6 +95,17 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
     fetchRoles()
   }, [open])
 
+  // The company role is the one login type that is tied to a company
+  const isCompanyLogin = isCompanyRoleName(availableRoles.find(role => role.$id === formData.role)?.name)
+
+  useEffect(() => {
+    if (open) {
+      getCompanies({ activeOnly: true })
+        .then(setCompanies)
+        .catch(error => console.error('Error fetching companies:', error))
+    }
+  }, [open])
+
   // The warning belongs to what was typed; drop it as soon as that changes
   useEffect(() => {
     setSimilar(null)
@@ -105,7 +121,8 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
       const result = await createUserAccount(formData, { allowSimilar: !!similar?.canOverride })
 
       if (!result.success) {
-        setSimilar({ users: result.duplicates, canOverride: result.canOverride })
+        if (result.message) toast.error(result.message)
+        else setSimilar({ users: result.duplicates, canOverride: result.canOverride })
 
         return
       }
@@ -120,6 +137,7 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
         password: '',
         phone: '',
         role: '',
+        companyId: '',
         avatar: availableAvatars[0]
       })
       if (onUpdate) onUpdate()
@@ -265,7 +283,7 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
                 <Select
                   label='Role'
                   value={formData.role}
-                  onChange={e => setFormData({ ...formData, role: e.target.value })}
+                  onChange={e => setFormData({ ...formData, role: e.target.value, companyId: '' })}
                   disabled={rolesLoading}
                 >
                   {rolesLoading ? (
@@ -280,6 +298,25 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
                 </Select>
               </FormControl>
             </Grid>
+            {isCompanyLogin && (
+              <Grid item xs={12}>
+                <TextField
+                  select
+                  fullWidth
+                  required
+                  label='Company'
+                  value={formData.companyId}
+                  onChange={e => setFormData({ ...formData, companyId: e.target.value })}
+                  helperText="This login will see only this company's trips and manifests, and nothing else in the system."
+                >
+                  {companies.map(company => (
+                    <MenuItem key={company.$id} value={company.$id}>
+                      {company.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         

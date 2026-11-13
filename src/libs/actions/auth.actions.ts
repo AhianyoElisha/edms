@@ -7,15 +7,16 @@ import {
 } from "../appwrite.config";
 import { parseStringify } from "../utils";
 import { appwriteConfig } from './../appwrite.config';
+import { portalGetProfile } from './portal.actions';
+import { getPortalToken } from '../portalClient';
+import { COMPANY_LABEL, COMPANY_ROLE } from '@/utils/companyAccess';
 
 
 // CREATE APPWRITE USER
 export const signInAccount = async (user: { username: string; password: string }) => {
     const email = `${user.username}@eds.com`
   try {
-    console.log(email, user.password)
     const session = await account.createEmailPasswordSession(email, user.password);
-    console.log(session);
     return parseStringify(session);
   } catch (error: any) {
     // Check existing user
@@ -48,22 +49,40 @@ export async function getCurrentUser(): Promise<any> {
 
     if (!currentAccount) throw Error;
 
-    const currentUser = await tablesDB.listRows(
-      appwriteConfig.database,
-      appwriteConfig.users,
-      [Query.equal('accountId', currentAccount.$id), Query.select(['*', 'role.*'])] // Fetch role details
-    );
-    // console.log(currentUser.documents[0].courses);
+    // A company login cannot read the database itself (see utils/companyAccess);
+    // its own record comes from the server instead.
+    if (currentAccount.labels?.includes(COMPANY_LABEL)) return await getCompanyProfile();
 
-    if (!currentUser) throw Error;
+    try {
+      const currentUser = await tablesDB.listRows(
+        appwriteConfig.database,
+        appwriteConfig.users,
+        [Query.equal('accountId', currentAccount.$id), Query.select(['*', 'role.*'])] // Fetch role details
+      );
 
-    return currentUser.rows[0];
+      if (currentUser?.rows?.[0]) return currentUser.rows[0];
+    } catch {
+      // fall through: may be a company login whose label has not reached this session yet
+    }
+
+    return await getCompanyProfile();
   } catch (error) {
     // console.log(error);
     return null;
   }
 }
 
+
+// The signed-in company login, shaped like a user row so the rest of the app can read it
+async function getCompanyProfile(): Promise<any> {
+  const profile = await portalGetProfile(await getPortalToken());
+
+  return {
+    ...profile,
+    status: 'active',
+    role: { name: COMPANY_ROLE, displayName: profile.companyName }
+  };
+}
 
 // ============================== SIGN OUT
 export async function signOutAccount() {
