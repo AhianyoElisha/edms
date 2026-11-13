@@ -4,6 +4,18 @@
 import { Query } from 'appwrite'
 import { appwriteConfig, databases, tablesDB } from '@/libs/appwrite.config'
 
+/**
+ * Which trips count towards revenue, shared with the dashboard (edms-dashboard.actions).
+ *
+ * A trip earns its price once it is booked, unless it was cancelled or deleted. The
+ * reports used to count only `completed` trips, but most trips are never moved to
+ * that status (about 1 in 10 are), so the Revenue and Profitability reports showed a
+ * fraction of what the dashboard did and a margin of -4245%.
+ */
+export const tripEarnsRevenue = (trip: any) => trip.status !== 'cancelled' && trip.status !== 'deleted'
+
+export const tripRevenue = (trip: any) => Number(trip.tripCost) || Number(trip.clientRate) || 0
+
 // ============================================
 // OPERATIONAL REPORTS
 // ============================================
@@ -294,7 +306,9 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
         driver.totalTrips++
         if (trip.status === 'completed') {
           driver.completedTrips++
-          driver.totalRevenue += trip.tripCost || trip.clientRate || 0
+        }
+        if (tripEarnsRevenue(trip)) {
+          driver.totalRevenue += tripRevenue(trip)
         }
         if (trip.status === 'cancelled') {
           driver.cancelledTrips++
@@ -321,7 +335,7 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
         ...driver,
         completionRate: driver.totalTrips > 0 ? ((driver.completedTrips / driver.totalTrips) * 100).toFixed(1) : '0',
         profit: driver.totalRevenue - driver.totalExpenses,
-        avgRevenuePerTrip: driver.completedTrips > 0 ? (driver.totalRevenue / driver.completedTrips).toFixed(2) : '0',
+        avgRevenuePerTrip: driver.totalTrips - driver.cancelledTrips > 0 ? (driver.totalRevenue / (driver.totalTrips - driver.cancelledTrips)).toFixed(2) : '0',
         avgExpensePerTrip: driver.totalTrips > 0 ? (driver.totalExpenses / driver.totalTrips).toFixed(2) : '0'
       }))
       .sort((a, b) => b.completedTrips - a.completedTrips)
@@ -422,7 +436,10 @@ export async function getRouteAnalysisReport(month?: number, year?: number) {
         route.totalTrips++
         if (trip.status === 'completed') {
           route.completedTrips++
-          route.totalRevenue += trip.tripCost || trip.clientRate || 0
+        }
+        if (tripEarnsRevenue(trip)) {
+          route.revenueTrips = (route.revenueTrips || 0) + 1
+          route.totalRevenue += tripRevenue(trip)
         }
       }
     })
@@ -433,7 +450,7 @@ export async function getRouteAnalysisReport(month?: number, year?: number) {
         ...route,
         completionRate: route.totalTrips > 0 ? ((route.completedTrips / route.totalTrips) * 100).toFixed(1) : '0',
         profit: route.totalRevenue - route.totalExpenses,
-        avgRevenuePerTrip: route.completedTrips > 0 ? (route.totalRevenue / route.completedTrips).toFixed(2) : '0',
+        avgRevenuePerTrip: route.revenueTrips > 0 ? (route.totalRevenue / route.revenueTrips).toFixed(2) : '0',
         utilizationScore: route.totalTrips > 0 ? Math.min(100, route.totalTrips * 10) : 0
       }))
       .sort((a, b) => b.totalTrips - a.totalTrips)
@@ -479,7 +496,7 @@ export async function getRevenueReport(month?: number, year?: number) {
     const startDate = startOfMonth.toISOString()
     const endDate = endOfMonth.toISOString()
 
-    // Get completed trips for the month
+    // Get the month's trips
     const trips = await databases.listDocuments(
       appwriteConfig.database,
       appwriteConfig.trips,
@@ -504,24 +521,25 @@ export async function getRevenueReport(month?: number, year?: number) {
     let paidRevenue = 0
     let pendingRevenue = 0
 
+    // The total, the daily chart and last month's figure all use the same rule, so they add up
     trips.documents.forEach((trip: any) => {
+      if (!tripEarnsRevenue(trip)) return
+
       const tripDay = new Date(trip.tripDate).getDate() - 1
-      const tripRevenue = trip.tripCost || trip.clientRate || 0
-      
+      const revenue = tripRevenue(trip)
+
       if (tripDay >= 0 && tripDay < daysInMonth) {
-        dailyRevenue[tripDay].revenue += tripRevenue
+        dailyRevenue[tripDay].revenue += revenue
         dailyRevenue[tripDay].trips++
       }
 
-      if (trip.status === 'completed') {
-        totalRevenue += tripRevenue
-        totalTrips++
-        
-        if (trip.paymentStatus === 'paid') {
-          paidRevenue += tripRevenue
-        } else {
-          pendingRevenue += tripRevenue
-        }
+      totalRevenue += revenue
+      totalTrips++
+
+      if (trip.paymentStatus === 'paid') {
+        paidRevenue += revenue
+      } else {
+        pendingRevenue += revenue
       }
     })
 
@@ -537,12 +555,12 @@ export async function getRevenueReport(month?: number, year?: number) {
       [
         Query.greaterThanEqual('tripDate', prevStartOfMonth.toISOString()),
         Query.lessThanEqual('tripDate', prevEndOfMonth.toISOString()),
-        Query.equal('status', 'completed'),
+        Query.notEqual('status', 'deleted'),
         Query.limit(2000)
       ]
     )
 
-    const prevRevenue = prevTrips.documents.reduce((sum: number, t: any) => sum + (t.tripCost || t.clientRate || 0), 0)
+    const prevRevenue = prevTrips.documents.filter(tripEarnsRevenue).reduce((sum: number, t: any) => sum + tripRevenue(t), 0)
     const revenueChange = prevRevenue > 0 ? (((totalRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1) : '0'
 
     return {
