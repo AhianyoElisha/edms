@@ -118,8 +118,11 @@ export async function createTripWithManifests(wizardData: TripWizardData): Promi
           
           // Package information stored directly on manifest
           packageSize: manifestData.packageSize,
-          packageCount: manifestData.packageCount,
+          packageCount: manifestData.packageCount || 0,
           deliveredCount: 0,
+          // Entered by the office: complete as-is, even with no package count,
+          // so it must not be mistaken for a field capture awaiting review.
+          detailsVerified: true,
           
           status: 'pending',
           notes: manifestData.notes || '',
@@ -224,8 +227,11 @@ export async function addManifestsToTrip(tripId: string, manifests: TripWizardDa
         dropoffSequence: manifests.indexOf(manifestData) + 1,
         manifestDate: trip.tripDate || new Date().toISOString(),
         packageSize: manifestData.packageSize,
-        packageCount: manifestData.packageCount,
+        packageCount: manifestData.packageCount || 0,
         deliveredCount: 0,
+        // Entered by the office: complete as-is, even with no package count,
+        // so it must not be mistaken for a field capture awaiting review.
+        detailsVerified: true,
         status: 'pending',
         notes: manifestData.notes || '',
         arrivalTime: null,
@@ -371,7 +377,7 @@ export async function updateTripWithManifests(
               dropoffSequence: index + 1,
               manifestDate,
               packageSize: manifestData.packageSize,
-              packageCount: manifestData.packageCount,
+              packageCount: manifestData.packageCount || 0,
               estimatedArrival: manifestData.estimatedArrival || null,
               notes: manifestData.notes || ''
             }
@@ -396,8 +402,11 @@ export async function updateTripWithManifests(
             dropoffSequence: index + 1,
             manifestDate,
             packageSize: manifestData.packageSize,
-            packageCount: manifestData.packageCount,
+            packageCount: manifestData.packageCount || 0,
             deliveredCount: 0,
+            // Entered by the office: complete as-is, even with no package count,
+            // so it must not be mistaken for a field capture awaiting review.
+            detailsVerified: true,
             status: 'pending',
             notes: manifestData.notes || '',
             arrivalTime: null,
@@ -580,6 +589,7 @@ export async function getTripById(tripId: string): Promise<any> {
           'route.*', // Fetch complete route details
           'manifests.*', // Fetch all manifests
           'manifests.dropofflocation.*', // Fetch dropoff location for each manifest
+          'rateCard.clientName', // The company the trip was priced for
         ])
       ]
     )

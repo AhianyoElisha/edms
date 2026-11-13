@@ -142,10 +142,7 @@ const AddManifestsView = ({ tripData }: AddManifestsViewProps) => {
         toast.error('Please select a package size for all manifests')
         return
       }
-      if (manifest.packageCount === undefined || manifest.packageCount < 1) {
-        toast.error('Please enter a valid package count (at least 1) for all manifests')
-        return
-      }
+      // Package count is optional: not every client's manifest carries one.
     }
 
     try {
@@ -158,7 +155,7 @@ const AddManifestsView = ({ tripData }: AddManifestsViewProps) => {
         dropoffAddress: m.address,
         manifestNumber: m.manifestNumber!,
         packageSize: m.packageSize as 'small' | 'medium' | 'big',
-        packageCount: m.packageCount!,
+        packageCount: m.packageCount || 0,
         estimatedArrival: m.estimatedArrival,
         notes: m.notes
       }))
@@ -301,10 +298,9 @@ const AddManifestsView = ({ tripData }: AddManifestsViewProps) => {
                                 type='number'
                                 value={manifest.packageCount || ''}
                                 onChange={(e) => updateManifest(manifest.id, 'packageCount', parseInt(e.target.value) || 0)}
-                                required
                                 size='small'
-                                inputProps={{ min: 1 }}
-                                helperText='Total packages'
+                                inputProps={{ min: 0 }}
+                                helperText='Optional'
                               />
                             </Grid>
                             <Grid item xs={12} sm={6} md={3}>

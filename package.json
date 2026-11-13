@@ -89,6 +89,7 @@
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "valibot": "0.36.0",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
@@ -102,6 +103,7 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/web-push": "^3.6.4",
     "autoprefixer": "10.4.19",
     "consola": "3.2.3",
     "dotenv-cli": "7.4.2",

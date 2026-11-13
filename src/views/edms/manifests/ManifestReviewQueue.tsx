@@ -24,15 +24,23 @@ import Dialog from '@mui/material/Dialog'
 import DialogContent from '@mui/material/DialogContent'
 import IconButton from '@mui/material/IconButton'
 import InputAdornment from '@mui/material/InputAdornment'
+import TablePagination from '@mui/material/TablePagination'
 
 // Third-party Imports
 import { toast } from 'react-toastify'
+
+// Component Imports
+import CompanyField from '@/components/edms/CompanyField'
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
 
 // Action Imports
-import { getManifestsAwaitingVerification, verifyManifestDetails } from '@/libs/actions/manifest.actions'
+import {
+  getManifestClientOptions,
+  getManifestsAwaitingVerification,
+  verifyManifestDetails
+} from '@/libs/actions/manifest.actions'
 
 const PACKAGE_SIZES = [
   { value: 'small', label: 'Small' },
@@ -42,12 +50,35 @@ const PACKAGE_SIZES = [
 
 interface DraftDetails {
   manifestNumber: string
+  clientName: string
   packageSize: string
   packageCount: string
-  deliveredCount: string
+  shortageCount: string
 }
 
-const emptyDraft: DraftDetails = { manifestNumber: '', packageSize: '', packageCount: '', deliveredCount: '' }
+// Start each form from whatever is already known: figures the driver typed at
+// the stop, and the company the trip was priced for.
+const initialDraft = (manifest: any): DraftDetails => {
+  const trip = typeof manifest.trip === 'object' ? manifest.trip : null
+
+  return {
+    manifestNumber: '',
+    clientName: manifest.clientName || trip?.rateCard?.clientName || '',
+    packageSize: manifest.packageSize || '',
+    packageCount: manifest.packageCount > 0 ? String(manifest.packageCount) : '',
+    shortageCount: manifest.shortageCount > 0 ? String(manifest.shortageCount) : ''
+  }
+}
+
+// Blank is fine (the field is optional); anything typed must be a whole number >= 0.
+const parseOptionalCount = (raw: string): number | null | 'invalid' => {
+  const value = raw.trim()
+
+  if (value === '') return null
+  if (!/^\d+$/.test(value)) return 'invalid'
+
+  return parseInt(value, 10)
+}
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return '—'
@@ -94,6 +125,13 @@ const ManifestReviewQueue = () => {
   const [savingId, setSavingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [lightbox, setLightbox] = useState<string | null>(null)
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+  const [clientOptions, setClientOptions] = useState<string[]>([])
+
+  useEffect(() => {
+    getManifestClientOptions().then(setClientOptions)
+  }, [])
 
   const loadQueue = useCallback(async () => {
     try {
@@ -131,6 +169,8 @@ const ManifestReviewQueue = () => {
           trip?.tripNumber,
           trip?.driver?.name,
           trip?.vehicle?.vehicleNumber,
+          trip?.route?.routeName,
+          m.clientName,
           locationName(m)
         ]
           .filter(Boolean)
@@ -141,33 +181,48 @@ const ManifestReviewQueue = () => {
     return rows
   }, [manifests, tripFilter, search])
 
-  const draftFor = (id: string) => drafts[id] || emptyDraft
+  // One page at a time: the queue can hold hundreds of manifests, and drawing every
+  // card (a photo and several inputs each) at once made the page slow to open and to type in.
+  const lastPage = Math.max(0, Math.ceil(visibleManifests.length / rowsPerPage) - 1)
+  const currentPage = Math.min(page, lastPage)
 
-  const updateDraft = (id: string, field: keyof DraftDetails, value: string) => {
-    setDrafts(prev => ({ ...prev, [id]: { ...(prev[id] || emptyDraft), [field]: value } }))
+  const pagedManifests = useMemo(
+    () => visibleManifests.slice(currentPage * rowsPerPage, (currentPage + 1) * rowsPerPage),
+    [visibleManifests, currentPage, rowsPerPage]
+  )
+
+  useEffect(() => {
+    setPage(0)
+  }, [search, tripFilter])
+
+  const draftFor = (manifest: any) => drafts[manifest.$id] || initialDraft(manifest)
+
+  const updateDraft = (manifest: any, field: keyof DraftDetails, value: string) => {
+    setDrafts(prev => ({ ...prev, [manifest.$id]: { ...(prev[manifest.$id] || initialDraft(manifest)), [field]: value } }))
   }
 
   const handleVerify = async (manifest: any) => {
-    const draft = draftFor(manifest.$id)
-    const packageCount = parseInt(draft.packageCount, 10)
+    const draft = draftFor(manifest)
 
-    if (!draft.packageSize) {
-      toast.error('Select the package size')
+    // Every figure is optional - not all clients' manifests carry a package
+    // count - so only what was actually typed gets checked.
+    const packageCount = parseOptionalCount(draft.packageCount)
+    const shortageCount = parseOptionalCount(draft.shortageCount)
 
-      return
-    }
-
-    if (!Number.isFinite(packageCount) || packageCount < 1) {
-      toast.error('Enter the number of packages')
+    if (packageCount === 'invalid') {
+      toast.error('Total packages must be a whole number, or left blank')
 
       return
     }
 
-    const deliveredRaw = draft.deliveredCount.trim()
-    const deliveredCount = deliveredRaw === '' ? packageCount : parseInt(deliveredRaw, 10)
+    if (shortageCount === 'invalid') {
+      toast.error('Shortages must be a whole number, or left blank')
 
-    if (!Number.isFinite(deliveredCount) || deliveredCount < 0 || deliveredCount > packageCount) {
-      toast.error('Delivered count must be between 0 and the total packages')
+      return
+    }
+
+    if (packageCount !== null && packageCount > 0 && shortageCount !== null && shortageCount > packageCount) {
+      toast.error('Shortages cannot be more than the total packages')
 
       return
     }
@@ -179,9 +234,10 @@ const ManifestReviewQueue = () => {
         manifest.$id,
         {
           manifestNumber: draft.manifestNumber.trim() || undefined,
-          packageSize: draft.packageSize,
+          clientName: draft.clientName.trim(),
+          packageSize: draft.packageSize || null,
           packageCount,
-          deliveredCount
+          shortageCount
         },
         user?.name || user?.email
       )
@@ -253,7 +309,7 @@ const ManifestReviewQueue = () => {
         fullWidth
         size='small'
         className='mb-6'
-        placeholder='Search by trip, driver, vehicle or stop…'
+        placeholder='Search by trip, driver, vehicle, route, company or stop…'
         value={search}
         onChange={e => setSearch(e.target.value)}
         InputProps={{
@@ -277,9 +333,9 @@ const ManifestReviewQueue = () => {
         </Card>
       ) : (
         <div className='flex flex-col gap-6'>
-          {visibleManifests.map(manifest => {
+          {pagedManifests.map(manifest => {
             const trip = typeof manifest.trip === 'object' ? manifest.trip : null
-            const draft = draftFor(manifest.$id)
+            const draft = draftFor(manifest)
             const photo = manifest.manifestImage || manifest.proofOfDeliveryImage
             const isSaving = savingId === manifest.$id
 
@@ -340,6 +396,7 @@ const ManifestReviewQueue = () => {
                             </Link>
                             {trip.driver?.name ? ` • ${trip.driver.name}` : ''}
                             {trip.vehicle?.vehicleNumber ? ` • ${trip.vehicle.vehicleNumber}` : ''}
+                            {trip.route?.routeName ? ` • ${trip.route.routeName}` : ''}
                           </>
                         ) : (
                           'Trip unavailable'
@@ -354,28 +411,41 @@ const ManifestReviewQueue = () => {
                       <Divider className='mb-4' />
 
                       <Grid container spacing={3}>
-                        <Grid item xs={12} sm={6} md={3}>
+                        <Grid item xs={12} sm={6}>
                           <TextField
                             fullWidth
                             size='small'
                             label='Manifest Number'
                             placeholder={manifest.manifestNumber}
                             value={draft.manifestNumber}
-                            onChange={e => updateDraft(manifest.$id, 'manifestNumber', e.target.value)}
+                            onChange={e => updateDraft(manifest, 'manifestNumber', e.target.value)}
                             disabled={!canVerify || isSaving}
                             helperText='From the paper'
                           />
                         </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
+                        <Grid item xs={12} sm={6}>
+                          <CompanyField
+                            options={clientOptions}
+                            value={draft.clientName}
+                            onChange={value => updateDraft(manifest, 'clientName', value)}
+                            disabled={!canVerify || isSaving}
+                            helperText='Pick one or type a new name'
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
                           <TextField
                             select
                             fullWidth
                             size='small'
                             label='Package Size'
                             value={draft.packageSize}
-                            onChange={e => updateDraft(manifest.$id, 'packageSize', e.target.value)}
+                            onChange={e => updateDraft(manifest, 'packageSize', e.target.value)}
                             disabled={!canVerify || isSaving}
+                            helperText='Optional'
                           >
+                            <MenuItem value=''>
+                              <em>Not specified</em>
+                            </MenuItem>
                             {PACKAGE_SIZES.map(size => (
                               <MenuItem key={size.value} value={size.value}>
                                 {size.label}
@@ -383,29 +453,30 @@ const ManifestReviewQueue = () => {
                             ))}
                           </TextField>
                         </Grid>
-                        <Grid item xs={6} md={3}>
+                        <Grid item xs={6} sm={4}>
                           <TextField
                             fullWidth
                             size='small'
                             type='number'
                             label='Total Packages'
                             value={draft.packageCount}
-                            onChange={e => updateDraft(manifest.$id, 'packageCount', e.target.value)}
-                            inputProps={{ min: 1 }}
+                            onChange={e => updateDraft(manifest, 'packageCount', e.target.value)}
+                            inputProps={{ min: 0 }}
                             disabled={!canVerify || isSaving}
+                            helperText='Optional'
                           />
                         </Grid>
-                        <Grid item xs={6} md={3}>
+                        <Grid item xs={6} sm={4}>
                           <TextField
                             fullWidth
                             size='small'
                             type='number'
-                            label='Delivered'
-                            value={draft.deliveredCount}
-                            onChange={e => updateDraft(manifest.$id, 'deliveredCount', e.target.value)}
+                            label='Shortages'
+                            value={draft.shortageCount}
+                            onChange={e => updateDraft(manifest, 'shortageCount', e.target.value)}
                             inputProps={{ min: 0 }}
                             disabled={!canVerify || isSaving}
-                            helperText='Blank = all'
+                            helperText='Optional – packages missing'
                           />
                         </Grid>
                       </Grid>
@@ -431,6 +502,25 @@ const ManifestReviewQueue = () => {
               </Card>
             )
           })}
+
+          <Card>
+            <TablePagination
+              component='div'
+              count={visibleManifests.length}
+              page={currentPage}
+              onPageChange={(_, nextPage) => {
+                setPage(nextPage)
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={event => {
+                setRowsPerPage(Number(event.target.value))
+                setPage(0)
+              }}
+              rowsPerPageOptions={[10, 25, 50]}
+              labelRowsPerPage='Manifests per page:'
+            />
+          </Card>
         </div>
       )}
 

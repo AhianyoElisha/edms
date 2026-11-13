@@ -145,10 +145,7 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
           alert('Please select a package size for all manifests')
           return
         }
-        if (manifest.packageCount === undefined || manifest.packageCount < 1) {
-          alert('Please enter a valid package count (at least 1) for all manifests')
-          return
-        }
+        // Package count is optional: not every client's manifest carries one.
       }
     }
 
@@ -160,7 +157,7 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
       dropoffAddress: m.address,
       manifestNumber: m.manifestNumber!,
       packageSize: m.packageSize as 'small' | 'medium' | 'big',
-      packageCount: m.packageCount!,
+      packageCount: m.packageCount || 0,
       departureTime: m.departureTime,
       estimatedArrival: m.estimatedArrival,
       notes: m.notes
@@ -343,10 +340,9 @@ const StepManifests = ({ handleNext, handlePrev, wizardData, updateWizardData }:
                                 type='number'
                                 value={manifest.packageCount || ''}
                                 onChange={(e) => updateManifest(manifest.id, 'packageCount', parseInt(e.target.value) || 0)}
-                                required
                                 size='small'
-                                inputProps={{ min: 1 }}
-                                helperText='Total packages'
+                                inputProps={{ min: 0 }}
+                                helperText='Optional'
                               />
                             </Grid>
 

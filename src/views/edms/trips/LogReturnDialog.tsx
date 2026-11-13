@@ -28,6 +28,9 @@ import type { RouteStopType, ReturnReasonType } from '@/types/apps/deliveryTypes
 import { getRouteDropoffLocations } from '@/libs/actions/route.actions'
 import { logFieldReturn } from '@/libs/actions/returnwaybill.actions'
 
+// Lib Imports
+import { notifyOffice } from '@/libs/notifications/client'
+
 interface LogReturnDialogProps {
   open: boolean
   onClose: () => void
@@ -178,13 +181,16 @@ const LogReturnDialog = ({ open, onClose, tripData, onLogged }: LogReturnDialogP
 
       const photoUrl = `${appwriteConfig.endpoint}/storage/buckets/${bucketId}/files/${uploaded.$id}/view?project=${appwriteConfig.project}`
 
-      await logFieldReturn({
+      const waybill: any = await logFieldReturn({
         tripId: tripData.$id,
         dropoffLocationId: selectedStop.locationId,
         pickupLocationId,
         photoUrl,
         returnReason: reason
       })
+
+      // Ring the office; never blocks the driver.
+      if (waybill?.$id) notifyOffice({ kind: 'return_logged', returnWaybillId: waybill.$id })
 
       toast.success(`Return logged for ${selectedStop.locationName || 'this stop'}`)
       onLogged?.()
