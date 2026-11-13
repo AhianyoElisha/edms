@@ -4,7 +4,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 
 // Next Imports
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useUrlFilters, useDebouncedUrlText } from '@/hooks/useUrlFilters'
 
 // MUI Imports
 import Card from '@mui/material/Card'
@@ -68,9 +68,7 @@ const RouteOverviewTable = () => {
   const { hasPermission } = usePermissions()
 
   // Routing
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const { searchParams, setParam } = useUrlFilters()
 
   // States
   const [routeData, setRouteData] = useState<RouteWithActions[]>([])
@@ -80,19 +78,12 @@ const RouteOverviewTable = () => {
   const globalFilter = searchParams.get('search') || ''
   const statusFilter = (searchParams.get('status') || 'all') as 'all' | 'active' | 'inactive'
 
-  // URL param helper
-  const updateParam = useCallback((key: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (value) {
-      params.set(key, value)
-    } else {
-      params.delete(key)
-    }
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [searchParams, pathname, router])
 
-  const setGlobalFilter = useCallback((value: string) => updateParam('search', value), [updateParam])
-  const setStatusFilter = useCallback((value: string) => updateParam('status', value === 'all' ? '' : value), [updateParam])
+  const setGlobalFilter = useCallback((value: string) => setParam('search', value), [setParam])
+  const setStatusFilter = useCallback((value: string) => setParam('status', value === 'all' ? '' : value), [setParam])
+
+  // What is typed stays local and reaches the URL once it settles (see useUrlFilters)
+  const [searchInput, setSearchInput] = useDebouncedUrlText(globalFilter, setGlobalFilter)
 
   // Load routes
   useEffect(() => {
@@ -160,7 +151,9 @@ const RouteOverviewTable = () => {
 
   const columns = useMemo<ColumnDef<RouteWithActions, any>[]>(
     () => [
-      columnHelper.accessor('routeCode', {
+      // Search what the cell shows: the route name and the location names, not just the code
+      columnHelper.accessor(row => `${row.routeCode || ''} ${row.routeName || ''}`, {
+        id: 'routeCode',
         header: 'Route Code',
         cell: ({ row }) => (
           <div className='flex items-center gap-2'>
@@ -175,7 +168,8 @@ const RouteOverviewTable = () => {
           </div>
         )
       }),
-      columnHelper.accessor('startLocation', {
+      columnHelper.accessor(row => (row.startLocation as any)?.locationName || '', {
+        id: 'startLocation',
         header: 'Start Location',
         cell: ({ row }) => (
           <Typography color='text.primary'>
@@ -185,7 +179,8 @@ const RouteOverviewTable = () => {
           </Typography>
         )
       }),
-      columnHelper.accessor('endLocation', {
+      columnHelper.accessor(row => (row.endLocation as any)?.locationName || '', {
+        id: 'endLocation',
         header: 'End Location',
         cell: ({ row }) => (
           <Typography color='text.primary'>
@@ -305,8 +300,8 @@ const RouteOverviewTable = () => {
             <MenuItem value='inactive'>Inactive</MenuItem>
           </TextField>
           <TextField
-            value={globalFilter ?? ''}
-            onChange={e => setGlobalFilter(e.target.value)}
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
             placeholder='Search Routes...'
             size='small'
             className='min-w-[200px]'
