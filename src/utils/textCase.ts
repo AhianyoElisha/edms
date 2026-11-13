@@ -9,6 +9,8 @@
  *    typed entirely in capitals, in which case it is treated like a name
  */
 
+import { toGhanaRegion } from './ghanaRegions'
+
 // Abbreviations that are written in capitals even inside a name
 const ACRONYMS = new Set([
   'GH', '3PL', 'EDS', 'EMG', 'BGC', 'PAWK', 'KAD', 'VDO', 'IHS', 'FLS', 'CCML',
@@ -55,14 +57,17 @@ export const toFreeTextCase = (value: string) => {
   return shouting ? toNameCase(trimmed) : trimmed
 }
 
-export type TextCaseKind = 'name' | 'email' | 'plate' | 'free'
+export type TextCaseKind = 'name' | 'email' | 'plate' | 'free' | 'region'
 export type TextCaseRules = Record<string, TextCaseKind>
 
 const CONVERTERS: Record<TextCaseKind, (value: string) => string> = {
   name: toNameCase,
   email: toEmailCase,
   plate: toPlateCase,
-  free: toFreeTextCase
+  free: toFreeTextCase,
+
+  // One of the 16 regions when recognisable ("ashanti", "Kumasi"); otherwise treated as a name
+  region: value => toGhanaRegion(value) || toNameCase(value)
 }
 
 /**
@@ -72,8 +77,8 @@ const CONVERTERS: Record<TextCaseKind, (value: string) => string> = {
 export const TEXT_CASE_RULES = {
   users: { name: 'name', email: 'email' },
   roles: { displayName: 'name', description: 'free' },
-  pickuplocations: { locationName: 'name', city: 'name', region: 'name', country: 'name', contactPerson: 'name', address: 'free' },
-  dropofflocations: { locationName: 'name', city: 'name', region: 'name', country: 'name', contactPerson: 'name', address: 'free' },
+  pickuplocations: { locationName: 'name', city: 'name', region: 'region', country: 'name', contactPerson: 'name', address: 'free' },
+  dropofflocations: { locationName: 'name', city: 'name', region: 'region', country: 'name', contactPerson: 'name', address: 'free' },
   routes: { routeName: 'name' },
   vehicles: { vehicleNumber: 'plate', brand: 'name', model: 'name' },
   // subCategory is picked from a fixed list, not typed
