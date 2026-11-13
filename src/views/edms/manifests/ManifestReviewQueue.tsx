@@ -24,7 +24,6 @@ import Dialog from '@mui/material/Dialog'
 import DialogContent from '@mui/material/DialogContent'
 import IconButton from '@mui/material/IconButton'
 import InputAdornment from '@mui/material/InputAdornment'
-import TablePagination from '@mui/material/TablePagination'
 
 // Third-party Imports
 import { toast } from 'react-toastify'
@@ -95,8 +94,6 @@ const ManifestReviewQueue = () => {
   const [savingId, setSavingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [lightbox, setLightbox] = useState<string | null>(null)
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(10)
 
   const loadQueue = useCallback(async () => {
     try {
@@ -143,20 +140,6 @@ const ManifestReviewQueue = () => {
 
     return rows
   }, [manifests, tripFilter, search])
-
-  // One page at a time: the queue can hold hundreds of manifests, and drawing every
-  // card (a photo and five inputs each) at once made the page slow to open and to type in.
-  const lastPage = Math.max(0, Math.ceil(visibleManifests.length / rowsPerPage) - 1)
-  const currentPage = Math.min(page, lastPage)
-
-  const pagedManifests = useMemo(
-    () => visibleManifests.slice(currentPage * rowsPerPage, (currentPage + 1) * rowsPerPage),
-    [visibleManifests, currentPage, rowsPerPage]
-  )
-
-  useEffect(() => {
-    setPage(0)
-  }, [search, tripFilter])
 
   const draftFor = (id: string) => drafts[id] || emptyDraft
 
@@ -294,7 +277,7 @@ const ManifestReviewQueue = () => {
         </Card>
       ) : (
         <div className='flex flex-col gap-6'>
-          {pagedManifests.map(manifest => {
+          {visibleManifests.map(manifest => {
             const trip = typeof manifest.trip === 'object' ? manifest.trip : null
             const draft = draftFor(manifest.$id)
             const photo = manifest.manifestImage || manifest.proofOfDeliveryImage
@@ -448,25 +431,6 @@ const ManifestReviewQueue = () => {
               </Card>
             )
           })}
-
-          <Card>
-            <TablePagination
-              component='div'
-              count={visibleManifests.length}
-              page={currentPage}
-              onPageChange={(_, nextPage) => {
-                setPage(nextPage)
-                window.scrollTo({ top: 0, behavior: 'smooth' })
-              }}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={event => {
-                setRowsPerPage(Number(event.target.value))
-                setPage(0)
-              }}
-              rowsPerPageOptions={[10, 25, 50]}
-              labelRowsPerPage='Manifests per page:'
-            />
-          </Card>
         </div>
       )}
 
