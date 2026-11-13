@@ -1,5 +1,7 @@
 import { Query } from 'appwrite'
 import { appwriteConfig, databases } from '@/libs/appwrite.config'
+import { listAllDocuments } from '@/libs/actions/paginate'
+import { tripEarnsRevenue, tripRevenue } from '@/libs/actions/reports.actions'
 
 // Cache for dashboard data
 const cache = new Map<string, { data: any; timestamp: number }>()
@@ -37,67 +39,53 @@ export async function getPackageStatistics(month?: number, year?: number) {
     const startDate = startOfMonth.toISOString()
     const endDate = endOfMonth.toISOString()
 
-    // Get all manifests for the month
-    const allManifests = await databases.listDocuments(
-      appwriteConfig.database,
+    // Every manifest created in the month, paged: a single Query.limit(1000) page was
+    // about to cut a busy month short (October has 953) with no error.
+    const monthManifests = await listAllDocuments<any>(
       appwriteConfig.manifests,
       [
         Query.greaterThanEqual('$createdAt', startDate),
-        Query.lessThanEqual('$createdAt', endDate),
-        Query.limit(1000)
-      ]
+        Query.lessThanEqual('$createdAt', endDate)
+      ],
+      'dashboard manifests'
     )
 
-    // Get delivered manifests
-    const deliveredManifests = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.manifests,
-      [
-        Query.equal('status', 'delivered'),
-        Query.limit(1000)
-      ]
-    )
+    // Status counts describe the selected month. They used to be all-time totals capped
+    // at 1,000, so every month showed the same "delivered" figure.
+    const countByStatus = (...statuses: string[]) =>
+      monthManifests.filter(manifest => statuses.includes(manifest.status)).length
 
-    // Get pending manifests (status = pending or loaded)
-    const pendingManifests = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.manifests,
-      [
-        Query.contains('status', ['pending', 'loaded']),
-        Query.limit(1000)
-      ]
-    )
-
-    // Get in-transit manifests
-    const inTransitManifests = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.manifests,
-      [
-        Query.equal('status', 'in-transit'),
-        Query.limit(1000)
-      ]
-    )
+    const inTransitInMonth = monthManifests.filter(manifest => manifest.status === 'in_transit' || manifest.status === 'in-transit')
 
     // Calculate total packages from manifests
     let totalPackages = 0
     let deliveredPackagesCount = 0
-    
-    allManifests.documents.forEach((manifest: any) => {
+
+    monthManifests.forEach(manifest => {
       totalPackages += manifest.packageCount || 0
       deliveredPackagesCount += manifest.deliveredCount || 0
     })
 
-    // Calculate daily delivery data from delivered manifests
+    // Daily deliveries: delivered manifests by the day they were delivered in this month
+    // (whichever month they were created in). Falls back to the last update for older
+    // rows without a delivery time.
+    const deliveredInMonth = await listAllDocuments<any>(
+      appwriteConfig.manifests,
+      [
+        Query.equal('status', ['delivered', 'completed']),
+        Query.greaterThanEqual('$updatedAt', startDate)
+      ],
+      'dashboard delivered manifests'
+    )
+
     const daysInMonth = endOfMonth.getDate()
     const dailyDeliveries = Array(daysInMonth).fill(0)
 
-    deliveredManifests.documents.forEach((manifest: any) => {
-      if (manifest.$updatedAt) {
-        const deliveryDay = new Date(manifest.$updatedAt).getDate()
-        const monthOfDelivery = new Date(manifest.$updatedAt).getMonth()
-        if (monthOfDelivery === currentMonth) {
-          dailyDeliveries[deliveryDay - 1] += manifest.deliveredCount || 0
-        }
+    deliveredInMonth.forEach(manifest => {
+      const deliveredOn = new Date(manifest.deliveryTime || manifest.$updatedAt)
+
+      if (deliveredOn >= startOfMonth && deliveredOn <= endOfMonth) {
+        dailyDeliveries[deliveredOn.getDate() - 1] += manifest.deliveredCount || 0
       }
     })
 
@@ -105,15 +93,15 @@ export async function getPackageStatistics(month?: number, year?: number) {
       totalPackages,
       deliveredPackages: deliveredPackagesCount,
       pendingPackages: totalPackages - deliveredPackagesCount,
-      inTransitPackages: inTransitManifests.documents.reduce((acc: number, m: any) => acc + (m.packageCount || 0) - (m.deliveredCount || 0), 0),
+      inTransitPackages: inTransitInMonth.reduce((acc: number, m: any) => acc + (m.packageCount || 0) - (m.deliveredCount || 0), 0),
       deliveryRate: totalPackages > 0 ? ((deliveredPackagesCount / totalPackages) * 100).toFixed(1) : '0',
       dailyDeliveries,
       dayLabels: Array.from({ length: daysInMonth }, (_, i) => i + 1),
       // Additional manifest-level stats
-      totalManifests: allManifests.total,
-      deliveredManifests: deliveredManifests.total,
-      pendingManifests: pendingManifests.total,
-      inTransitManifests: inTransitManifests.total
+      totalManifests: monthManifests.length,
+      deliveredManifests: countByStatus('delivered', 'completed'),
+      pendingManifests: countByStatus('pending', 'loaded'),
+      inTransitManifests: inTransitInMonth.length
     }
 
     setCachedData(cacheKey, result)
@@ -155,52 +143,40 @@ export async function getTripStatistics(month?: number, year?: number) {
     const startDate = startOfMonth.toISOString()
     const endDate = endOfMonth.toISOString()
 
-    // Get all trips
-    const allTrips = await databases.listDocuments(
-      appwriteConfig.database,
+    // The month's trips by trip date, the same field the reports and the Trips page
+    // filter on. Filtering on $createdAt put a trip logged a few days late in the wrong
+    // month, and emptied every past month when a migration re-stamped the rows.
+    const monthTrips = await listAllDocuments<any>(
       appwriteConfig.trips,
       [
-        Query.greaterThanEqual('$createdAt', startDate),
-        Query.lessThanEqual('$createdAt', endDate),
-        Query.notEqual('status', 'deleted'),
-        Query.limit(1000)
-      ]
+        Query.greaterThanEqual('tripDate', startDate),
+        Query.lessThanEqual('tripDate', endDate),
+        Query.notEqual('status', 'deleted')
+      ],
+      'dashboard trips'
     )
 
-    // Get completed trips
-    const completedTrips = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      [
-        Query.equal('status', 'completed'),
-        Query.greaterThanEqual('$createdAt', startDate),
-        Query.lessThanEqual('$createdAt', endDate),
-        Query.limit(1000)
-      ]
-    )
+    const completedCount = monthTrips.filter(trip => trip.status === 'completed').length
 
     // Get active trips
     const activeTrips = await databases.listDocuments(
       appwriteConfig.database,
       appwriteConfig.trips,
       [
-        Query.equal('status', 'in-progress'),
-        Query.limit(1000)
+        // The stored value is in_progress; 'in-progress' matched nothing, so Active was always 0
+        Query.equal('status', 'in_progress'),
+        Query.limit(1)
       ]
     )
 
-    // Calculate total revenue from trip costs
-    let totalRevenue = 0
-    allTrips.documents.forEach((trip: any) => {
-      const cost = trip.tripCost || 0
-      totalRevenue += Number(cost)
-    })
+    // Same revenue rule as the reports (see tripEarnsRevenue)
+    const totalRevenue = monthTrips.filter(tripEarnsRevenue).reduce((sum, trip) => sum + tripRevenue(trip), 0)
 
     const result = {
-      totalTrips: allTrips.total,
-      completedTrips: completedTrips.total,
+      totalTrips: monthTrips.length,
+      completedTrips: completedCount,
       activeTrips: activeTrips.total,
-      completionRate: allTrips.total > 0 ? ((completedTrips.total / allTrips.total) * 100).toFixed(1) : '0',
+      completionRate: monthTrips.length > 0 ? ((completedCount / monthTrips.length) * 100).toFixed(1) : '0',
       totalRevenue
     }
 
@@ -255,17 +231,18 @@ export async function getDriverPerformance(month?: number, year?: number) {
       })
     })
 
-    // Get trips with driver info for the selected month
-    const trips = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      [
-        Query.greaterThanEqual('$createdAt', startDate),
-        Query.lessThanEqual('$createdAt', endDate),
-        Query.notEqual('status', 'deleted'),
-        Query.limit(1000)
-      ]
-    )
+    // Get trips with driver info for the selected month (by trip date, as above)
+    const trips = {
+      documents: await listAllDocuments<any>(
+        appwriteConfig.trips,
+        [
+          Query.greaterThanEqual('tripDate', startDate),
+          Query.lessThanEqual('tripDate', endDate),
+          Query.notEqual('status', 'deleted')
+        ],
+        'dashboard driver trips'
+      )
+    }
 
     // Calculate driver performance
     const driverMap = new Map()

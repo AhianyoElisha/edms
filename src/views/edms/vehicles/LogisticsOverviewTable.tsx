@@ -23,6 +23,7 @@ import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
+  getFilteredRowModel,
   useReactTable,
   getFacetedRowModel,
   getFacetedUniqueValues,
@@ -244,7 +245,9 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
           </Typography>
         )
       }),
-      columnHelper.accessor('driver', {
+      // Text accessor so a vehicle can be found by its driver's name
+      columnHelper.accessor(row => (row.driver as any)?.name || '', {
+        id: 'driver',
         header: 'Driver',
         cell: ({ row }) => {
           const driver = row.original.driver as any
@@ -358,13 +361,18 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
       fuzzy: fuzzyFilter
     },
     state: {
-      rowSelection
+      rowSelection,
+      globalFilter
     },
     initialState: {
       pagination: {
         pageSize: 5
       }
     },
+    // The search box was never connected to the table: it kept its text but filtered nothing
+    globalFilterFn: fuzzyFilter,
+    onGlobalFilterChange: setGlobalFilter,
+    getFilteredRowModel: getFilteredRowModel(),
     enableRowSelection: true, //enable row selection for all rows
     // enableRowSelection: row => row.original.age > 18, // or enable row selection conditionally per row
     onRowSelectionChange: setRowSelection,
@@ -472,7 +480,7 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
         rowsPerPageOptions={[5, 10, 25, 40, 50, 100]}
         component='div'
         className='border-bs'
-        count={table.getExpandedRowModel().rows.length}
+        count={table.getFilteredRowModel().rows.length}
         rowsPerPage={table.getState().pagination.pageSize}
         page={table.getState().pagination.pageIndex}
         onPageChange={(_, page) => {

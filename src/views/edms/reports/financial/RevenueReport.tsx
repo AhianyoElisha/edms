@@ -361,7 +361,7 @@ const RevenueReport = () => {
         <StatCard
           title='Avg per Trip'
           value={`GH₵ ${Number(reportData.summary.avgRevenuePerTrip).toLocaleString()}`}
-          subtitle={`${reportData.summary.totalTrips} completed trips`}
+          subtitle={`${reportData.summary.totalTrips} trips`}
           icon='ri-bar-chart-line'
           color='info'
         />
@@ -488,7 +488,7 @@ const RevenueReport = () => {
                     <i className='ri-truck-line'></i>
                   </Avatar>
                   <Box>
-                    <Typography variant='body2' fontWeight={500}>Completed Trips</Typography>
+                    <Typography variant='body2' fontWeight={500}>Trips</Typography>
                     <Typography variant='caption' color='text.secondary'>Revenue-generating trips</Typography>
                   </Box>
                 </Box>
@@ -502,7 +502,7 @@ const RevenueReport = () => {
                   </Avatar>
                   <Box>
                     <Typography variant='body2' fontWeight={500}>Average Revenue</Typography>
-                    <Typography variant='caption' color='text.secondary'>Per completed trip</Typography>
+                    <Typography variant='caption' color='text.secondary'>Per trip</Typography>
                   </Box>
                 </Box>
                 <Typography variant='h6' fontWeight={600}>GH₵ {Number(reportData.summary.avgRevenuePerTrip).toLocaleString()}</Typography>
