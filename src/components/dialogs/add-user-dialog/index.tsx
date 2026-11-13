@@ -20,9 +20,11 @@ import MenuItem from '@mui/material/MenuItem'
 import Avatar from '@mui/material/Avatar'
 import Box from '@mui/material/Box'
 import InputAdornment from '@mui/material/InputAdornment'
+import Alert from '@mui/material/Alert'
 
 // Actions
 import { createUserAccount } from '@/libs/actions/user.actions'
+import type { SimilarUser } from '@/libs/actions/user.actions'
 import { getRolesList } from '@/libs/actions/roles.actions'
 import { toast } from 'react-toastify'
 
@@ -55,6 +57,9 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
   const [rolesLoading, setRolesLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [availableRoles, setAvailableRoles] = useState<RoleType[]>([])
+
+  // People already in the system who look like the one being added
+  const [similar, setSimilar] = useState<{ users: SimilarUser[]; canOverride: boolean } | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     username: '',
@@ -85,18 +90,28 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
     fetchRoles()
   }, [open])
 
+  // The warning belongs to what was typed; drop it as soon as that changes
+  useEffect(() => {
+    setSimilar(null)
+  }, [formData.name, formData.phone, formData.email, open])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     try {
       setLoading(true)
-      
-      console.log('=== Form Data Being Submitted ===');
-      console.log('Form data:', formData);
-      
-      await createUserAccount(formData)
-      
+
+      // A second submit with the warning still showing means "add anyway"
+      const result = await createUserAccount(formData, { allowSimilar: !!similar?.canOverride })
+
+      if (!result.success) {
+        setSimilar({ users: result.duplicates, canOverride: result.canOverride })
+
+        return
+      }
+
       toast.success('User created successfully')
+      setSimilar(null)
       setOpen(false)
       setFormData({
         name: '',
@@ -269,8 +284,13 @@ const AddUserDialog = ({ open, setOpen, onUpdate }: AddUserProps) => {
         </DialogContent>
         
         <DialogActions className='justify-center pbs-0 sm:pbe-16 sm:pli-16'>
-          <Button variant='contained' type='submit' disabled={loading || rolesLoading}>
-            {loading ? 'Creating...' : 'Create User'}
+          <Button
+            variant='contained'
+            type='submit'
+            color={similar?.canOverride ? 'warning' : 'primary'}
+            disabled={loading || rolesLoading || (!!similar && !similar.canOverride)}
+          >
+            {loading ? 'Creating...' : similar?.canOverride ? 'Add anyway' : 'Create User'}
           </Button>
           <Button variant='outlined' color='secondary' onClick={() => setOpen(false)}>
             Cancel

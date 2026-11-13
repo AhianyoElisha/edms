@@ -167,7 +167,7 @@ const VehicleDetails = ({ vehicleData: initialVehicleData, vehicleId }: { vehicl
             <VehicleInfoCard vehicleData={vehicleData} />
           </Grid>
           <Grid item xs={12}>
-            <DriverInfoCard vehicleData={vehicleData} />
+            <DriverInfoCard vehicleData={vehicleData} onChangeDriver={() => setEditDrawerOpen(true)} />
           </Grid>
         </Grid>
       </Grid>

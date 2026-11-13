@@ -12,6 +12,8 @@ import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
+import Checkbox from '@mui/material/Checkbox'
+import FormControlLabel from '@mui/material/FormControlLabel'
 import { DateTimePicker } from '@mui/x-date-pickers-pro'
 import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs'
 import { LocalizationProvider } from '@mui/x-date-pickers-pro'
@@ -30,6 +32,8 @@ import { getAllVehicles } from '@/libs/actions/vehicle.actions'
 import { getAllRoutes } from '@/libs/actions/route.actions'
 import { getUserList } from '@/libs/actions/customer.action'
 import { getAllRateCards } from '@/libs/actions/ratecard.actions'
+
+import { vehicleDriverId } from '@/utils/fleetIdentity'
 
 interface DriverUser {
   $id: string
@@ -59,6 +63,13 @@ const StepTripDetails = ({
   const [tripCost, setTripCost] = useState<number | undefined>(wizardData.tripDetails.tripCost)
   const [costError, setCostError] = useState<string | null>(null)
   const [notes, setNotes] = useState(wizardData.tripDetails.notes || '')
+
+  // Keep the vehicle's assigned driver in step with who actually drives it. On by
+  // default for a new trip; off when an existing trip is opened for editing, so
+  // correcting an old trip does not silently reassign today's vehicle.
+  const [assignDriver, setAssignDriver] = useState(
+    wizardData.tripDetails.assignDriverToVehicle ?? !wizardData.tripDetails.driverId
+  )
 
   // Load data
   useEffect(() => {
@@ -139,6 +150,17 @@ const StepTripDetails = ({
     setTripCost(volumePrice.rate)
   }, [routeId, tonnage, routes, rateCards])
 
+  const selectedVehicle = vehicles.find(v => v.$id === vehicleId) || null
+  const selectedDriver = drivers.find(d => d.$id === driverId) || null
+  const assignedDriver = (selectedVehicle?.driver as any) || null
+  const assignedDriverId = vehicleDriverId(selectedVehicle)
+  const driverDiffersFromAssigned = !!selectedVehicle && !!selectedDriver && assignedDriverId !== driverId
+
+  // The vehicle the chosen driver is assigned to at the moment, if it is another one
+  const driversOtherVehicle = selectedDriver
+    ? vehicles.find(v => v.$id !== vehicleId && vehicleDriverId(v) === driverId) || null
+    : null
+
   const handleSubmit = () => {
     if (!driverId || !vehicleId || !routeId || !startTime || !tonnage) {
       alert('Please fill in all required fields')
@@ -162,7 +184,8 @@ const StepTripDetails = ({
         startTime,
         tonnage,
         tripCost: tripCost || 0,
-        notes
+        notes,
+        assignDriverToVehicle: assignDriver && driverDiffersFromAssigned
       }
     })
 
@@ -211,7 +234,10 @@ const StepTripDetails = ({
                 <div>
                   <Typography variant='body1'>{vehicle.vehicleNumber}</Typography>
                   <Typography variant='caption' color='text.secondary'>
-                    {vehicle.type} - {vehicle.brand} {vehicle.model}
+                    {(vehicle.driver as any)?.name && (vehicle.driver as any)?.status !== 'deleted'
+                      ? `Driver: ${(vehicle.driver as any).name}`
+                      : 'No driver assigned'}
+                    {vehicle.brand || vehicle.model ? ` · ${[vehicle.brand, vehicle.model].filter(Boolean).join(' ')}` : ''}
                   </Typography>
                 </div>
               </li>
@@ -234,12 +260,14 @@ const StepTripDetails = ({
             onChange={(_, selected) => {
               const selectedDriverId = selected?.$id || ''
               setDriverId(selectedDriverId)
-              const matchingVehicle = vehicles.find(v => {
-                const driverField = v.driver as any
-                const vehicleDriverId = typeof driverField === 'object' ? driverField?.$id : driverField
-                return vehicleDriverId === selectedDriverId
-              })
-              if (matchingVehicle) setVehicleId(matchingVehicle.$id)
+
+              // Suggest the driver's own vehicle, but never replace a vehicle that
+              // was already picked: a stand-in driver takes the vehicle as chosen
+              if (!vehicleId && selectedDriverId) {
+                const matchingVehicle = vehicles.find(v => vehicleDriverId(v) === selectedDriverId)
+
+                if (matchingVehicle) setVehicleId(matchingVehicle.$id)
+              }
             }}
             renderOption={(props, driver) => (
               <li {...props} key={driver.$id}>
@@ -258,6 +286,28 @@ const StepTripDetails = ({
             isOptionEqualToValue={(option, value) => option.$id === value.$id}
           />
         </Grid>
+
+        {driverDiffersFromAssigned && (
+          <Grid item xs={12}>
+            <Alert severity='info' icon={<i className='ri-user-shared-line' />}>
+              <Typography variant='body2' color='inherit'>
+                {assignedDriver?.name && assignedDriver?.status !== 'deleted'
+                  ? `${selectedVehicle?.vehicleNumber} is assigned to ${assignedDriver.name} in the system.`
+                  : `${selectedVehicle?.vehicleNumber} has no assigned driver in the system.`}
+              </Typography>
+              <FormControlLabel
+                control={<Checkbox size='small' checked={assignDriver} onChange={e => setAssignDriver(e.target.checked)} />}
+                label={
+                  <Typography variant='body2' color='inherit'>
+                    Make {selectedDriver?.name} the assigned driver of this vehicle from now on
+                    {driversOtherVehicle ? ` (moves them off ${driversOtherVehicle.vehicleNumber})` : ''}. Untick if this
+                    is a one-off trip.
+                  </Typography>
+                }
+              />
+            </Alert>
+          </Grid>
+        )}
 
         {/* Route */}
         <Grid item xs={12}>

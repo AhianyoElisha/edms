@@ -15,7 +15,7 @@ import FormHelperText from '@mui/material/FormHelperText'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import InputLabel from '@mui/material/InputLabel'
-import { Alert, Autocomplete } from '@mui/material'
+import { Alert } from '@mui/material'
 import { toast } from 'react-toastify'
 
 // Components
@@ -24,8 +24,7 @@ import PerfectScrollbar from 'react-perfect-scrollbar'
 // Types
 import type { Logistics } from '@/types/apps/ecommerceTypes'
 import { saveTruckOrTricycleToDB } from '@/libs/actions/customer.action'
-import { getAllRoutes } from '@/libs/actions/route.actions'
-import { getAllUsers } from '@/libs/actions/auth.actions'
+import VehicleDriverField from './VehicleDriverField'
 
 type Props = {
   open: boolean
@@ -50,10 +49,6 @@ const AddLogisticsDrawer = (props: Props) => {
   const { open, handleClose, onSuccess } = props
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [drivers, setDrivers] = useState<any[]>([])
-  const [routes, setRoutes] = useState<any[]>([])
-  const [loadingDrivers, setLoadingDrivers] = useState(false)
-  const [loadingRoutes, setLoadingRoutes] = useState(false)
 
   const {
     control,
@@ -77,25 +72,6 @@ const AddLogisticsDrawer = (props: Props) => {
   })
 
   const ownership = watch('ownership')
-
-  // Fetch drivers and routes
-  useEffect(() => {
-    if (open) {
-      fetchDrivers()
-    }
-  }, [open])
-
-  const fetchDrivers = async () => {
-    try {
-      setLoadingDrivers(true)
-      const response = await getAllUsers('driver')
-      setDrivers(response || [])
-    } catch (error) {
-      console.error('Error fetching drivers:', error)
-    } finally {
-      setLoadingDrivers(false)
-    }
-  }
 
   const onSubmit = async (data: Logistics) => {
     try {
@@ -126,7 +102,7 @@ const AddLogisticsDrawer = (props: Props) => {
     } catch (error) {
       console.error('Error saving vehicle:', error)
       setError(error instanceof Error ? error.message : 'Failed to add vehicle')
-      toast.error('Failed to add vehicle')
+      toast.error(error instanceof Error ? error.message : 'Failed to add vehicle')
     } finally {
       setIsSubmitting(false)
     }
@@ -335,21 +311,11 @@ const AddLogisticsDrawer = (props: Props) => {
               name='driver'
               control={control}
               render={({ field: { onChange, value } }) => (
-                <Autocomplete
-                  value={drivers.find((d) => d.$id === value) || null}
-                  onChange={(_, newValue) => onChange(newValue?.$id || '')}
-                  options={drivers}
-                  getOptionLabel={(option) => `${option.name || ''}`}
-                  loading={loadingDrivers}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label='Assign Driver (Optional)'
-                      placeholder='Select a driver'
-                      error={!!errors.driver}
-                      helperText={errors.driver?.message || 'Assign a driver to this vehicle'}
-                    />
-                  )}
+                <VehicleDriverField
+                  value={(value as string) || ''}
+                  onChange={onChange}
+                  open={open}
+                  error={errors.driver?.message}
                 />
               )}
             />

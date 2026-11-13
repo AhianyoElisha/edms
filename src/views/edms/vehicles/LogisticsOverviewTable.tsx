@@ -255,7 +255,15 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
           
           return (
             <Typography color='text.primary'>
-              {driverName ? (
+              {driverName && driver.status === 'deleted' ? (
+                <Chip
+                  variant='tonal'
+                  label={`${driverName} (removed)`}
+                  size='small'
+                  color='warning'
+                  icon={<i className='ri-user-unfollow-line' />}
+                />
+              ) : driverName ? (
                 <Chip
                   variant='tonal'
                   label={driverName}

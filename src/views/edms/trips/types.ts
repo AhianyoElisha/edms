@@ -11,6 +11,9 @@ export interface TripDetailsData {
   tonnage?: string
   tripCost?: number
   notes?: string
+  // Set when the chosen driver should also become the vehicle's assigned driver
+  // (the vehicle was assigned to someone else, or to nobody, when the trip was planned)
+  assignDriverToVehicle?: boolean
 }
 
 // NEW: ManifestData now includes package size and count directly
