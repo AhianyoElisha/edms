@@ -1,5 +1,6 @@
 import { Client, Account, Databases, Storage, Avatars, TablesDB } from "appwrite";
 import { Client as ServerClient, Databases as ServerDatabases, Storage as ServerStorage } from "node-appwrite";
+import { withTextCase } from "./textCaseGuard";
 
 export const appwriteConfig = {
   // Core Configuration
@@ -87,10 +88,12 @@ client.setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!);
 client.setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT!);
 
 export const account = new Account(client);
-export const databases = new Databases(client);
+// Every save goes through withTextCase so typed names, emails and plates are
+// stored one consistent way (see utils/textCase)
+export const databases = withTextCase(new Databases(client));
 export const storage = new Storage(client);
 export const avatars = new Avatars(client);
-export const tablesDB = new TablesDB(client);
+export const tablesDB = withTextCase(new TablesDB(client));
 
 // Server-side Appwrite client (for server actions with admin privileges)
 const serverClient = new ServerClient()
@@ -98,5 +101,5 @@ const serverClient = new ServerClient()
   .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT!)
   .setKey(process.env.APPWRITE_API_KEY!);
 
-export const serverDatabases = new ServerDatabases(serverClient);
+export const serverDatabases = withTextCase(new ServerDatabases(serverClient));
 export const serverStorage = new ServerStorage(serverClient);
