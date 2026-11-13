@@ -175,7 +175,7 @@ const CompaniesView = () => {
                       </TableCell>
                       <TableCell align='right'>
                         {counts ? (
-                          <Link href={`/edms/manifests?company=${company.$id}`} className='text-primary'>
+                          <Link href={`/delivery/manifests?company=${company.$id}`} className='text-primary'>
                             {counts.manifests}
                           </Link>
                         ) : (
