@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useUrlFilters, useDebouncedUrlText, useUrlDateFilter } from '@/hooks/useUrlFilters'
 import {
   Card,
   CardHeader,
@@ -33,13 +33,13 @@ import { DatePicker } from '@mui/x-date-pickers-pro'
 import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs'
 import { LocalizationProvider } from '@mui/x-date-pickers-pro'
 import { LicenseInfo } from '@mui/x-license'
-import dayjs, { Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
 import { 
   Assignment,
   Schedule,
   LocalShipping
 } from '@mui/icons-material'
-import { ManifestType, ManifestFilters } from '@/types/apps/deliveryTypes'
+import { ManifestType } from '@/types/apps/deliveryTypes'
 import { 
   getAllManifests, 
   deleteManifest,
@@ -87,9 +87,7 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
   // Same gate the review queue uses: drivers hold manifests.edit, but closing
   // out manifests is the office's job.
   const canBulkComplete = !isDriver && hasPermission('manifests.edit')
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const { searchParams, setParam, setParams } = useUrlFilters()
 
   const [manifests, setManifests] = useState<ManifestType[]>([])
   const [filteredManifests, setFilteredManifests] = useState<ManifestType[]>([])
@@ -102,16 +100,6 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
   const [bulkUpdating, setBulkUpdating] = useState(false)
 
-  // URL param helper
-  const updateParam = useCallback((key: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (value) {
-      params.set(key, value)
-    } else {
-      params.delete(key)
-    }
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [searchParams, pathname, router])
   
   // Helper function to get package size display label
   const getPackageSizeLabel = (packageSize: string) => {
@@ -129,26 +117,27 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
 
   // Read filters from URL params
   const searchValue = searchParams.get('search') || ''
-  const dateFrom = searchParams.get('dateFrom') ? dayjs(searchParams.get('dateFrom')) : null
-  const dateTo = searchParams.get('dateTo') ? dayjs(searchParams.get('dateTo')) : null
   const statusFilter = searchParams.get('status') || ''
 
-  const setSearchValue = useCallback((value: string) => updateParam('search', value), [updateParam])
-  const setDateFrom = useCallback((value: Dayjs | null) => updateParam('dateFrom', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
-  const setDateTo = useCallback((value: Dayjs | null) => updateParam('dateTo', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
-  const setStatusFilter = useCallback((value: string) => updateParam('status', value), [updateParam])
+  const setSearchValue = useCallback((value: string) => setParam('search', value), [setParam])
+  const setStatusFilter = useCallback((value: string) => setParam('status', value), [setParam])
+  const commitDateFrom = useCallback((value: string) => setParam('dateFrom', value), [setParam])
+  const commitDateTo = useCallback((value: string) => setParam('dateTo', value), [setParam])
 
-  // Filters object for API call
-  const filters: ManifestFilters = useMemo(() => ({
-    search: searchValue,
-    status: undefined
-  }), [searchValue])
+  // What is typed stays local and reaches the URL once it settles (see useUrlFilters)
+  const [searchInput, setSearchInput] = useDebouncedUrlText(searchValue, setSearchValue)
+  const fromDate = useUrlDateFilter(searchParams.get('dateFrom') || '', commitDateFrom)
+  const toDate = useUrlDateFilter(searchParams.get('dateTo') || '', commitDateTo)
+  const dateFrom = fromDate.applied
+  const dateTo = toDate.applied
 
-  // Fetch manifests
+  // Fetch manifests. Search, dates and status are all applied in the browser, so the
+  // list is loaded once: refetching on every search change swapped the whole table for
+  // the loader, which threw the cursor out of the search box mid-word.
   const fetchManifests = async () => {
     try {
       setLoading(true)
-      const data = await getAllManifests(filters)
+      const data = await getAllManifests()
       setManifests(data)
     } catch (error) {
       console.error('Error fetching manifests:', error)
@@ -159,16 +148,20 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
 
   useEffect(() => {
     fetchManifests()
-  }, [filters])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Apply filters
   const applyFilters = useMemo(() => {
     let filtered = [...manifests]
 
-    // Search filter
-    if (filters.search) {
+    // Search filter: manifest number or the trip number shown under it
+    const query = searchValue.trim().toLowerCase()
+
+    if (query) {
       filtered = filtered.filter(manifest =>
-        manifest.manifestNumber.toLowerCase().includes(filters.search.toLowerCase())
+        (manifest.manifestNumber || '').toLowerCase().includes(query) ||
+        (((manifest as any).trip?.tripNumber as string | undefined) || '').toLowerCase().includes(query)
       )
     }
 
@@ -190,7 +183,7 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
     }
 
     return filtered
-  }, [manifests, filters, dateFrom, dateTo, statusFilter])
+  }, [manifests, searchValue, dateFrom, dateTo, statusFilter])
 
   // Export configuration
   const exportColumns: ExportColumn[] = useMemo(() => [
@@ -463,26 +456,26 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
 
       <Box sx={{ px: 3, pb: 2, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
         <TextField
-          value={searchValue}
-          onChange={e => setSearchValue(e.target.value)}
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
           placeholder='Search Manifests...'
           size='small'
           sx={{ minWidth: 200 }}
         />
         <DatePicker
           label='From Date'
-          value={dateFrom}
-          onChange={(val) => setDateFrom(val)}
+          value={fromDate.value}
+          onChange={fromDate.onChange}
           slotProps={{ textField: { size: 'small', sx: { minWidth: 160 } } }}
         />
         <DatePicker
           label='To Date'
-          value={dateTo}
-          onChange={(val) => setDateTo(val)}
+          value={toDate.value}
+          onChange={toDate.onChange}
           slotProps={{ textField: { size: 'small', sx: { minWidth: 160 } } }}
         />
         {(dateFrom || dateTo) && (
-          <Button size='small' variant='text' onClick={() => { setDateFrom(null); setDateTo(null) }}>
+          <Button size='small' variant='text' onClick={() => setParams({ dateFrom: null, dateTo: null })}>
             Clear Dates
           </Button>
         )}

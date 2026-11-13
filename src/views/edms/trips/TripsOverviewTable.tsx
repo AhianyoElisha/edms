@@ -4,7 +4,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 
 // Next Imports
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useUrlFilters, useDebouncedUrlText, useUrlDateFilter } from '@/hooks/useUrlFilters'
 
 // MUI Imports
 import Card from '@mui/material/Card'
@@ -22,7 +22,7 @@ import { DatePicker } from '@mui/x-date-pickers-pro'
 import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs'
 import { LocalizationProvider } from '@mui/x-date-pickers-pro'
 import { LicenseInfo } from '@mui/x-license'
-import dayjs, { Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
 
 // Third-party Imports
 import classnames from 'classnames'
@@ -91,31 +91,24 @@ const TripsOverviewTable = () => {
   const [isDeleting, setIsDeleting] = useState(false)
 
   // Routing
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const { searchParams, setParam, setParams } = useUrlFilters()
 
   // Read filters from URL params
   const globalFilter = searchParams.get('search') || ''
   const statusFilter = searchParams.get('status') || 'all'
-  const dateFrom = searchParams.get('dateFrom') ? dayjs(searchParams.get('dateFrom')) : null
-  const dateTo = searchParams.get('dateTo') ? dayjs(searchParams.get('dateTo')) : null
 
-  // URL param helper
-  const updateParam = useCallback((key: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (value) {
-      params.set(key, value)
-    } else {
-      params.delete(key)
-    }
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [searchParams, pathname, router])
 
-  const setGlobalFilter = useCallback((value: string) => updateParam('search', value), [updateParam])
-  const setStatusFilter = useCallback((value: string) => updateParam('status', value === 'all' ? '' : value), [updateParam])
-  const setDateFrom = useCallback((value: Dayjs | null) => updateParam('dateFrom', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
-  const setDateTo = useCallback((value: Dayjs | null) => updateParam('dateTo', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
+  const setGlobalFilter = useCallback((value: string) => setParam('search', value), [setParam])
+  const setStatusFilter = useCallback((value: string) => setParam('status', value === 'all' ? '' : value), [setParam])
+  const commitDateFrom = useCallback((value: string) => setParam('dateFrom', value), [setParam])
+  const commitDateTo = useCallback((value: string) => setParam('dateTo', value), [setParam])
+
+  // What is typed stays local and reaches the URL once it settles (see useUrlFilters)
+  const [searchInput, setSearchInput] = useDebouncedUrlText(globalFilter, setGlobalFilter)
+  const fromDate = useUrlDateFilter(searchParams.get('dateFrom') || '', commitDateFrom)
+  const toDate = useUrlDateFilter(searchParams.get('dateTo') || '', commitDateTo)
+  const dateFrom = fromDate.applied
+  const dateTo = toDate.applied
 
   // Permissions
   const { hasPermission, canViewFinancials, isDriver, isAdmin, user } = usePermissions()
@@ -255,23 +248,28 @@ const TripsOverviewTable = () => {
           </Typography>
         )
       }),
-      columnHelper.accessor('driver', {
+      // Text accessors: the table search only looks at string/number column values, so
+      // a column holding the related row itself (driver, vehicle, route) was never searched
+      columnHelper.accessor(row => row.driver?.name || '', {
+        id: 'driver',
         header: 'Driver',
         cell: ({ row }) => (
           <Typography color='text.primary'>
-            {row.original.driver.name || 'N/A'}
+            {row.original.driver?.name || 'N/A'}
           </Typography>
         )
       }),
-      columnHelper.accessor('vehicle', {
+      columnHelper.accessor(row => row.vehicle?.vehicleNumber || '', {
+        id: 'vehicle',
         header: 'Vehicle',
         cell: ({ row }) => (
           <Typography color='text.primary'>
-            {row.original.vehicle.vehicleNumber || 'N/A'}
+            {row.original.vehicle?.vehicleNumber || 'N/A'}
           </Typography>
         )
       }),
-      columnHelper.accessor('route', {
+      columnHelper.accessor(row => row.route?.routeName || '', {
+        id: 'route',
         header: 'Route',
         cell: ({ row }) => (
           <Typography color='text.primary'>
@@ -402,8 +400,8 @@ const TripsOverviewTable = () => {
               <MenuItem value='cancelled'>Cancelled</MenuItem>
             </TextField>
             <TextField
-              value={globalFilter ?? ''}
-              onChange={e => setGlobalFilter(e.target.value)}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
               placeholder='Search Trips...'
               size='small'
               className='min-w-[200px]'
@@ -453,18 +451,18 @@ const TripsOverviewTable = () => {
         <div className='flex flex-wrap items-center gap-2'>
           <DatePicker
             label='From Date'
-            value={dateFrom}
-            onChange={(val) => setDateFrom(val)}
+            value={fromDate.value}
+            onChange={fromDate.onChange}
             slotProps={{ textField: { size: 'small', sx: { minWidth: 160 } } }}
           />
           <DatePicker
             label='To Date'
-            value={dateTo}
-            onChange={(val) => setDateTo(val)}
+            value={toDate.value}
+            onChange={toDate.onChange}
             slotProps={{ textField: { size: 'small', sx: { minWidth: 160 } } }}
           />
           {(dateFrom || dateTo) && (
-            <Button size='small' variant='text' onClick={() => { setDateFrom(null); setDateTo(null) }}>
+            <Button size='small' variant='text' onClick={() => setParams({ dateFrom: null, dateTo: null })}>
               Clear Dates
             </Button>
           )}

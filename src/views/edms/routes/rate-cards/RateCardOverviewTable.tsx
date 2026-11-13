@@ -4,7 +4,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 
 // Next Imports
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useUrlFilters, useDebouncedUrlText, useUrlDateFilter } from '@/hooks/useUrlFilters'
 
 // MUI Imports
 import Card from '@mui/material/Card'
@@ -21,7 +21,7 @@ import { DatePicker } from '@mui/x-date-pickers-pro'
 import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs'
 import { LocalizationProvider } from '@mui/x-date-pickers-pro'
 import { LicenseInfo } from '@mui/x-license'
-import dayjs, { Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
 
 // Third-party Imports
 import classnames from 'classnames'
@@ -133,33 +133,26 @@ const RateCardOverviewTable = () => {
   const [clients, setClients] = useState<{ code: string; name: string }[]>([])
 
   // Routing
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const { searchParams, setParam, setParams } = useUrlFilters()
 
   // Read filters from URL params
   const globalFilter = searchParams.get('search') || ''
   const statusFilter = (searchParams.get('status') || 'all') as 'all' | 'active' | 'inactive'
   const clientFilter = searchParams.get('client') || 'all'
-  const dateFrom = searchParams.get('dateFrom') ? dayjs(searchParams.get('dateFrom')) : null
-  const dateTo = searchParams.get('dateTo') ? dayjs(searchParams.get('dateTo')) : null
 
-  // URL param helper
-  const updateParam = useCallback((key: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (value) {
-      params.set(key, value)
-    } else {
-      params.delete(key)
-    }
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [searchParams, pathname, router])
 
-  const setGlobalFilter = useCallback((value: string) => updateParam('search', value), [updateParam])
-  const setStatusFilter = useCallback((value: 'all' | 'active' | 'inactive') => updateParam('status', value === 'all' ? '' : value), [updateParam])
-  const setClientFilter = useCallback((value: string) => updateParam('client', value === 'all' ? '' : value), [updateParam])
-  const setDateFrom = useCallback((value: Dayjs | null) => updateParam('dateFrom', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
-  const setDateTo = useCallback((value: Dayjs | null) => updateParam('dateTo', value ? value.format('YYYY-MM-DD') : ''), [updateParam])
+  const setGlobalFilter = useCallback((value: string) => setParam('search', value), [setParam])
+  const setStatusFilter = useCallback((value: 'all' | 'active' | 'inactive') => setParam('status', value === 'all' ? '' : value), [setParam])
+  const setClientFilter = useCallback((value: string) => setParam('client', value === 'all' ? '' : value), [setParam])
+  const commitDateFrom = useCallback((value: string) => setParam('dateFrom', value), [setParam])
+  const commitDateTo = useCallback((value: string) => setParam('dateTo', value), [setParam])
+
+  // What is typed stays local and reaches the URL once it settles (see useUrlFilters)
+  const [searchInput, setSearchInput] = useDebouncedUrlText(globalFilter, setGlobalFilter)
+  const fromDate = useUrlDateFilter(searchParams.get('dateFrom') || '', commitDateFrom)
+  const toDate = useUrlDateFilter(searchParams.get('dateTo') || '', commitDateTo)
+  const dateFrom = fromDate.applied
+  const dateTo = toDate.applied
 
   // Permissions
   const { hasPermission } = usePermissions()
@@ -265,7 +258,9 @@ const RateCardOverviewTable = () => {
 
   const columns = useMemo<ColumnDef<RateCardWithActions, any>[]>(
     () => [
-      columnHelper.accessor('clientCode', {
+      // Both lines shown in the cell are searchable, not just the code
+      columnHelper.accessor(row => `${row.clientCode || ''} ${row.clientName || ''}`, {
+        id: 'clientCode',
         header: 'Client',
         cell: ({ row }) => (
           <div className='flex items-center gap-2'>
@@ -280,7 +275,8 @@ const RateCardOverviewTable = () => {
           </div>
         )
       }),
-      columnHelper.accessor('routeCode', {
+      columnHelper.accessor(row => `${row.routeCode || ''} ${row.routeDescription || ''}`, {
+        id: 'routeCode',
         header: 'Route',
         cell: ({ row }) => (
           <div className='flex flex-col'>
@@ -426,8 +422,8 @@ const RateCardOverviewTable = () => {
               ))}
             </TextField>
             <TextField
-              value={globalFilter ?? ''}
-              onChange={e => setGlobalFilter(e.target.value)}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
               placeholder='Search Rate Cards...'
               size='small'
               className='min-w-[200px]'
@@ -466,18 +462,18 @@ const RateCardOverviewTable = () => {
         <div className='flex flex-wrap items-center gap-2'>
           <DatePicker
             label='Effective From (Start)'
-            value={dateFrom}
-            onChange={(val) => setDateFrom(val)}
+            value={fromDate.value}
+            onChange={fromDate.onChange}
             slotProps={{ textField: { size: 'small', sx: { minWidth: 180 } } }}
           />
           <DatePicker
             label='Effective From (End)'
-            value={dateTo}
-            onChange={(val) => setDateTo(val)}
+            value={toDate.value}
+            onChange={toDate.onChange}
             slotProps={{ textField: { size: 'small', sx: { minWidth: 180 } } }}
           />
           {(dateFrom || dateTo) && (
-            <Button size='small' variant='text' onClick={() => { setDateFrom(null); setDateTo(null) }}>
+            <Button size='small' variant='text' onClick={() => setParams({ dateFrom: null, dateTo: null })}>
               Clear Dates
             </Button>
           )}
