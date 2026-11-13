@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 // Next Imports
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 
 // MUI Imports
 import Card from '@mui/material/Card'
@@ -24,12 +23,17 @@ import Dialog from '@mui/material/Dialog'
 import DialogContent from '@mui/material/DialogContent'
 import IconButton from '@mui/material/IconButton'
 import InputAdornment from '@mui/material/InputAdornment'
+import TablePagination from '@mui/material/TablePagination'
 
 // Third-party Imports
 import { toast } from 'react-toastify'
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
+
+// Component Imports
+import { QueueFilterBar, useQueueFilters } from '@/components/edms/QueueFilters'
+import type { QueueFilterDef } from '@/components/edms/QueueFilters'
 
 // Type Imports
 import type { ReturnReasonType } from '@/types/apps/deliveryTypes'
@@ -93,6 +97,65 @@ const statusLabel = (status?: string) => {
   }
 }
 
+const tripOf = (waybill: any) => (typeof waybill.trip === 'object' ? waybill.trip : null)
+
+const locationOption = (location: any) =>
+  location && typeof location === 'object' && location.$id ? { id: location.$id, label: locationName(location) } : null
+
+// The dropdown filters, same idea as the manifest review queue
+const FILTERS: QueueFilterDef<any>[] = [
+  {
+    param: 'tripId',
+    label: 'Trip',
+    pick: w => {
+      const trip = tripOf(w)
+      const id = trip?.$id || (typeof w.trip === 'string' ? w.trip : '')
+
+      return id ? { id, label: trip?.tripNumber || id } : null
+    }
+  },
+  {
+    param: 'driverId',
+    label: 'Driver',
+    pick: w => {
+      const driver = tripOf(w)?.driver
+
+      return driver?.$id ? { id: driver.$id, label: driver.name || 'Unnamed driver' } : null
+    }
+  },
+  {
+    param: 'vehicleId',
+    label: 'Vehicle',
+    pick: w => {
+      const vehicle = tripOf(w)?.vehicle
+
+      return vehicle?.$id ? { id: vehicle.$id, label: vehicle.vehicleNumber || 'Unnamed vehicle' } : null
+    }
+  },
+  {
+    param: 'routeId',
+    label: 'Route',
+    pick: w => {
+      const route = tripOf(w)?.route
+
+      return route && typeof route === 'object' && route.$id
+        ? { id: route.$id, label: route.routeName || 'Unnamed route' }
+        : null
+    }
+  },
+  { param: 'fromId', label: 'Returned from', pick: w => locationOption(w.dropofflocation) },
+  { param: 'toId', label: 'Returning to', pick: w => locationOption(w.pickuplocation) },
+  {
+    param: 'reason',
+    label: 'Reason',
+    pick: w =>
+      w.returnReason
+        ? { id: w.returnReason, label: RETURN_REASONS.find(r => r.value === w.returnReason)?.label || w.returnReason }
+        : null
+  },
+  { param: 'status', label: 'Status', pick: w => (w.status ? { id: w.status, label: statusLabel(w.status) } : null) }
+]
+
 /**
  * The back office's catch-up screen for returns.
  *
@@ -102,9 +165,6 @@ const statusLabel = (status?: string) => {
  * through them without opening a trip at a time.
  */
 const ReturnWaybillReviewQueue = () => {
-  const searchParams = useSearchParams()
-  const tripFilter = searchParams.get('tripId')
-
   const { user, hasAnyPermission, isDriver, isLoading: permissionsLoading } = usePermissions()
 
   // Entering the figures is the office's job - drivers never see this queue.
@@ -116,6 +176,8 @@ const ReturnWaybillReviewQueue = () => {
   const [savingId, setSavingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [lightbox, setLightbox] = useState<string | null>(null)
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
 
   const loadQueue = useCallback(async () => {
     try {
@@ -135,12 +197,11 @@ const ReturnWaybillReviewQueue = () => {
     loadQueue()
   }, [loadQueue])
 
-  const visibleWaybills = useMemo(() => {
-    let rows = waybills
+  // Dropdown and date filters live in the URL (existing ?tripId= links keep working)
+  const filters = useQueueFilters(waybills, FILTERS, w => w.returnDate || w.$createdAt)
 
-    if (tripFilter) {
-      rows = rows.filter(w => (typeof w.trip === 'object' ? w.trip?.$id : w.trip) === tripFilter)
-    }
+  const visibleWaybills = useMemo(() => {
+    let rows = filters.filtered
 
     if (search.trim()) {
       const term = search.trim().toLowerCase()
@@ -153,6 +214,7 @@ const ReturnWaybillReviewQueue = () => {
           trip?.tripNumber,
           trip?.driver?.name,
           trip?.vehicle?.vehicleNumber,
+          trip?.route?.routeName,
           locationName(w.dropofflocation),
           locationName(w.pickuplocation)
         ]
@@ -162,7 +224,26 @@ const ReturnWaybillReviewQueue = () => {
     }
 
     return rows
-  }, [waybills, tripFilter, search])
+  }, [filters.filtered, search])
+
+  // One page at a time: drawing every card (a photo and several inputs each) at once
+  // made the page slow to open and to type in
+  const lastPage = Math.max(0, Math.ceil(visibleWaybills.length / rowsPerPage) - 1)
+  const currentPage = Math.min(page, lastPage)
+
+  const pagedWaybills = useMemo(
+    () => visibleWaybills.slice(currentPage * rowsPerPage, (currentPage + 1) * rowsPerPage),
+    [visibleWaybills, currentPage, rowsPerPage]
+  )
+
+  useEffect(() => {
+    setPage(0)
+  }, [search, filters.key])
+
+  const clearFilters = () => {
+    setSearch('')
+    filters.clear()
+  }
 
   const draftFor = (waybill: any): DraftDetails => drafts[waybill.$id] || { ...emptyDraft, returnReason: waybill.returnReason || '' }
 
@@ -255,49 +336,47 @@ const ReturnWaybillReviewQueue = () => {
         </CardContent>
       </Card>
 
-      {tripFilter && (
-        <Alert
-          severity='info'
-          className='mb-6'
-          action={
-            <Button size='small' href='/edms/returns/waybills/review'>
-              Show all
-            </Button>
-          }
-        >
-          Showing returns for one trip only.
-        </Alert>
-      )}
-
-      <TextField
-        fullWidth
-        size='small'
-        className='mb-6'
-        placeholder='Search by waybill, trip, driver, vehicle or location…'
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position='start'>
-              <i className='ri-search-line' />
-            </InputAdornment>
-          )
-        }}
-      />
+      <Card className='mb-6'>
+        <CardContent>
+          <QueueFilterBar
+            bar={filters.bar}
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder='Search by waybill, trip, driver, vehicle, route or location…'
+            shown={visibleWaybills.length}
+            total={waybills.length}
+            noun='returns'
+            anyActive={filters.activeCount > 0 || !!search}
+            onClear={clearFilters}
+          />
+        </CardContent>
+      </Card>
 
       {visibleWaybills.length === 0 ? (
         <Card>
           <CardContent className='flex flex-col items-center justify-center py-16 gap-2'>
-            <i className='ri-checkbox-circle-line text-6xl text-success' />
-            <Typography variant='h6'>Nothing waiting on you</Typography>
-            <Typography variant='body2' color='text.secondary'>
-              Every logged return has its package details recorded.
-            </Typography>
+            {waybills.length > 0 ? (
+              <>
+                <i className='ri-filter-off-line text-6xl text-textSecondary' />
+                <Typography variant='h6'>No returns match these filters</Typography>
+                <Button variant='outlined' size='small' onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              </>
+            ) : (
+              <>
+                <i className='ri-checkbox-circle-line text-6xl text-success' />
+                <Typography variant='h6'>Nothing waiting on you</Typography>
+                <Typography variant='body2' color='text.secondary'>
+                  Every logged return has its package details recorded.
+                </Typography>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (
         <div className='flex flex-col gap-6'>
-          {visibleWaybills.map(waybill => {
+          {pagedWaybills.map(waybill => {
             const trip = typeof waybill.trip === 'object' ? waybill.trip : null
             const draft = draftFor(waybill)
             const photo = waybill.waybillImage || waybill.proofOfDelivery
@@ -476,6 +555,24 @@ const ReturnWaybillReviewQueue = () => {
               </Card>
             )
           })}
+          <Card>
+            <TablePagination
+              component='div'
+              count={visibleWaybills.length}
+              page={currentPage}
+              onPageChange={(_, next) => {
+                setPage(next)
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={e => {
+                setRowsPerPage(parseInt(e.target.value, 10))
+                setPage(0)
+              }}
+              rowsPerPageOptions={[10, 25, 50]}
+              labelRowsPerPage='Returns per page:'
+            />
+          </Card>
         </div>
       )}
 
