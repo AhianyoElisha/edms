@@ -1,7 +1,7 @@
 'use client'
 
 // React Imports
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 // MUI Imports
@@ -52,6 +52,9 @@ import {
 // Actions Imports
 import { createRateCard, getRateCardById, duplicateRateCard } from '@/libs/actions/ratecard.actions'
 import { getAllRoutes } from '@/libs/actions/route.actions'
+import CompanyField from '@/components/edms/CompanyField'
+import { getCompanies } from '@/libs/actions/company.actions'
+import type { CompanyType } from '@/libs/actions/company.actions'
 
 interface RateCardCreateFormProps {
   mode?: 'create' | 'edit'
@@ -71,6 +74,26 @@ const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCre
   // Form states
   const [clientName, setClientName] = useState('')
   const [clientCode, setClientCode] = useState('')
+  const [companies, setCompanies] = useState<CompanyType[]>([])
+
+  const loadCompanies = useCallback(() => {
+    getCompanies({ activeOnly: true })
+      .then(setCompanies)
+      .catch(error => console.error('Error loading companies:', error))
+  }, [])
+
+  useEffect(() => {
+    loadCompanies()
+  }, [loadCompanies])
+
+  // Picking a company starts the client code from the company's own code
+  const handleCompanyChange = (name: string) => {
+    setClientName(name)
+
+    const company = companies.find(c => c.name === name)
+
+    if (company && !clientCode.trim()) setClientCode(company.code)
+  }
   const [routeCode, setRouteCode] = useState('')
   const [routeDescription, setRouteDescription] = useState('')
   const [selectedRoute, setSelectedRoute] = useState<RouteType | null>(null)
@@ -244,13 +267,16 @@ const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCre
                 </Typography>
                 <Grid container spacing={4}>
                   <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label='Client Name'
-                      value={clientName}
-                      onChange={e => setClientName(e.target.value)}
-                      placeholder='e.g., JUMIA'
+                    <CompanyField
+                      size='medium'
+                      label='Company'
                       required
+                      allowAdd
+                      options={companies.map(company => company.name)}
+                      value={clientName}
+                      onChange={handleCompanyChange}
+                      onCompanyAdded={loadCompanies}
+                      helperText='Pick the company, or add a new one from the list'
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
@@ -260,7 +286,7 @@ const RateCardCreateForm = ({ mode = 'create', rateCardId, userId }: RateCardCre
                       value={clientCode}
                       onChange={e => handleClientCodeChange(e.target.value)}
                       placeholder='e.g., JUM'
-                      helperText='Unique identifier for the client (auto-uppercased)'
+                      helperText="This card's own code, e.g. JUM 001 (auto-uppercased)"
                       required
                     />
                   </Grid>

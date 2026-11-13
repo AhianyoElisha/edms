@@ -5,6 +5,7 @@ import { appwriteConfig } from '@/libs/appwrite.config'
 import { ID, Query } from 'node-appwrite'
 import { listAllRows } from './paginate'
 import { setVehicleDriver } from './customer.action'
+import { companyIdForRoute, companyIdForTrip } from './company.actions'
 
 // Type Imports
 import type { TripWizardData } from '@/views/edms/trips/types'
@@ -52,9 +53,13 @@ export async function createTripWithManifests(wizardData: TripWizardData): Promi
     // Determine initial status based on whether manifests are provided
     const initialStatus = manifests.length === 0 ? 'awaiting_manifests' : 'planned'
 
+    // The trip belongs to the company whose rate card covers its route
+    const companyId = await companyIdForRoute(tripDetails.routeId)
+
     // Step 1: Create the trip document
     const tripData = {
       tripNumber,
+      companyId,
       vehicle: tripDetails.vehicleId,
       driver: tripDetails.driverId,
       route: tripDetails.routeId,
@@ -160,7 +165,7 @@ export async function createTripWithManifests(wizardData: TripWizardData): Promi
           appwriteConfig.database,
           appwriteConfig.manifests,
           ID.unique(),
-          manifestDoc
+          { ...manifestDoc, companyId }
         )
 
         manifestIds.push(manifest.$id)
@@ -232,6 +237,9 @@ export async function addManifestsToTrip(tripId: string, manifests: TripWizardDa
     const manifestIds: string[] = []
     const manifestMap = new Map<string, string>()
 
+    // New manifests belong to the trip's company
+    const tripCompanyId = (trip as any).companyId || (await companyIdForTrip(tripId))
+
     // Calculate total packages
     const totalPackages = manifests.reduce((sum, m) => sum + (m.packageCount || 0), 0)
 
@@ -266,7 +274,7 @@ export async function addManifestsToTrip(tripId: string, manifests: TripWizardDa
         appwriteConfig.database,
         appwriteConfig.manifests,
         ID.unique(),
-        manifestDoc
+        { ...manifestDoc, companyId: tripCompanyId }
       )
 
       manifestIds.push(manifest.$id)
@@ -334,6 +342,9 @@ export async function updateTripWithManifests(
     const { tripDetails, manifests } = wizardData
 
     const trip = await getTripById(tripId)
+
+    // A changed route can move the trip to another company
+    const companyId = await companyIdForRoute(tripDetails.routeId)
 
     if (!trip) {
       return { success: false, error: 'Trip not found' }
@@ -415,6 +426,7 @@ export async function updateTripWithManifests(
           {
             manifestNumber: manifestData.manifestNumber,
             trip: tripId,
+            companyId,
             dropofflocation: manifestData.dropoffLocationId,
             dropoffSequence: index + 1,
             manifestDate,
@@ -487,6 +499,7 @@ export async function updateTripWithManifests(
       vehicle: tripDetails.vehicleId,
       driver: tripDetails.driverId,
       route: tripDetails.routeId,
+      companyId,
       tripDate: new Date(tripDetails.startTime).toISOString(),
       startTime: new Date(tripDetails.startTime).toISOString(),
       status,
@@ -496,6 +509,21 @@ export async function updateTripWithManifests(
       tripCost: tripDetails.tripCost || 0,
       checkpoints: JSON.stringify(checkpoints)
     })
+
+    // Manifests with no company of their own follow the trip to its new company
+    if (companyId !== ((trip as any).companyId || null)) {
+      const tripManifests = await databases.listDocuments(appwriteConfig.database, appwriteConfig.manifests, [
+        Query.equal('trip', tripId),
+        Query.select(['$id', 'clientName', 'companyId']),
+        Query.limit(500)
+      ])
+
+      for (const manifest of tripManifests.documents as any[]) {
+        if (!manifest.clientName && manifest.companyId !== companyId) {
+          await databases.updateDocument(appwriteConfig.database, appwriteConfig.manifests, manifest.$id, { companyId })
+        }
+      }
+    }
 
     await syncVehicleDriver(tripDetails)
 

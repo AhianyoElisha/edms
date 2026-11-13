@@ -22,6 +22,7 @@ const rulesByCollectionId = (): Record<string, TextCaseRules> => {
     vehicles: process.env.NEXT_PUBLIC_VEHICLES_COLLECTION_ID,
     expenses: process.env.NEXT_PUBLIC_EXPENSES_COLLECTION_ID,
     ratecards: process.env.NEXT_PUBLIC_RATE_CARDS_COLLECTION_ID,
+    companies: process.env.NEXT_PUBLIC_COMPANIES_COLLECTION_ID || 'companies',
     trips: process.env.NEXT_PUBLIC_TRIPS_COLLECTION_ID,
     manifests: process.env.NEXT_PUBLIC_MANIFESTS_COLLECTION_ID,
     returnwaybills: process.env.NEXT_PUBLIC_RETURN_WAYBILLS_COLLECTION_ID

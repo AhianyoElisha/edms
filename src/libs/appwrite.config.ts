@@ -35,6 +35,8 @@ export const appwriteConfig = {
   expenses: process.env.NEXT_PUBLIC_EXPENSES_COLLECTION_ID!,
   tripexenses: process.env.NEXT_PUBLIC_EXPENSES_COLLECTION_ID!, // Alias for expenses
   ratecards: process.env.NEXT_PUBLIC_RATE_CARDS_COLLECTION_ID!,
+  // The clients whose goods are carried; rate cards, trips and manifests point at one
+  companies: process.env.NEXT_PUBLIC_COMPANIES_COLLECTION_ID || 'companies',
   
   // EDMS - Misc
   notifications: process.env.NEXT_PUBLIC_NOTIFICATIONS_COLLECTION_ID!,

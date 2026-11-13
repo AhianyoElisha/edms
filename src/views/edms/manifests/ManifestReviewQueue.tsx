@@ -652,7 +652,9 @@ const ManifestReviewQueue = () => {
                             value={draft.clientName}
                             onChange={value => updateDraft(manifest, 'clientName', value)}
                             disabled={!canVerify || isSaving}
-                            helperText='Pick one or type a new name'
+                            helperText='Whose goods are these?'
+                            allowAdd={canVerify}
+                            onCompanyAdded={() => getManifestClientOptions().then(setClientOptions)}
                           />
                         </Grid>
                         <Grid item xs={12} sm={4}>

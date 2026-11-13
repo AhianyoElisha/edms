@@ -199,6 +199,10 @@ const verticalMenuData = (dictionary: Awaited<ReturnType<typeof getDictionary>>)
               {
                 label: 'Rate Cards',
                 href: '/edms/routes/rate-cards'
+              },
+              {
+                label: 'Companies',
+                href: '/edms/companies'
               }
             ]
           },

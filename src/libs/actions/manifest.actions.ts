@@ -2,6 +2,7 @@ import { ID, Query } from 'appwrite'
 import { databases, appwriteConfig, tablesDB } from '@/libs/appwrite.config'
 import type { ManifestType, ManifestFilters, ManifestStats } from '@/types/apps/deliveryTypes'
 import { listAllDocuments } from './paginate'
+import { companyIdForName, companyIdForTrip, getCompanies } from './company.actions'
 
 // Database and Collection IDs
 const DATABASE_ID = appwriteConfig.database
@@ -191,6 +192,10 @@ export const createManifest = async (
       ID.unique(),
       {
         ...manifestFields,
+        // A manifest belongs to its trip's company unless one was given
+        companyId:
+          manifestFields.companyId ||
+          (await companyIdForTrip(typeof manifestFields.trip === 'object' ? manifestFields.trip?.$id : manifestFields.trip)),
         manifestNumber,
         status: 'pending' as const
       }
@@ -1007,6 +1012,8 @@ export const logManifestDelivery = async (params: {
         // Only sent when the driver actually entered them.
         ...(shortageCount > 0 ? { shortageCount } : {}),
         ...(clientName ? { clientName } : {}),
+        // The company the driver named, or else the trip's own company
+        companyId: (clientName ? await companyIdForName(clientName) : null) || trip.companyId || null,
         status: 'delivered',
         notes: notes || '',
         arrivalTime: now,
@@ -1129,6 +1136,16 @@ export const verifyManifestDetails = async (
       updateData.clientName = details.clientName?.trim() || null
     }
 
+    // Keep the company link in step with the name: the company entered here, or
+    // else the company of the trip the manifest is on
+    if (details.clientName !== undefined || !stored.companyId) {
+      const storedTripId = typeof stored.trip === 'object' ? stored.trip?.$id : stored.trip
+      const entered = details.clientName !== undefined ? details.clientName : stored.clientName
+
+      updateData.companyId =
+        (entered?.trim() ? await companyIdForName(entered) : null) || (await companyIdForTrip(storedTripId)) || null
+    }
+
     if (details.manifestNumber) updateData.manifestNumber = details.manifestNumber
     if (details.notes !== undefined) updateData.notes = details.notes
     if (verifiedBy) updateData.verifiedBy = verifiedBy
@@ -1229,28 +1246,16 @@ export const getManifestsAwaitingVerification = async (): Promise<any[]> => {
 /**
  * The companies a manifest can belong to, for the Company pickers.
  *
- * Clients are already defined where their rates are - on the rate cards - so
- * that list is reused here rather than kept twice. The pickers also accept free
- * text, so a company with no rate card yet can still be recorded.
+ * These are the active companies from the Companies page. A company has to be
+ * added there before it can be picked, so the same client is never spelt two ways.
  */
 export const getManifestClientOptions = async (): Promise<string[]> => {
   try {
-    const response = await databases.listDocuments(DATABASE_ID, appwriteConfig.ratecards, [
-      Query.select(['clientName']),
-      Query.limit(1000)
-    ])
+    const companies = await getCompanies({ activeOnly: true })
 
-    const names = new Map<string, string>()
-
-    response.documents.forEach((card: any) => {
-      const name = (card.clientName || '').trim()
-
-      if (name && !names.has(name.toUpperCase())) names.set(name.toUpperCase(), name)
-    })
-
-    return Array.from(names.values()).sort((a, b) => a.localeCompare(b))
+    return companies.map(company => company.name)
   } catch (error) {
-    console.warn('Could not load the client list:', error)
+    console.warn('Could not load the company list:', error)
 
     return []
   }
