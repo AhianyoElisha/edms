@@ -337,7 +337,7 @@ export async function getReturnWaybillsAwaitingVerification(): Promise<ReturnWay
       [
         Query.equal('detailsVerified', false),
         Query.orderDesc('$createdAt'),
-        Query.select(['*', 'trip.*', 'trip.driver.*', 'trip.vehicle.*', 'dropofflocation.*', 'pickuplocation.*']),
+        Query.select(['*', 'trip.*', 'trip.driver.*', 'trip.vehicle.*', 'trip.route.*', 'dropofflocation.*', 'pickuplocation.*']),
         Query.limit(500)
       ]
     )
