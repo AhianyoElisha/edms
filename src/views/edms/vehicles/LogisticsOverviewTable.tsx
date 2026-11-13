@@ -53,6 +53,7 @@ import { toast } from 'react-toastify'
 import LoaderDark from '@/components/layout/shared/LoaderDark'
 import AddLogisticsDrawer from './AddTruckorTricycleDrawer'
 import EditLogisticsDrawer from './EditTruckorTricycleDrawer'
+import ChangeDriverDialog from './ChangeDriverDialog'
 import { Button, CardContent, TextField, TextFieldProps, Dialog, DialogTitle, DialogContent, DialogActions, Box } from '@mui/material'
 import { useAuth } from '@/contexts/AppwriteProvider'
 
@@ -139,6 +140,7 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
   const [isLoading, setIsLoading] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [vehicleToDelete, setVehicleToDelete] = useState<Logistics | null>(null)
+  const [driverDialogVehicle, setDriverDialogVehicle] = useState<Logistics | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -321,6 +323,12 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
               icon: 'ri-edit-box-line',
               linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
               menuItemProps: { onClick: () => setEditLogisticsOpen({ open: true, data: row.original })}
+            }] : []),
+            ...(hasPermission('vehicles.edit') ? [{
+              text: 'Change driver',
+              icon: 'ri-user-shared-line',
+              linkProps: { className: 'flex items-center gap-2 is-full plb-1.5 pli-4' },
+              menuItemProps: { onClick: () => setDriverDialogVehicle(row.original) }
             }] : []),
             { 
               text: 'Details', 
@@ -508,6 +516,13 @@ const LogisticsOverviewTable = ({ vehicleData }: { vehicleData?: Logistics[] }) 
         handleClose={() => setEditLogisticsOpen({ open: false, data: null })}
         vehicleData={editLogisticsOpen.data!}
         onSuccess={fetchLogisticsData}
+      />
+
+      <ChangeDriverDialog
+        open={!!driverDialogVehicle}
+        vehicle={driverDialogVehicle}
+        onClose={() => setDriverDialogVehicle(null)}
+        onSaved={fetchLogisticsData}
       />
 
       {/* Delete Vehicle Confirmation Dialog */}

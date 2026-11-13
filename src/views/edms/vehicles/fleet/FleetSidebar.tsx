@@ -33,7 +33,10 @@ import DirectionalIcon from '@components/DirectionalIcon'
 import { Logistics } from '@/types/apps/ecommerceTypes'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-toastify'
-import { getLogisticsList } from '@/libs/actions/customer.action'
+import Button from '@mui/material/Button'
+import Chip from '@mui/material/Chip'
+import ChangeDriverDialog from '../ChangeDriverDialog'
+import { usePermissions } from '@/hooks/usePermissions'
 
 type Props = {
   backdropOpen: boolean
@@ -116,14 +119,19 @@ const VehicleTracking = ({
   vehicleTrackingData,
   index,
   expanded,
-  handleChange
+  handleChange,
+  onChangeDriver
 }: {
   vehicleTrackingData: Logistics
   index: number
   expanded: number | false
   handleChange: (panel: number) => (event: SyntheticEvent, isExpanded: boolean) => void
-  }) => {
-  
+  onChangeDriver?: (vehicle: Logistics) => void
+}) => {
+  const driver = vehicleTrackingData.driver as any
+  const driverName = driver && typeof driver === 'object' ? driver.name : null
+  const driverRemoved = driver && typeof driver === 'object' && driver.status === 'deleted'
+
   return (
     <Accordion expanded={expanded === index} onChange={handleChange(index)}>
       <AccordionSummary
@@ -143,10 +151,33 @@ const VehicleTracking = ({
             <Typography color='text.primary' className='font-normal'>
               {vehicleTrackingData.vehicleNumber}
             </Typography>
-            <Typography className='text-textSecondary font-normal'>{`Ezar Delivery Services`}</Typography>
+            <Typography className='text-textSecondary font-normal'>
+              {driverName ? `Driver: ${driverName}${driverRemoved ? ' (removed)' : ''}` : 'No driver assigned'}
+            </Typography>
           </div>
         </div>
       </AccordionSummary>
+      <AccordionDetails>
+        <div className='flex flex-wrap items-center gap-3 pbe-4'>
+          <Chip
+            size='small'
+            variant='tonal'
+            color={driverName && !driverRemoved ? 'primary' : 'warning'}
+            icon={<i className='ri-user-line' />}
+            label={driverName ? `${driverName}${driverRemoved ? ' (removed)' : ''}` : 'Unassigned'}
+          />
+          {onChangeDriver && (
+            <Button
+              size='small'
+              variant='outlined'
+              startIcon={<i className='ri-user-shared-line' />}
+              onClick={() => onChangeDriver(vehicleTrackingData)}
+            >
+              {driverName ? 'Change driver' : 'Assign driver'}
+            </Button>
+          )}
+        </div>
+      </AccordionDetails>
     </Accordion>
   )
 }
@@ -169,6 +200,9 @@ const FleetSidebar = (props: Props) => {
 
 
   const router = useRouter()
+  const { hasPermission } = usePermissions()
+  const canEdit = hasPermission('vehicles.edit')
+  const [driverDialogVehicle, setDriverDialogVehicle] = useState<Logistics | null>(null)
 
 
 
@@ -228,10 +262,17 @@ const FleetSidebar = (props: Props) => {
             index={index}
             expanded={expanded}
             handleChange={handleChange}
+            onChangeDriver={canEdit ? setDriverDialogVehicle : undefined}
             key={index}
           />
         ))}
       </ScrollWrapper>
+      <ChangeDriverDialog
+        open={!!driverDialogVehicle}
+        vehicle={driverDialogVehicle}
+        onClose={() => setDriverDialogVehicle(null)}
+        onSaved={fetchLogisticsData}
+      />
     </Drawer>
   )
 }
