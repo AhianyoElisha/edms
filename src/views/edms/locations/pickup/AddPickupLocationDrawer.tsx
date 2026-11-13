@@ -22,6 +22,8 @@ import GoogleMapLocationPicker from '@/components/GoogleMapLocationPicker'
 import { GPSCoordinates } from '@/types/apps/deliveryTypes'
 import { createPickupLocation, CreatePickupLocationData } from '@/libs/actions/location.actions'
 import { WEST_AFRICAN_COUNTRIES } from '@/data/countries'
+import MenuItem from '@mui/material/MenuItem'
+import { GHANA_REGIONS, toGhanaRegion } from '@/utils/ghanaRegions'
 
 interface AddPickupLocationDrawerProps {
   open: boolean
@@ -115,7 +117,7 @@ const AddPickupLocationDrawer: React.FC<AddPickupLocationDrawerProps> = ({
       locationCode,
       address: address || '',
       city: city || prev.city,
-      region: region || prev.region,
+      region: toGhanaRegion(region) || prev.region,
       country: country || prev.country,
       gpsCoordinates: `${coordinates.latitude},${coordinates.longitude}`
     }))
@@ -252,11 +254,25 @@ const AddPickupLocationDrawer: React.FC<AddPickupLocationDrawerProps> = ({
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
+                select
                 fullWidth
-                label='Region/State'
-                value={formData.region}
+                label='Region'
+                value={formData.region || ''}
                 onChange={(e) => handleInputChange('region', e.target.value)}
-              />
+              >
+                <MenuItem value=''>
+                  <em>Not set</em>
+                </MenuItem>
+                {GHANA_REGIONS.map(region => (
+                  <MenuItem key={region} value={region}>
+                    {region}
+                  </MenuItem>
+                ))}
+                {/* A value saved before regions became a fixed list stays selectable until it is corrected */}
+                {formData.region && !(GHANA_REGIONS as readonly string[]).includes(formData.region) && (
+                  <MenuItem value={formData.region}>{formData.region} (not a listed region)</MenuItem>
+                )}
+              </TextField>
             </Grid>
             <Grid item xs={12} sm={6}>
               <Autocomplete
