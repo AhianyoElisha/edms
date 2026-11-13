@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 // Next Imports
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 
 // MUI Imports
 import Card from '@mui/material/Card'
@@ -25,15 +24,21 @@ import DialogContent from '@mui/material/DialogContent'
 import IconButton from '@mui/material/IconButton'
 import InputAdornment from '@mui/material/InputAdornment'
 import TablePagination from '@mui/material/TablePagination'
+import Autocomplete from '@mui/material/Autocomplete'
+import { DatePicker } from '@mui/x-date-pickers-pro'
+import { AdapterDayjs } from '@mui/x-date-pickers-pro/AdapterDayjs'
+import { LocalizationProvider } from '@mui/x-date-pickers-pro'
 
 // Third-party Imports
 import { toast } from 'react-toastify'
+import dayjs from 'dayjs'
 
 // Component Imports
 import CompanyField from '@/components/edms/CompanyField'
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
+import { useUrlFilters, useUrlDateFilter } from '@/hooks/useUrlFilters'
 
 // Action Imports
 import {
@@ -41,6 +46,7 @@ import {
   getManifestsAwaitingVerification,
   verifyManifestDetails
 } from '@/libs/actions/manifest.actions'
+import { getAllRateCards } from '@/libs/actions/ratecard.actions'
 
 const PACKAGE_SIZES = [
   { value: 'small', label: 'Small' },
@@ -101,6 +107,94 @@ const locationName = (manifest: any) => {
   return 'Unknown stop'
 }
 
+const tripOf = (manifest: any) => (typeof manifest.trip === 'object' ? manifest.trip : null)
+
+// route id or route code -> the company that route is priced for (from the rate cards)
+type RouteCompanies = Record<string, string>
+
+// A manifest in this queue rarely has its company filled in yet (that is part of the
+// review), so fall back to the company whose rate card covers the trip's route.
+const companyOf = (manifest: any, routeCompanies: RouteCompanies = {}) => {
+  const trip = tripOf(manifest)
+  const route = trip?.route
+
+  return (
+    manifest.clientName ||
+    trip?.rateCard?.clientName ||
+    (route && typeof route === 'object' ? routeCompanies[route.$id] || routeCompanies[route.routeCode] : '') ||
+    ''
+  )
+}
+
+type FilterOption = { id: string; label: string }
+
+// The dropdown filters. Each one reads its value off a manifest as an id (what the
+// URL stores and rows are matched on) and a label (what the user sees).
+const FILTERS: Array<{
+  param: string
+  label: string
+  pick: (manifest: any, routeCompanies: RouteCompanies) => FilterOption | null
+}> = [
+  {
+    param: 'tripId',
+    label: 'Trip',
+    pick: m => {
+      const trip = tripOf(m)
+      const id = trip?.$id || (typeof m.trip === 'string' ? m.trip : '')
+
+      return id ? { id, label: trip?.tripNumber || id } : null
+    }
+  },
+  {
+    param: 'driverId',
+    label: 'Driver',
+    pick: m => {
+      const driver = tripOf(m)?.driver
+
+      return driver?.$id ? { id: driver.$id, label: driver.name || 'Unnamed driver' } : null
+    }
+  },
+  {
+    param: 'vehicleId',
+    label: 'Vehicle',
+    pick: m => {
+      const vehicle = tripOf(m)?.vehicle
+
+      return vehicle?.$id ? { id: vehicle.$id, label: vehicle.vehicleNumber || 'Unnamed vehicle' } : null
+    }
+  },
+  {
+    param: 'routeId',
+    label: 'Route',
+    pick: m => {
+      const route = tripOf(m)?.route
+
+      return route?.$id ? { id: route.$id, label: route.routeName || 'Unnamed route' } : null
+    }
+  },
+  {
+    param: 'company',
+    label: 'Company',
+    pick: (m, routeCompanies) => {
+      const company = companyOf(m, routeCompanies)
+
+      // Matched without regard to case so "Jumia" and "JUMIA" are one option
+      return company ? { id: company.trim().toLowerCase(), label: company.trim() } : null
+    }
+  },
+  {
+    param: 'stopId',
+    label: 'Drop-off location',
+    pick: m => {
+      const location = m.dropofflocation
+
+      return location && typeof location === 'object' && location.$id
+        ? { id: location.$id, label: locationName(m) }
+        : null
+    }
+  }
+]
+
 /**
  * The back office's catch-up screen.
  *
@@ -110,8 +204,16 @@ const locationName = (manifest: any) => {
  * can work through a morning's deliveries without opening a trip at a time.
  */
 const ManifestReviewQueue = () => {
-  const searchParams = useSearchParams()
-  const tripFilter = searchParams.get('tripId')
+  // Filters live in the URL, so a filtered queue survives a reload and can be shared
+  const { searchParams, setParam, setParams } = useUrlFilters()
+  const filterKey = FILTERS.map(f => searchParams.get(f.param) || '').join('|')
+  const dateFromParam = searchParams.get('dateFrom') || ''
+  const dateToParam = searchParams.get('dateTo') || ''
+
+  const commitDateFrom = useCallback((value: string) => setParam('dateFrom', value), [setParam])
+  const commitDateTo = useCallback((value: string) => setParam('dateTo', value), [setParam])
+  const fromDate = useUrlDateFilter(dateFromParam, commitDateFrom)
+  const toDate = useUrlDateFilter(dateToParam, commitDateTo)
 
   const { user, hasPermission, isDriver, isLoading: permissionsLoading } = usePermissions()
 
@@ -128,9 +230,28 @@ const ManifestReviewQueue = () => {
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [clientOptions, setClientOptions] = useState<string[]>([])
+  const [routeCompanies, setRouteCompanies] = useState<RouteCompanies>({})
 
   useEffect(() => {
     getManifestClientOptions().then(setClientOptions)
+
+    // Which company each route belongs to, for the Company filter
+    getAllRateCards()
+      .then(cards => {
+        const map: RouteCompanies = {}
+
+        cards.forEach((card: any) => {
+          if (!card.clientName) return
+
+          const routeId = typeof card.route === 'object' ? card.route?.$id : card.route
+
+          if (routeId) map[routeId] = card.clientName
+          if (card.routeCode) map[card.routeCode] = card.clientName
+        })
+
+        setRouteCompanies(map)
+      })
+      .catch(error => console.error('Error loading rate cards for the company filter:', error))
   }, [])
 
   const loadQueue = useCallback(async () => {
@@ -151,11 +272,47 @@ const ManifestReviewQueue = () => {
     loadQueue()
   }, [loadQueue])
 
+  // What each dropdown offers: the values that occur in the queue, with how many
+  // manifests each one has, so nobody picks an option that returns nothing
+  const filterOptions = useMemo(
+    () =>
+      FILTERS.map(filter => {
+        const seen = new Map<string, FilterOption & { count: number }>()
+
+        manifests.forEach(m => {
+          const option = filter.pick(m, routeCompanies)
+
+          if (!option) return
+
+          const existing = seen.get(option.id)
+
+          if (existing) existing.count++
+          else seen.set(option.id, { ...option, count: 1 })
+        })
+
+        return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
+      }),
+    [manifests, routeCompanies]
+  )
+
   const visibleManifests = useMemo(() => {
     let rows = manifests
+    const selected = filterKey.split('|')
 
-    if (tripFilter) {
-      rows = rows.filter(m => (typeof m.trip === 'object' ? m.trip?.$id : m.trip) === tripFilter)
+    FILTERS.forEach((filter, index) => {
+      if (selected[index]) rows = rows.filter(m => filter.pick(m, routeCompanies)?.id === selected[index])
+    })
+
+    // Dates compare against when the delivery was logged
+    if (fromDate.applied || toDate.applied) {
+      const from = fromDate.applied?.startOf('day')
+      const to = toDate.applied?.endOf('day')
+
+      rows = rows.filter(m => {
+        const logged = dayjs(m.deliveryTime || m.$createdAt)
+
+        return (!from || !logged.isBefore(from)) && (!to || !logged.isAfter(to))
+      })
     }
 
     if (search.trim()) {
@@ -170,7 +327,7 @@ const ManifestReviewQueue = () => {
           trip?.driver?.name,
           trip?.vehicle?.vehicleNumber,
           trip?.route?.routeName,
-          m.clientName,
+          companyOf(m, routeCompanies),
           locationName(m)
         ]
           .filter(Boolean)
@@ -179,7 +336,7 @@ const ManifestReviewQueue = () => {
     }
 
     return rows
-  }, [manifests, tripFilter, search])
+  }, [manifests, routeCompanies, filterKey, fromDate.applied, toDate.applied, search])
 
   // One page at a time: the queue can hold hundreds of manifests, and drawing every
   // card (a photo and several inputs each) at once made the page slow to open and to type in.
@@ -193,7 +350,14 @@ const ManifestReviewQueue = () => {
 
   useEffect(() => {
     setPage(0)
-  }, [search, tripFilter])
+  }, [search, filterKey, dateFromParam, dateToParam])
+
+  const activeFilterCount = filterKey.split('|').filter(Boolean).length + (dateFromParam ? 1 : 0) + (dateToParam ? 1 : 0)
+
+  const clearFilters = () => {
+    setSearch('')
+    setParams({ ...Object.fromEntries(FILTERS.map(f => [f.param, null])), dateFrom: null, dateTo: null })
+  }
 
   const draftFor = (manifest: any) => drafts[manifest.$id] || initialDraft(manifest)
 
@@ -271,7 +435,7 @@ const ManifestReviewQueue = () => {
   }
 
   return (
-    <>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Card className='mb-6'>
         <CardContent className='flex flex-col sm:flex-row sm:items-center gap-4'>
           <div className='flex-1'>
@@ -291,44 +455,103 @@ const ManifestReviewQueue = () => {
         </CardContent>
       </Card>
 
-      {tripFilter && (
-        <Alert
-          severity='info'
-          className='mb-6'
-          action={
-            <Button size='small' href='/edms/manifests/review'>
-              Show all
-            </Button>
-          }
-        >
-          Showing manifests for one trip only.
-        </Alert>
-      )}
+      <Card className='mb-6'>
+        <CardContent>
+          <Grid container spacing={4}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                size='small'
+                placeholder='Search by trip, driver, vehicle, route, company or stop…'
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position='start'>
+                      <i className='ri-search-line' />
+                    </InputAdornment>
+                  )
+                }}
+              />
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <DatePicker
+                label='Logged from'
+                value={fromDate.value}
+                onChange={fromDate.onChange}
+                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+              />
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <DatePicker
+                label='Logged to'
+                value={toDate.value}
+                onChange={toDate.onChange}
+                slotProps={{ textField: { size: 'small', fullWidth: true } }}
+              />
+            </Grid>
+            {FILTERS.map((filter, index) => {
+              const options = filterOptions[index]
+              const selectedId = searchParams.get(filter.param) || ''
 
-      <TextField
-        fullWidth
-        size='small'
-        className='mb-6'
-        placeholder='Search by trip, driver, vehicle, route, company or stop…'
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position='start'>
-              <i className='ri-search-line' />
-            </InputAdornment>
-          )
-        }}
-      />
+              return (
+                <Grid item xs={12} sm={6} md={4} key={filter.param}>
+                  <Autocomplete
+                    size='small'
+                    options={options}
+                    // A filter that arrived by link may point at something no longer in the queue
+                    value={options.find(o => o.id === selectedId) || (selectedId ? { id: selectedId, label: 'Not in the queue', count: 0 } : null)}
+                    onChange={(_, option) => setParam(filter.param, option?.id || '')}
+                    getOptionLabel={option => option.label}
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    renderOption={(props, option) => (
+                      <li {...props} key={option.id}>
+                        <span className='flex-1'>{option.label}</span>
+                        <Typography variant='caption' color='text.secondary'>
+                          {option.count}
+                        </Typography>
+                      </li>
+                    )}
+                    renderInput={params => <TextField {...params} label={filter.label} placeholder={`All ${options.length}`} />}
+                    noOptionsText='Nothing in the queue'
+                  />
+                </Grid>
+              )
+            })}
+            {(activeFilterCount > 0 || search) && (
+              <Grid item xs={12} className='flex items-center gap-3'>
+                <Typography variant='body2' color='text.secondary'>
+                  Showing {visibleManifests.length} of {manifests.length} manifests
+                </Typography>
+                <Button size='small' variant='text' onClick={clearFilters} startIcon={<i className='ri-filter-off-line' />}>
+                  Clear filters
+                </Button>
+              </Grid>
+            )}
+          </Grid>
+        </CardContent>
+      </Card>
 
       {visibleManifests.length === 0 ? (
         <Card>
           <CardContent className='flex flex-col items-center justify-center py-16 gap-2'>
-            <i className='ri-checkbox-circle-line text-6xl text-success' />
-            <Typography variant='h6'>Nothing waiting on you</Typography>
-            <Typography variant='body2' color='text.secondary'>
-              Every logged delivery has its package details recorded.
-            </Typography>
+            {manifests.length > 0 ? (
+              <>
+                <i className='ri-filter-off-line text-6xl text-textSecondary' />
+                <Typography variant='h6'>No manifests match these filters</Typography>
+                <Button variant='outlined' size='small' onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              </>
+            ) : (
+              <>
+                <i className='ri-checkbox-circle-line text-6xl text-success' />
+                <Typography variant='h6'>Nothing waiting on you</Typography>
+                <Typography variant='body2' color='text.secondary'>
+                  Every logged delivery has its package details recorded.
+                </Typography>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -536,7 +759,7 @@ const ManifestReviewQueue = () => {
           {lightbox && <img src={lightbox} alt='Manifest' className='w-full h-auto' />}
         </DialogContent>
       </Dialog>
-    </>
+    </LocalizationProvider>
   )
 }
 
