@@ -59,6 +59,8 @@ import OpenDialogOnElementClick from '@/components/dialogs/OpenDialogOnElementCl
 import GenericTableExportDialog from '@/components/dialogs/generic-table-export-dialog'
 import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-table-export-dialog'
 import CompanyFilterSelect from '@/components/edms/CompanyFilterSelect'
+import { FilterDropdowns, useDropdownFilters } from '@/components/edms/QueueFilters'
+import type { QueueFilterDef } from '@/components/edms/QueueFilters'
 
 LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz03MTc0MCxFPTE3MjI1MzA1NTIwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
 
@@ -66,6 +68,19 @@ LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz03MTc0MCxFPTE3MjI1M
 // its figures - completing a field capture before review would lock in zeros.
 const isReadyToComplete = (manifest: ManifestType) =>
   manifest.status === 'delivered' && !isManifestAwaitingVerification(manifest)
+
+const refOption = (ref: any, labelKey: string, fallback: string) =>
+  ref && typeof ref === 'object' && ref.$id ? { id: ref.$id as string, label: (ref[labelKey] as string) || fallback } : null
+
+const tripOf = (manifest: any) => (manifest.trip && typeof manifest.trip === 'object' ? manifest.trip : null)
+
+const MANIFEST_FILTERS: QueueFilterDef<any>[] = [
+  { param: 'tripId', label: 'Trip', pick: m => refOption(tripOf(m), 'tripNumber', 'Trip') },
+  { param: 'driverId', label: 'Driver', pick: m => refOption(tripOf(m)?.driver, 'name', 'Unnamed driver') },
+  { param: 'vehicleId', label: 'Vehicle', pick: m => refOption(tripOf(m)?.vehicle, 'vehicleNumber', 'Unnamed vehicle') },
+  { param: 'routeId', label: 'Route', pick: m => refOption(tripOf(m)?.route, 'routeName', 'Unnamed route') },
+  { param: 'stopId', label: 'Drop-off location', pick: m => refOption(m.dropofflocation, 'locationName', 'Unnamed location') }
+]
 
 const STATUS_FILTERS = [
   { value: '', label: 'All Statuses' },
@@ -153,9 +168,12 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Dropdown filters (trip, driver, vehicle, route, drop-off), applied before the rest
+  const dropdownFilters = useDropdownFilters(manifests, MANIFEST_FILTERS)
+
   // Apply filters
   const applyFilters = useMemo(() => {
-    let filtered = [...manifests]
+    let filtered = [...dropdownFilters.filtered]
 
     // Search filter: manifest number or the trip number shown under it
     const query = searchValue.trim().toLowerCase()
@@ -189,7 +207,7 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
     }
 
     return filtered
-  }, [manifests, searchValue, dateFrom, dateTo, statusFilter, companyFilter])
+  }, [dropdownFilters.filtered, searchValue, dateFrom, dateTo, statusFilter, companyFilter])
 
   // Export configuration
   const exportColumns: ExportColumn[] = useMemo(() => [
@@ -500,6 +518,14 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
           ))}
         </TextField>
         <CompanyFilterSelect value={companyFilter} onChange={value => setParam('company', value)} />
+      </Box>
+
+      <Box sx={{ px: 3, pb: 2 }}>
+        <FilterDropdowns
+          dropdowns={dropdownFilters.dropdowns}
+          activeCount={dropdownFilters.activeCount}
+          onClear={dropdownFilters.clear}
+        />
       </Box>
 
       {canBulkComplete && selectedIds.size > 0 && (

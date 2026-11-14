@@ -34,7 +34,16 @@ export const getAllManifests = async (filters?: ManifestFilters): Promise<Manife
     // Add ordering
     queries.push(Query.orderDesc('$createdAt'))
     
-    queries.push(Query.select(['*', 'trip.*']))
+    // The trip's driver, vehicle and route and the drop-off name feed the list's filters
+    queries.push(
+      Query.select([
+        '*', 'trip.*',
+        'trip.driver.$id', 'trip.driver.name',
+        'trip.vehicle.$id', 'trip.vehicle.vehicleNumber',
+        'trip.route.$id', 'trip.route.routeName',
+        'dropofflocation.$id', 'dropofflocation.locationName'
+      ])
+    )
 
     // Paged: expanding `trip` caps a page at 500 rows once the manifests span more
     // than 500 distinct trips, and a flat limit would silently truncate before then
