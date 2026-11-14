@@ -3,7 +3,7 @@
 // React Imports
 import { useEffect, useState } from 'react'
 import type { ChangeEvent } from 'react'
-import logo from '@assets/mineral.png'
+import logo from '@assets/edsdark.png'
 
 // MUI Imports
 import Dialog from '@mui/material/Dialog'
@@ -109,8 +109,9 @@ const exportToPDF = (data: any[]) => {
     const logoBase64 = canvas.toDataURL('image/png')
 
     // Add logo to PDF
-    const logoWidth = 50
+    // Kept in the logo's own proportions so it is not stretched
     const logoHeight = 30
+    const logoWidth = img.height > 0 ? (logoHeight * img.width) / img.height : 34
     const logoX = (pageWidth - logoWidth) / 2
     doc.addImage(logoBase64, 'PNG', logoX, 10, logoWidth, logoHeight)
     
@@ -152,7 +153,7 @@ const exportToPDF = (data: any[]) => {
     doc.line(20, yPosition + 15, pageWidth - 20, yPosition + 15)
     
     // Create table data
-    const tableColumn = ['Category', 'Created Date', 'Quantity', 'Total Price(GH₵)']
+    const tableColumn = ['Category', 'Created Date', 'Quantity', 'Total Price(GHS)']
     const tableRows = data.map(item => [
       item.category.title,
       new Date(item.$createdAt).toLocaleDateString(),
