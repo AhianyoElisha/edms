@@ -4,6 +4,7 @@
 import { Query } from 'appwrite'
 import { appwriteConfig, databases, tablesDB } from '@/libs/appwrite.config'
 import { listTripsForInvoiceMonth } from './tripMonth.actions'
+import { getAllExpenses } from './expense.actions'
 
 /**
  * Which trips count towards revenue, shared with the dashboard (edms-dashboard.actions).
@@ -261,16 +262,9 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
     // Get all trips for the month
     const trips = await monthTrips(currentMonth, currentYear, 'rows')
 
-    // Get expenses for the month
-    const expenses = await tablesDB.listRows(
-      appwriteConfig.database,
-      appwriteConfig.expenses,
-      [
-        Query.greaterThanEqual('expenseDate', startDate),
-        Query.lessThanEqual('expenseDate', endDate),
-        Query.limit(2000)
-      ]
-    )
+    // The month's expenses, each with the driver it was for where that is known
+    // (saved on the expense, or whoever had the vehicle on the expense date)
+    const expenses = await getAllExpenses({ dateRange: { start: startDate, end: endDate } })
 
     // Build driver map
     const driverMap = new Map<string, any>()
@@ -312,20 +306,48 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
       }
     })
 
-    // Aggregate expense data by trip's driver
-    expenses.rows.forEach((expense: any) => {
-      if (expense.tripId) {
-        const trip = trips.rows.find((t: any) => t.$id === expense.tripId)
-        if (trip && trip.driver && driverMap.has(trip.driver)) {
-          const driver = driverMap.get(trip.driver)
-          driver.totalExpenses += expense.amount || 0
-        }
+    // Put each expense against its driver. Most expenses are not linked to a vehicle
+    // or a trip - the office types the driver's name into the description - so when
+    // there is no link, a description naming exactly one driver counts for that driver.
+    const driverNames = users.rows
+      .filter((user: any) => user.status !== 'deleted')
+      .map((user: any) => ({
+        id: user.$id,
+        words: String(user.name || '').toLowerCase().split(/[^a-z]+/).filter((word: string) => word.length >= 3 && word !== 'driver')
+      }))
+      .filter((entry: { words: string[] }) => entry.words.length > 0)
+
+    const driverNamedIn = (text: string) => {
+      const lower = text.toLowerCase()
+      const hits = driverNames.filter((entry: { words: string[] }) => entry.words.every(word => lower.includes(word)))
+
+      if (hits.length === 0) return null
+
+      // "Richard Mensah" beats "Mensah": the fuller name is the better match
+      const most = Math.max(...hits.map((entry: { words: string[] }) => entry.words.length))
+      const best = hits.filter((entry: { words: string[] }) => entry.words.length === most)
+
+      return best.length === 1 ? best[0].id : null
+    }
+
+    let unassignedExpenses = 0
+    let unassignedExpenseCount = 0
+
+    expenses.forEach(expense => {
+      const amount = expense.amount || 0
+      const driverId = (expense.driverId && driverMap.has(expense.driverId) ? expense.driverId : null) || driverNamedIn(expense.description || '')
+
+      if (driverId && driverMap.has(driverId)) {
+        driverMap.get(driverId).totalExpenses += amount
+      } else {
+        unassignedExpenses += amount
+        unassignedExpenseCount++
       }
     })
 
     // Convert to array and calculate rates
     const driverPerformance = Array.from(driverMap.values())
-      .filter(d => d.totalTrips > 0) // Only include drivers with trips
+      .filter(d => d.totalTrips > 0 || d.totalExpenses > 0) // Drivers with trips, or with expenses against them
       .map(driver => ({
         ...driver,
         completionRate: driver.totalTrips > 0 ? ((driver.completedTrips / driver.totalTrips) * 100).toFixed(1) : '0',
@@ -348,7 +370,11 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
         totalTrips: trips.total,
         completedTrips: trips.rows.filter((t: any) => t.status === 'completed').length,
         totalRevenue: driverPerformance.reduce((sum, d) => sum + d.totalRevenue, 0),
-        totalExpenses: driverPerformance.reduce((sum, d) => sum + d.totalExpenses, 0)
+        totalExpenses: driverPerformance.reduce((sum, d) => sum + d.totalExpenses, 0),
+
+        // Expenses in the month that name no driver (office costs, or a description without a name)
+        unassignedExpenses,
+        unassignedExpenseCount
       }
     }
   } catch (error) {
@@ -780,12 +806,21 @@ export async function getInvoicingReport(month?: number, year?: number) {
     const startDate = startOfMonth.toISOString()
     const endDate = endOfMonth.toISOString()
 
-    // Get all trips for the month
-    const trips = await monthTrips(currentMonth, currentYear, 'documents')
+    // The trips on the month's invoice. Every trip that earns its price is billable -
+    // not only those marked completed, which most trips never are.
+    const allTrips = await listTripsForInvoiceMonth<any>(currentMonth, currentYear, 'rows', [
+      Query.select(['$id', 'tripNumber', 'tripDate', 'status', 'tripCost', 'clientRate', 'invoiceGenerated', 'paymentStatus', 'billingMonth', 'driver.name', 'route.routeName'])
+    ])
+
+    const billable = allTrips
+      .filter(tripEarnsRevenue)
+      .sort((a: any, b: any) => String(a.tripDate).localeCompare(String(b.tripDate)))
+      .map((trip: any) => ({ ...trip, driverName: trip.driver?.name || '', routeName: trip.route?.routeName || '' }))
 
     let totalBilled = 0
     let totalPaid = 0
     let totalPending = 0
+    let totalUninvoiced = 0
     let invoicedTrips = 0
     let uninvoicedTrips = 0
 
@@ -795,29 +830,28 @@ export async function getInvoicingReport(month?: number, year?: number) {
       partial: { count: 0, amount: 0 }
     }
 
-    trips.documents.forEach((trip: any) => {
-      const tripRevenue = trip.tripCost || trip.clientRate || 0
-      
-      if (trip.status === 'completed') {
-        if (trip.invoiceGenerated) {
-          invoicedTrips++
-          totalBilled += tripRevenue
+    billable.forEach((trip: any) => {
+      const amount = tripRevenue(trip)
 
-          const status = trip.paymentStatus || 'pending'
-          if (invoiceStatus[status]) {
-            invoiceStatus[status].count++
-            invoiceStatus[status].amount += tripRevenue
-          }
+      if (!trip.invoiceGenerated) {
+        uninvoicedTrips++
+        totalUninvoiced += amount
 
-          if (status === 'paid') {
-            totalPaid += tripRevenue
-          } else {
-            totalPending += tripRevenue
-          }
-        } else {
-          uninvoicedTrips++
-        }
+        return
       }
+
+      invoicedTrips++
+      totalBilled += amount
+
+      const status = trip.paymentStatus || 'pending'
+
+      if (invoiceStatus[status]) {
+        invoiceStatus[status].count++
+        invoiceStatus[status].amount += amount
+      }
+
+      if (status === 'paid') totalPaid += amount
+      else totalPending += amount
     })
 
     return {
@@ -833,14 +867,15 @@ export async function getInvoicingReport(month?: number, year?: number) {
         collectionRate: totalBilled > 0 ? ((totalPaid / totalBilled) * 100).toFixed(1) : '0',
         invoicedTrips,
         uninvoicedTrips,
-        invoiceRate: trips.total > 0 ? ((invoicedTrips / trips.total) * 100).toFixed(1) : '0'
+        totalUninvoiced,
+        invoiceRate: billable.length > 0 ? ((invoicedTrips / billable.length) * 100).toFixed(1) : '0'
       },
       byStatus: Object.entries(invoiceStatus).map(([status, data]) => ({
         status,
         ...data,
         percentage: totalBilled > 0 ? ((data.amount / totalBilled) * 100).toFixed(1) : '0'
       })),
-      trips: trips.documents.filter((t: any) => t.status === 'completed').slice(0, 20)
+      trips: billable
     }
   } catch (error) {
     console.error('Error fetching invoicing report:', error)

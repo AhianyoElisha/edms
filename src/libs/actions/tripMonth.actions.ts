@@ -91,3 +91,28 @@ export async function setTripsInvoiceMonth(tripIds: string[], billingMonth: stri
 
   return { changed, failed: tripIds.length - changed, firstError }
 }
+
+/**
+ * Record that trips have been invoiced to the client, and whether they have been paid.
+ * `invoiced: false` clears both, for a trip ticked by mistake.
+ */
+export async function setTripsBilling(tripIds: string[], update: { invoiced: boolean; paid?: boolean }) {
+  const data = update.invoiced
+    ? { invoiceGenerated: true, ...(update.paid === undefined ? {} : { paymentStatus: update.paid ? 'paid' : 'pending' }) }
+    : { invoiceGenerated: false, paymentStatus: 'pending' }
+
+  let changed = 0
+  let firstError = ''
+
+  for (const tripId of tripIds) {
+    try {
+      await databases.updateDocument(appwriteConfig.database, appwriteConfig.trips, tripId, data)
+      changed++
+    } catch (error: any) {
+      console.error('Could not update the invoice status of trip', tripId, error)
+      if (!firstError) firstError = error?.message || 'Unknown error'
+    }
+  }
+
+  return { changed, failed: tripIds.length - changed, firstError }
+}

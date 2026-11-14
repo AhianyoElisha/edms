@@ -26,6 +26,7 @@ import TableCell from '@mui/material/TableCell'
 import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
+import TablePagination from '@mui/material/TablePagination'
 import Paper from '@mui/material/Paper'
 import Divider from '@mui/material/Divider'
 
@@ -107,6 +108,7 @@ const TripStatusChip = ({ status }: { status: string }) => {
 }
 
 const InvoicingReport = () => {
+  const [tripPage, setTripPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
@@ -340,7 +342,7 @@ const InvoicingReport = () => {
         <StatCard
           title='Uninvoiced Trips'
           value={reportData.summary.uninvoicedTrips}
-          subtitle='Pending invoice generation'
+          subtitle={`GH₵ ${Number(reportData.summary.totalUninvoiced || 0).toLocaleString()} not yet invoiced`}
           icon='ri-draft-line'
           color='error'
         />
@@ -469,14 +471,14 @@ const InvoicingReport = () => {
       <Grid item xs={12}>
         <Card>
           <CardHeader 
-            title='Completed Trips' 
-            subheader={`${reportData.trips.length} trips with billing information`}
+            title='Trips on this invoice'
+            subheader={`${reportData.trips.length} trips. Mark trips invoiced or paid on Trips > Monthly Breakdown.`}
           />
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Trip ID</TableCell>
+                  <TableCell>Trip</TableCell>
                   <TableCell>Date</TableCell>
                   <TableCell>Route</TableCell>
                   <TableCell>Driver</TableCell>
@@ -490,16 +492,16 @@ const InvoicingReport = () => {
                   <TableRow>
                     <TableCell colSpan={7} align='center' className='py-8'>
                       <Typography variant='body2' color='text.secondary'>
-                        No completed trips for this period
+                        No trips for this period
                       </Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  reportData.trips.map((trip: any) => (
+                  reportData.trips.slice(tripPage * 25, tripPage * 25 + 25).map((trip: any) => (
                     <TableRow key={trip.$id} hover>
                       <TableCell>
                         <Typography variant='body2' fontWeight={500}>
-                          {trip.$id.slice(0, 8)}...
+                          {trip.tripNumber || trip.$id.slice(0, 8)}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -548,6 +550,14 @@ const InvoicingReport = () => {
               </TableBody>
             </Table>
           </TableContainer>
+          <TablePagination
+            component='div'
+            count={reportData.trips.length}
+            page={tripPage}
+            rowsPerPage={25}
+            rowsPerPageOptions={[25]}
+            onPageChange={(_, value) => setTripPage(value)}
+          />
         </Card>
       </Grid>
 
@@ -567,7 +577,7 @@ const InvoicingReport = () => {
                       <Typography variant='subtitle2' fontWeight={600}>Pending Invoices</Typography>
                     </Box>
                     <Typography variant='body2' color='text.secondary'>
-                      {reportData.summary.uninvoicedTrips} completed trips need invoice generation
+                      {reportData.summary.uninvoicedTrips} trips have not been invoiced yet
                     </Typography>
                   </Box>
                 </Grid>

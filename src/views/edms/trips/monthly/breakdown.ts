@@ -26,6 +26,10 @@ export type BreakdownTrip = {
   runMonth: string
   invoiceMonth: string
 
+  /** Invoiced to the client, and paid by them */
+  invoiced: boolean
+  paid: boolean
+
   /** Moved to another month's invoice / brought into this one from another month */
   movedOut: boolean
   movedIn: boolean
@@ -99,6 +103,8 @@ export const toBreakdownTrip = (trip: any, month: string): BreakdownTrip => {
     earns: trip.status !== 'cancelled' && trip.status !== 'deleted',
     runMonth,
     invoiceMonth,
+    invoiced: !!trip.invoiceGenerated,
+    paid: !!trip.invoiceGenerated && trip.paymentStatus === 'paid',
     movedOut: runMonth === month && invoiceMonth !== month,
     movedIn: runMonth !== month && invoiceMonth === month,
     manifestCount: manifests.length,
