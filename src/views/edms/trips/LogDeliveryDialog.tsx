@@ -69,6 +69,7 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
   const [clientName, setClientName] = useState('')
   const [packageCount, setPackageCount] = useState('')
   const [shortageCount, setShortageCount] = useState('')
+  const [surplusCount, setSurplusCount] = useState('')
 
   // The company this trip was priced for is the sensible default.
   const tripClientName: string =
@@ -129,6 +130,7 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
 
     setPackageCount('')
     setShortageCount('')
+    setSurplusCount('')
     setSelectedStop(null)
     setPhotoFile(null)
     setPhotoPreview(prev => {
@@ -140,6 +142,7 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
 
   const parsedPackageCount = packageCount.trim() === '' ? 0 : parseInt(packageCount, 10)
   const parsedShortage = shortageCount.trim() === '' ? 0 : parseInt(shortageCount, 10)
+  const parsedSurplus = surplusCount.trim() === '' ? 0 : parseInt(surplusCount, 10)
 
   const figuresError =
     !Number.isFinite(parsedPackageCount) || parsedPackageCount < 0
@@ -148,7 +151,11 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
         ? 'Shortages must be a whole number'
         : parsedPackageCount > 0 && parsedShortage > parsedPackageCount
           ? 'Shortages cannot be more than the package count'
-          : null
+          : !Number.isFinite(parsedSurplus) || parsedSurplus < 0
+            ? 'Surplus must be a whole number'
+            : parsedShortage > 0 && parsedSurplus > 0
+              ? 'Enter either shortages or surplus, not both'
+              : null
 
   const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -208,7 +215,8 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
         photoUrl,
         clientName: clientName.trim() || undefined,
         packageCount: parsedPackageCount || undefined,
-        shortageCount: parsedShortage || undefined
+        shortageCount: parsedShortage || undefined,
+        surplusCount: parsedSurplus || undefined
       })
 
       // Ring the office. Not awaited: the delivery is saved either way and the
@@ -398,6 +406,19 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
               onChange={e => setShortageCount(e.target.value)}
               inputProps={{ min: 0, inputMode: 'numeric' }}
               disabled={submitting}
+            />
+          </Grid>
+          <Grid item xs={6}>
+            <TextField
+              fullWidth
+              size='small'
+              type='number'
+              label='Surplus'
+              value={surplusCount}
+              onChange={e => setSurplusCount(e.target.value)}
+              inputProps={{ min: 0, inputMode: 'numeric' }}
+              disabled={submitting}
+              helperText='Extra packages carried'
             />
           </Grid>
         </Grid>

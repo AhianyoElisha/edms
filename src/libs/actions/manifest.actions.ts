@@ -967,6 +967,8 @@ export const logManifestDelivery = async (params: {
   clientName?: string
   packageCount?: number
   shortageCount?: number
+  // Packages carried over and above the manifest
+  surplusCount?: number
 }): Promise<ManifestType> => {
   const {
     tripId,
@@ -981,6 +983,7 @@ export const logManifestDelivery = async (params: {
   const clientName = params.clientName?.trim() || ''
   const packageCount = Math.max(0, Math.floor(params.packageCount || 0))
   const shortageCount = Math.max(0, Math.floor(params.shortageCount || 0))
+  const surplusCount = Math.max(0, Math.floor(params.surplusCount || 0))
   const deliveredCount = packageCount > 0 ? Math.max(0, packageCount - shortageCount) : 0
 
   try {
@@ -1011,6 +1014,7 @@ export const logManifestDelivery = async (params: {
         deliveredCount,
         // Only sent when the driver actually entered them.
         ...(shortageCount > 0 ? { shortageCount } : {}),
+        ...(surplusCount > 0 ? { surplusCount } : {}),
         ...(clientName ? { clientName } : {}),
         // The company the driver named, or else the trip's own company
         companyId: (clientName ? await companyIdForName(clientName) : null) || trip.companyId || null,
@@ -1097,6 +1101,8 @@ export const verifyManifestDetails = async (
     packageCount?: number | null
     // Packages that did not arrive. Stands on its own when no count is given.
     shortageCount?: number | null
+    // Packages delivered over and above the manifest. Independent of the count.
+    surplusCount?: number | null
     // Legacy: callers that still think in "delivered" rather than "short".
     deliveredCount?: number
     notes?: string
@@ -1131,6 +1137,12 @@ export const verifyManifestDetails = async (
 
     // Written only when there is something to record or something to clear.
     if (shortageCount > 0 || stored.shortageCount) updateData.shortageCount = shortageCount
+
+    if (details.surplusCount !== undefined) {
+      const surplusCount = Math.max(0, Math.floor(details.surplusCount ?? 0))
+
+      if (surplusCount > 0 || stored.surplusCount) updateData.surplusCount = surplusCount
+    }
 
     if (details.clientName !== undefined && (details.clientName || stored.clientName)) {
       updateData.clientName = details.clientName?.trim() || null

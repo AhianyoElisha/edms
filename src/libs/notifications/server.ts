@@ -105,7 +105,8 @@ const buildContent = async (request: NotifyRequest): Promise<AlertContent> => {
       trip?.vehicle?.vehicleNumber || null,
       trip?.route?.routeName || null,
       manifest.clientName || null,
-      manifest.shortageCount ? `${manifest.shortageCount} short` : null
+      manifest.shortageCount ? `${manifest.shortageCount} short` : null,
+      manifest.surplusCount ? `${manifest.surplusCount} extra` : null
     ].filter(Boolean)
 
     return {
