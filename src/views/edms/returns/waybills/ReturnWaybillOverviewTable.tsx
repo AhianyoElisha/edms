@@ -58,6 +58,8 @@ import {
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
+import CompanyFilterSelect from '@/components/edms/CompanyFilterSelect'
+import { useUrlFilters } from '@/hooks/useUrlFilters'
 
 type ReturnWaybillWithActions = ReturnWaybillType
 
@@ -112,6 +114,10 @@ const ReturnWaybillOverviewTable = () => {
   const [globalFilter, setGlobalFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [reasonFilter, setReasonFilter] = useState<string>('all')
+
+  // Company is kept in the URL, like on the Trips and Manifests lists, so links can carry it
+  const { searchParams, setParam } = useUrlFilters()
+  const companyFilter = searchParams.get('company') || ''
   
   // Dialog states
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false)
@@ -382,8 +388,21 @@ const ReturnWaybillOverviewTable = () => {
     [router]
   )
 
+  // A return belongs to the company of the trip it came back on
+  const visibleWaybills = useMemo(
+    () =>
+      companyFilter
+        ? waybillData.filter(waybill => {
+            const trip = waybill.trip as any
+
+            return trip && typeof trip === 'object' && trip.companyId === companyFilter
+          })
+        : waybillData,
+    [waybillData, companyFilter]
+  )
+
   const table = useReactTable({
-    data: waybillData,
+    data: visibleWaybills,
     columns,
     filterFns: {
       fuzzy: fuzzyFilter
@@ -431,6 +450,7 @@ const ReturnWaybillOverviewTable = () => {
               <MenuItem value='customer_return'>Customer Return</MenuItem>
               <MenuItem value='other'>Other</MenuItem>
             </TextField>
+            <CompanyFilterSelect value={companyFilter} onChange={value => setParam('company', value)} />
             <TextField
               value={globalFilter ?? ''}
               onChange={e => setGlobalFilter(e.target.value)}
