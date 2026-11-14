@@ -73,15 +73,17 @@ export async function listTripsAroundMonth<T extends { $id: string } = any>(
 
 /**
  * Move trips onto another month's invoice, or back to the month they were run in
- * (null). Returns how many were changed and the first error, if any failed.
+ * (null). For a client invoiced twice a month, `billingPeriod` names which of that
+ * month's invoices (1 or 2); null leaves it to the trip date.
+ * Returns how many were changed and the first error, if any failed.
  */
-export async function setTripsInvoiceMonth(tripIds: string[], billingMonth: string | null) {
+export async function setTripsInvoiceMonth(tripIds: string[], billingMonth: string | null, billingPeriod: 1 | 2 | null = null) {
   let changed = 0
   let firstError = ''
 
   for (const tripId of tripIds) {
     try {
-      await databases.updateDocument(appwriteConfig.database, appwriteConfig.trips, tripId, { billingMonth })
+      await databases.updateDocument(appwriteConfig.database, appwriteConfig.trips, tripId, { billingMonth, billingPeriod })
       changed++
     } catch (error: any) {
       console.error('Could not change the invoice month of trip', tripId, error)

@@ -126,6 +126,8 @@ export interface TripType {
   tripCost?: number // Price from rate card based on route + tonnage
   // Month the trip is invoiced in ("2026-11") when it was moved out of the month it was run in
   billingMonth?: string | null
+  // Which of the month's two invoices (1 or 2), when moved off the one its date puts it on
+  billingPeriod?: number | null
   clientRate?: number
   driverRate?: number
   profit?: number

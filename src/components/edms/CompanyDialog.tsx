@@ -34,7 +34,7 @@ type Props = {
   onSaved?: (company: CompanyType) => void
 }
 
-const blank = { name: '', code: '', contactPerson: '', contactPhone: '', contactEmail: '', notes: '', isActive: true }
+const blank = { name: '', code: '', contactPerson: '', contactPhone: '', contactEmail: '', notes: '', invoiceCutoffDay: '', isActive: true }
 
 // "Imperial Health Sciences" -> IHS, "Jumia" -> JUM
 const suggestCode = (name: string) => {
@@ -71,6 +71,7 @@ const CompanyDialog = ({ open, onClose, company, initialName, onSaved }: Props) 
             contactPhone: company.contactPhone || '',
             contactEmail: company.contactEmail || '',
             notes: company.notes || '',
+            invoiceCutoffDay: company.invoiceCutoffDay ? String(company.invoiceCutoffDay) : '',
             isActive: company.isActive !== false
           }
         : { ...blank, name: initialName || '', code: suggestCode(initialName || '') }
@@ -174,6 +175,18 @@ const CompanyDialog = ({ open, onClose, company, initialName, onSaved }: Props) 
               label='Notes'
               value={form.notes}
               onChange={e => set('notes', e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              type='number'
+              label='First invoice covers trips up to day'
+              placeholder='e.g. 14'
+              value={form.invoiceCutoffDay}
+              onChange={e => set('invoiceCutoffDay', e.target.value)}
+              inputProps={{ min: 1, max: 28 }}
+              helperText='Only for a company that invoices twice a month: trips up to this day go on the first invoice, the rest on the second. Leave empty for one invoice a month.'
             />
           </Grid>
           {company && (

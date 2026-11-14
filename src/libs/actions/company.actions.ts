@@ -33,6 +33,12 @@ export interface CompanyType {
   contactEmail?: string | null
   notes?: string | null
   isActive?: boolean | null
+
+  /**
+   * Last day of the month covered by the client's first invoice (e.g. 14), for
+   * clients invoiced twice a month. Empty: one invoice a month.
+   */
+  invoiceCutoffDay?: number | null
 }
 
 export interface CompanyInput {
@@ -43,6 +49,7 @@ export interface CompanyInput {
   contactEmail?: string
   notes?: string
   isActive?: boolean
+  invoiceCutoffDay?: number | string | null
 }
 
 const nameKey = (name?: string | null) => (name || '').trim().toLowerCase().replace(/\s+/g, ' ')
@@ -125,6 +132,13 @@ const assertUnique = async (input: { name: string; code: string }, excludeId?: s
   if (sameCode) throw new Error(`The code ${sameCode.code} is already used by ${sameCode.name}.`)
 }
 
+// A day of the month every month has, or nothing
+const cutoffDay = (value: CompanyInput['invoiceCutoffDay']) => {
+  const day = Math.floor(Number(value))
+
+  return day >= 1 && day <= 28 ? day : null
+}
+
 const clean = (input: CompanyInput) => ({
   name: input.name.trim(),
   code: codeKey(input.code),
@@ -132,7 +146,8 @@ const clean = (input: CompanyInput) => ({
   contactPhone: input.contactPhone?.trim() || null,
   contactEmail: input.contactEmail?.trim() || null,
   notes: input.notes?.trim() || null,
-  isActive: input.isActive !== false
+  isActive: input.isActive !== false,
+  invoiceCutoffDay: cutoffDay(input.invoiceCutoffDay)
 })
 
 export async function createCompany(input: CompanyInput): Promise<CompanyType> {
