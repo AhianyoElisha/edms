@@ -23,7 +23,7 @@ export type ExpenseDriver = { id: string; name: string }
 type Props = {
   vehicleId: string
 
-  /** ISO date of the expense */
+  /** ISO date of the expense; empty while the date is being typed */
   expenseDate: string
   value: ExpenseDriver | null
 
@@ -64,13 +64,14 @@ const ExpenseDriverField = ({ vehicleId, expenseDate, value, auto, onChange, dis
 
   // Follow the vehicle and date until a driver is chosen by hand
   useEffect(() => {
-    if (!auto || !assignments) return
+    // A half-typed date says nothing about the driver, so leave the field as it is
+    if (!auto || !assignments || !expenseDate) return
 
     const suggested = held ? { id: held.driverId, name: held.driverName || 'Unnamed driver' } : null
 
     if ((suggested?.id || '') !== (value?.id || '')) onChange(suggested, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auto, assignments, held])
+  }, [auto, assignments, held, expenseDate])
 
   // A driver who has since been removed still has to show on their old expenses
   const options = useMemo(
@@ -82,7 +83,7 @@ const ExpenseDriverField = ({ vehicleId, expenseDate, value, auto, onChange, dis
 
   const helperText = !vehicleId
     ? 'Optional. Pick a vehicle and this fills in with whoever had it on the expense date.'
-    : !assignments
+    : !assignments || !expenseDate
       ? ''
       : !held
         ? `Nobody is recorded as having this vehicle on ${day}. Pick the driver if the expense was for one.`

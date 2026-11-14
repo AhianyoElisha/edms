@@ -557,7 +557,7 @@ const ExpenseEditForm = ({ expenseId }: ExpenseEditFormProps) => {
                     <Grid item xs={12}>
                       <ExpenseDriverField
                         vehicleId={vehicleId}
-                        expenseDate={expenseDate.toISOString()}
+                        expenseDate={expenseDate?.isValid() ? expenseDate.toISOString() : ''}
                         value={driver}
                         auto={driverAuto}
                         onChange={(selected, auto) => {
