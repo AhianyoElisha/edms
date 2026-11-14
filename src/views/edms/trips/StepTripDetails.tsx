@@ -30,6 +30,7 @@ import { VOLUME_TIERS, getVolumeTierByTonnage, findVolumePriceForTier } from '@/
 // Actions
 import { getAllVehicles } from '@/libs/actions/vehicle.actions'
 import VehicleSelect from '@/components/edms/VehicleSelect'
+import { checkTripDate } from '@/utils/tripDateCheck'
 import { getAllRoutes } from '@/libs/actions/route.actions'
 import { getUserList } from '@/libs/actions/customer.action'
 import { getAllRateCards } from '@/libs/actions/ratecard.actions'
@@ -60,6 +61,11 @@ const StepTripDetails = ({
   const [vehicleId, setVehicleId] = useState(wizardData.tripDetails.vehicleId)
   const [routeId, setRouteId] = useState(wizardData.tripDetails.routeId)
   const [startTime, setStartTime] = useState(wizardData.tripDetails.startTime)
+
+  // When editing, the date the trip already has is left alone - an old trip must stay
+  // editable. Only a date typed now is checked.
+  const [savedStartTime] = useState(wizardData.tripDetails.startTime)
+  const dateCheck = startTime && startTime !== savedStartTime ? checkTripDate(startTime) : null
   const [tonnage, setTonnage] = useState(wizardData.tripDetails.tonnage || '')
   const [tripCost, setTripCost] = useState<number | undefined>(wizardData.tripDetails.tripCost)
   const [costError, setCostError] = useState<string | null>(null)
@@ -167,6 +173,9 @@ const StepTripDetails = ({
       alert('Please fill in all required fields')
       return
     }
+
+    // A wrong year would drop the trip out of every monthly report and invoice
+    if (dateCheck?.level === 'error') return
 
     const driver = drivers.find(d => d.$id === driverId)
     const vehicle = vehicles.find(v => v.$id === vehicleId)
@@ -389,13 +398,19 @@ const StepTripDetails = ({
             label='Trip Start Time'
             value={startTime ? dayjs(startTime) : null}
             onChange={(date) => {
-              const isoDate = date ? date.toISOString() : ''
-              setStartTime(isoDate)
+              // A half-typed date is not a date yet; keep what was there until it is
+              if (date && !date.isValid()) return
+
+              setStartTime(date ? date.toISOString() : '')
             }}
             slotProps={{
               textField: {
                 fullWidth: true,
-                required: true
+                required: true,
+                error: dateCheck?.level === 'error',
+                color: dateCheck?.level === 'warning' ? 'warning' : undefined,
+                focused: dateCheck?.level === 'warning' ? true : undefined,
+                helperText: dateCheck?.message
               }
             }}
           />
