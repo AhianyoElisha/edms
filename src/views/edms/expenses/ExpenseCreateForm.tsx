@@ -36,6 +36,7 @@ import dayjs, { Dayjs } from 'dayjs'
 import { createExpenseWithReceipt } from '@/libs/actions/expense.actions'
 import { getAllTrips } from '@/libs/actions/trip.actions'
 import { getAllVehicles } from '@/libs/actions/vehicle.actions'
+import VehicleSelect from '@/components/edms/VehicleSelect'
 
 // Type Imports
 import type { 
@@ -488,30 +489,12 @@ const ExpenseCreateForm = () => {
 
                     {/* Vehicle Selection */}
                     <Grid item xs={12}>
-                      <Autocomplete
-                        fullWidth
+                      <VehicleSelect
+                        vehicles={vehicles}
+                        value={vehicleId}
                         disabled={dataLoading}
-                        options={vehicles}
-                        getOptionLabel={v => `${v.vehicleNumber}${v.brand ? ' - ' + v.brand : ''}${v.model ? ' ' + v.model : ''}`}
-                        value={vehicles.find(v => v.$id === vehicleId) || null}
-                        onChange={(_, selected) => setVehicleId(selected?.$id || '')}
-                        renderOption={(props, vehicle) => (
-                          <li {...props} key={vehicle.$id}>
-                            <div>
-                              <Typography variant='body2'>{vehicle.vehicleNumber}</Typography>
-                              {(vehicle.brand || vehicle.model) && (
-                                <Typography variant='caption' color='text.secondary'>
-                                  {vehicle.brand} {vehicle.model}
-                                </Typography>
-                              )}
-                            </div>
-                          </li>
-                        )}
-                        renderInput={params => (
-                          <TextField {...params} label='Vehicle' placeholder='Search vehicle...' />
-                        )}
-                        noOptionsText='No active vehicles available'
-                        isOptionEqualToValue={(option, value) => option.$id === value.$id}
+                        noOptionsText='No active vehicle matches'
+                        onChange={selectedVehicleId => setVehicleId(selectedVehicleId)}
                       />
                     </Grid>
                   </Grid>

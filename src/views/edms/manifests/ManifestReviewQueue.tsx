@@ -35,6 +35,7 @@ import dayjs from 'dayjs'
 
 // Component Imports
 import CompanyField from '@/components/edms/CompanyField'
+import { useFilterOptionDisplay } from '@/components/edms/QueueFilters'
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
@@ -136,6 +137,7 @@ const FILTERS: Array<{
   param: string
   label: string
   pick: (manifest: any, routeCompanies: RouteCompanies) => FilterOption | null
+  kind?: 'vehicle'
 }> = [
   {
     param: 'tripId',
@@ -159,6 +161,7 @@ const FILTERS: Array<{
   {
     param: 'vehicleId',
     label: 'Vehicle',
+    kind: 'vehicle',
     pick: m => {
       const vehicle = tripOf(m)?.vehicle
 
@@ -241,6 +244,7 @@ const ManifestReviewQueue = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [clientOptions, setClientOptions] = useState<string[]>([])
   const [routeCompanies, setRouteCompanies] = useState<RouteCompanies>({})
+  const filterDisplay = useFilterOptionDisplay()
 
   useEffect(() => {
     getManifestClientOptions().then(setClientOptions)
@@ -533,16 +537,8 @@ const ManifestReviewQueue = () => {
                     // A filter that arrived by link may point at something no longer in the queue
                     value={options.find(o => o.id === selectedId) || (selectedId ? { id: selectedId, label: 'Not in the queue', count: 0 } : null)}
                     onChange={(_, option) => setParam(filter.param, option?.id || '')}
-                    getOptionLabel={option => option.label}
                     isOptionEqualToValue={(option, value) => option.id === value.id}
-                    renderOption={(props, option) => (
-                      <li {...props} key={option.id}>
-                        <span className='flex-1'>{option.label}</span>
-                        <Typography variant='caption' color='text.secondary'>
-                          {option.count}
-                        </Typography>
-                      </li>
-                    )}
+                    {...filterDisplay(filter)}
                     renderInput={params => <TextField {...params} label={filter.label} placeholder={`All ${options.length}`} />}
                     noOptionsText='Nothing in the queue'
                   />

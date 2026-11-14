@@ -127,6 +127,7 @@ const BASE_FILTERS: QueueFilterDef<any>[] = [
   {
     param: 'vehicleId',
     label: 'Vehicle',
+    kind: 'vehicle',
     pick: w => {
       const vehicle = tripOf(w)?.vehicle
 

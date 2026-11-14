@@ -44,6 +44,7 @@ import dayjs, { Dayjs } from 'dayjs'
 // Action Imports
 import { getAllExpenses, markExpenseAsPaid } from '@/libs/actions/expense.actions'
 import { getAllVehicles } from '@/libs/actions/vehicle.actions'
+import { matchesVehicleSearch, vehicleDriverName } from '@/utils/fleetIdentity'
 import { getAllUsers } from '@/libs/actions/auth.actions'
 
 // Hook Imports
@@ -313,6 +314,19 @@ const ExpenseListView = () => {
     [vehicles]
   )
 
+  // Driver assigned to each plate, shown beside it and searchable in the vehicle filter
+  const driverByVehicleNumber = useMemo(() => {
+    const names = new Map<string, string>()
+
+    vehicles.forEach(v => {
+      const driverName = vehicleDriverName(v)
+
+      if (v.vehicleNumber && driverName) names.set(v.vehicleNumber, driverName)
+    })
+
+    return names
+  }, [vehicles])
+
   const activeFilterCount = [searchQuery, filterType, filterStatus, filterVehicle, filterDriver, dateFromStr, dateToStr]
     .filter(Boolean).length
 
@@ -322,7 +336,21 @@ const ExpenseListView = () => {
 
     if (filterType) result = result.filter(expense => expense.expenseType === filterType)
     if (filterStatus) result = result.filter(expense => expense.paymentStatus === filterStatus)
-    if (filterVehicle) result = result.filter(expense => matchesVehicle(expense, filterVehicle))
+    if (filterVehicle) {
+      // A driver's name typed into the vehicle filter finds the vehicles they drive
+      const words = filterVehicle.toLowerCase().split(/\s+/).filter(Boolean)
+      const driverPlates = new Set<string>()
+
+      driverByVehicleNumber.forEach((driverName, number) => {
+        if (words.every(word => driverName.toLowerCase().includes(word))) driverPlates.add(normalizePlate(number))
+      })
+
+      result = result.filter(
+        expense =>
+          matchesVehicle(expense, filterVehicle) ||
+          (!!expense.vehicleNumber && driverPlates.has(normalizePlate(expense.vehicleNumber)))
+      )
+    }
     if (filterDriver) result = result.filter(expense => matchesDriver(expense, filterDriver))
 
     // Search filter
@@ -371,7 +399,7 @@ const ExpenseListView = () => {
     })
 
     return result
-  }, [expenses, searchQuery, filterType, filterStatus, filterVehicle, filterDriver, order, orderBy])
+  }, [expenses, searchQuery, filterType, filterStatus, filterVehicle, filterDriver, driverByVehicleNumber, order, orderBy])
 
   // A filter change can leave the table on a page that no longer exists, which
   // showed "No expenses found" even though there were matches on page one.
@@ -712,6 +740,26 @@ const ExpenseListView = () => {
                       freeSolo
                       size="small"
                       options={vehicleNumbers}
+                      filterOptions={(all, state) =>
+                        all.filter(number =>
+                          matchesVehicleSearch(state.inputValue, {
+                            vehicleNumber: number,
+                            driverName: driverByVehicleNumber.get(number)
+                          })
+                        )
+                      }
+                      renderOption={(props, number) => (
+                        <li {...props} key={number}>
+                          <div>
+                            <Typography variant="body2">{number}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {driverByVehicleNumber.get(number)
+                                ? `Driver: ${driverByVehicleNumber.get(number)}`
+                                : 'No driver assigned'}
+                            </Typography>
+                          </div>
+                        </li>
+                      )}
                       inputValue={vehicleInput}
                       onInputChange={(_, value, reason) => {
                         if (reason === 'reset' && value === '' && vehicleInput !== '') return
@@ -719,7 +767,7 @@ const ExpenseListView = () => {
                         updateParamDebounced('vehicle', value)
                       }}
                       renderInput={(params) => (
-                        <TextField {...params} label="Vehicle number" placeholder="e.g. AW 3773-26" />
+                        <TextField {...params} label="Vehicle" placeholder="Number or driver's name" />
                       )}
                     />
                   </Grid>

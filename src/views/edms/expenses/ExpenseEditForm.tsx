@@ -36,6 +36,7 @@ import dayjs, { Dayjs } from 'dayjs'
 import { getExpenseById, updateExpense, uploadReceiptImage, uploadAdditionalImages, removeReceiptImage, removeAdditionalImage } from '@/libs/actions/expense.actions'
 import { getAllTrips } from '@/libs/actions/trip.actions'
 import { getAllVehicles } from '@/libs/actions/vehicle.actions'
+import VehicleSelect from '@/components/edms/VehicleSelect'
 import { storage, appwriteConfig } from '@/libs/appwrite.config'
 
 // Type Imports
@@ -532,23 +533,12 @@ const ExpenseEditForm = ({ expenseId }: ExpenseEditFormProps) => {
 
                     {/* Vehicle Selection */}
                     <Grid item xs={12}>
-                      <FormControl fullWidth>
-                        <InputLabel>Vehicle</InputLabel>
-                        <Select
-                          value={vehicleId}
-                          label="Vehicle"
-                          onChange={(e) => setVehicleId(e.target.value)}
-                        >
-                          <MenuItem value="">None</MenuItem>
-                          {vehicles.map((vehicle) => (
-                            <MenuItem key={vehicle.$id} value={vehicle.$id}>
-                              {vehicle.vehicleNumber}
-                              {vehicle.brand && ` - ${vehicle.brand}`}
-                              {vehicle.model && ` ${vehicle.model}`}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
+                      <VehicleSelect
+                        vehicles={vehicles}
+                        value={vehicleId}
+                        noOptionsText='No active vehicle matches'
+                        onChange={selectedVehicleId => setVehicleId(selectedVehicleId)}
+                      />
                     </Grid>
                   </Grid>
                 </CardContent>

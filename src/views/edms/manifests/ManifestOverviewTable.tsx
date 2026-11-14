@@ -77,7 +77,7 @@ const tripOf = (manifest: any) => (manifest.trip && typeof manifest.trip === 'ob
 const MANIFEST_FILTERS: QueueFilterDef<any>[] = [
   { param: 'tripId', label: 'Trip', pick: m => refOption(tripOf(m), 'tripNumber', 'Trip') },
   { param: 'driverId', label: 'Driver', pick: m => refOption(tripOf(m)?.driver, 'name', 'Unnamed driver') },
-  { param: 'vehicleId', label: 'Vehicle', pick: m => refOption(tripOf(m)?.vehicle, 'vehicleNumber', 'Unnamed vehicle') },
+  { param: 'vehicleId', label: 'Vehicle', kind: 'vehicle', pick: m => refOption(tripOf(m)?.vehicle, 'vehicleNumber', 'Unnamed vehicle') },
   { param: 'routeId', label: 'Route', pick: m => refOption(tripOf(m)?.route, 'routeName', 'Unnamed route') },
   { param: 'stopId', label: 'Drop-off location', pick: m => refOption(m.dropofflocation, 'locationName', 'Unnamed location') }
 ]
