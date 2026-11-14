@@ -8,6 +8,7 @@ import { emailKey, personNameKey, phoneKey } from '@/utils/fleetIdentity';
 import { withTextCase } from '../textCaseGuard';
 import { toNameCase } from '@/utils/textCase';
 import { COMPANY_LABEL, STAFF_LABEL, isCompanyRoleName } from '@/utils/companyAccess';
+import { logVehicleDriverChange } from './vehicleassignment.actions';
 
 // Initialize server-side Appwrite client with API key
 const serverClient = new Client()
@@ -395,6 +396,7 @@ export async function deleteUser(userId: string) {
 
       for (const vehicle of vehicles.documents) {
         await serverDatabases.updateDocument(appwriteConfig.database, appwriteConfig.vehicles, vehicle.$id, { driver: null });
+        await logVehicleDriverChange(vehicle.$id, null, { db: serverDatabases as any, changedBy: 'Driver removed' });
       }
     } catch (vehicleError: any) {
       console.error('Failed to unassign vehicles (continuing):', vehicleError?.message);

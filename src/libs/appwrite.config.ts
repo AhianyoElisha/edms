@@ -37,6 +37,7 @@ export const appwriteConfig = {
   ratecards: process.env.NEXT_PUBLIC_RATE_CARDS_COLLECTION_ID!,
   // The clients whose goods are carried; rate cards, trips and manifests point at one
   companies: process.env.NEXT_PUBLIC_COMPANIES_COLLECTION_ID || 'companies',
+  vehicleassignments: process.env.NEXT_PUBLIC_VEHICLE_ASSIGNMENTS_COLLECTION_ID || 'vehicleassignments',
   
   // EDMS - Misc
   notifications: process.env.NEXT_PUBLIC_NOTIFICATIONS_COLLECTION_ID!,

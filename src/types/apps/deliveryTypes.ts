@@ -704,7 +704,13 @@ export interface ExpenseType {
   // Filled in by getAllExpenses() from the linked vehicle / trip, when there is one
   vehicleNumber?: string
   tripNumber?: string
+  // The driver the expense was for. Saved on the expense when it is recorded, so it
+  // stays with that driver after the vehicle passes to someone else.
+  driverId?: string | null
   driverName?: string
+  // Where driverName came from: 'recorded' = saved on the expense, 'history' = whoever
+  // had the vehicle on the expense date, 'trip' = the linked trip's driver
+  driverSource?: 'recorded' | 'history' | 'trip'
   paymentMethod?: PaymentMethodType
   paymentStatus: PaymentStatusType
   approvedBy?: string // User ID who approved the expense
@@ -726,6 +732,8 @@ export interface ExpenseInput {
   receiptNumber?: string
   vehicleId?: string
   tripId?: string
+  driverId?: string | null
+  driverName?: string | null
   paymentMethod?: PaymentMethodType
   paymentStatus?: PaymentStatusType
   isRecurring?: boolean

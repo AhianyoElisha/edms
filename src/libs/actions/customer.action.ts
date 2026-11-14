@@ -6,6 +6,7 @@ import { listAllDocuments } from './paginate'
 import { formatVehicleNumber, vehicleKey } from '@/utils/fleetIdentity'
 import { isCompanyRoleName } from '@/utils/companyAccess'
 import { syncAccountAccess } from './user.actions'
+import { logVehicleDriverChange } from './vehicleassignment.actions'
 
 
 export async function saveCustomerToDB(Customer: Customer) {
@@ -74,6 +75,7 @@ async function releaseDriverFromOtherVehicles(driverId: string, keepVehicleId?: 
   for (const vehicle of current.documents) {
     if (vehicle.$id === keepVehicleId) continue
     await databases.updateDocument(appwriteConfig.database, appwriteConfig.vehicles, vehicle.$id, { driver: null })
+    await logVehicleDriverChange(vehicle.$id, null)
   }
 }
 
@@ -84,9 +86,13 @@ async function releaseDriverFromOtherVehicles(driverId: string, keepVehicleId?: 
 export async function setVehicleDriver(vehicleId: string, driverId: string | null) {
   if (driverId) await releaseDriverFromOtherVehicles(driverId, vehicleId)
 
-  return databases.updateDocument(appwriteConfig.database, appwriteConfig.vehicles, vehicleId, {
+  const updated = await databases.updateDocument(appwriteConfig.database, appwriteConfig.vehicles, vehicleId, {
     driver: driverId || null
   })
+
+  await logVehicleDriverChange(vehicleId, driverId || null)
+
+  return updated
 }
 
 // Save vehicle to database (Delivery Service)
@@ -112,6 +118,9 @@ export async function saveTruckOrTricycleToDB(vehicle: Logistics) {
           cbmVolume: vehicle.cbmVolume || null,
         }
     );
+
+    if (vehicle.driver) await logVehicleDriverChange(newVehicle.$id, vehicle.driver as string)
+
     return newVehicle;
   } catch (error) {
     console.error('Error creating vehicle:', error);
@@ -143,6 +152,10 @@ export async function updateTruckOrTricycleInDB(vehicle: Logistics & { id: strin
           cbmVolume: vehicle.cbmVolume || null,
       }
     );
+
+    // Does nothing when the driver was left as it was
+    await logVehicleDriverChange(vehicle.id, (vehicle.driver as string) || null)
+
     return updatedVehicle;
   } catch (error) {
     console.error('Error updating vehicle:', error);

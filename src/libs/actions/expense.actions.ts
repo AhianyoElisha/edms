@@ -13,6 +13,8 @@ import type {
   PaymentStatusType
 } from '@/types/apps/deliveryTypes'
 import { listAllDocuments } from './paginate'
+import { getVehicleAssignments } from './vehicleassignment.actions'
+import { assignmentOn } from '@/utils/vehicleCustody'
 
 const relationId = (value: any): string | undefined =>
   value && typeof value === 'object' ? value.$id : value || undefined
@@ -65,19 +67,32 @@ export async function getAllExpenses(filters?: ExpenseFilters): Promise<ExpenseT
 
     // Paged with the shared helper: a flat limit dropped everything past the first
     // page with no error, and expanding a relationship caps a page at 500 rows.
-    const documents = await listAllDocuments<any>(appwriteConfig.expenses, queries, 'expenses')
+    const [documents, assignments] = await Promise.all([
+      listAllDocuments<any>(appwriteConfig.expenses, queries, 'expenses'),
+      getVehicleAssignments()
+    ])
 
     const expenses = documents.map((doc: any) => {
       const vehicle = doc.vehicleId && typeof doc.vehicleId === 'object' ? doc.vehicleId : null
       const trip = doc.tripId && typeof doc.tripId === 'object' ? doc.tripId : null
 
+      const vehicleId = relationId(doc.vehicleId)
+
+      // The driver saved on the expense wins. Older expenses have none, so fall back to
+      // whoever had the vehicle on the expense date - never to its driver today.
+      const held = !doc.driverName && vehicleId ? assignmentOn(assignments, vehicleId, doc.expenseDate) : null
+
+      const driverSource = doc.driverName ? 'recorded' : held?.driverName ? 'history' : trip?.driver?.name ? 'trip' : undefined
+
       return {
         ...doc,
-        vehicleId: relationId(doc.vehicleId),
+        vehicleId,
         vehicleNumber: vehicle?.vehicleNumber || undefined,
         tripId: relationId(doc.tripId),
         tripNumber: trip?.tripNumber || undefined,
-        driverName: trip?.driver?.name || undefined,
+        driverId: doc.driverId || held?.driverId || undefined,
+        driverName: doc.driverName || held?.driverName || trip?.driver?.name || undefined,
+        driverSource,
         // Parse additionalImages if stored as JSON string
         additionalImages: doc.additionalImages
           ? (typeof doc.additionalImages === 'string' ? JSON.parse(doc.additionalImages) : doc.additionalImages)
@@ -227,6 +242,8 @@ export async function createExpense(
         receiptNumber: expenseData.receiptNumber || null,
         vehicleId: expenseData.vehicleId || null,
         tripId: expenseData.tripId || null,
+        driverId: expenseData.driverId || null,
+        driverName: expenseData.driverName || null,
         paymentMethod: expenseData.paymentMethod || 'cash',
         paymentStatus: expenseData.paymentStatus || 'pending',
         isRecurring: expenseData.isRecurring || false,

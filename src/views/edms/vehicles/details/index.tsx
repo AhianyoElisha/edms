@@ -19,6 +19,7 @@ import { Breadcrumbs } from '@mui/material'
 import VehicleInfoCard from './VehicleInfoCard'
 import DriverInfoCard from './DriverInfoCard'
 import VehicleTripHistory from './VehicleTripHistory'
+import VehicleDriverHistory from './VehicleDriverHistory'
 import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
 import EditLogisticsDrawer from '../EditTruckorTricycleDrawer'
 
@@ -154,6 +155,13 @@ const VehicleDetails = ({ vehicleData: initialVehicleData, vehicleId }: { vehicl
       {/* Main Content */}
       <Grid item xs={12} md={8}>
         <Grid container spacing={6}>
+          <Grid item xs={12}>
+            <VehicleDriverHistory
+              vehicleId={vehicleId}
+              vehicleNumber={vehicleData?.vehicleNumber}
+              refreshKey={vehicleData?.$updatedAt}
+            />
+          </Grid>
           <Grid item xs={12}>
             <VehicleTripHistory vehicleId={vehicleId} />
           </Grid>

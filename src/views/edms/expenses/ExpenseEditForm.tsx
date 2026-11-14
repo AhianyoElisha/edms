@@ -37,6 +37,8 @@ import { getExpenseById, updateExpense, uploadReceiptImage, uploadAdditionalImag
 import { getAllTrips } from '@/libs/actions/trip.actions'
 import { getAllVehicles } from '@/libs/actions/vehicle.actions'
 import VehicleSelect from '@/components/edms/VehicleSelect'
+import ExpenseDriverField from './ExpenseDriverField'
+import type { ExpenseDriver } from './ExpenseDriverField'
 import { storage, appwriteConfig } from '@/libs/appwrite.config'
 
 // Type Imports
@@ -122,6 +124,8 @@ const ExpenseEditForm = ({ expenseId }: ExpenseEditFormProps) => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatusType>('paid')
   const [tripId, setTripId] = useState<string>('')
   const [vehicleId, setVehicleId] = useState<string>('')
+  const [driver, setDriver] = useState<ExpenseDriver | null>(null)
+  const [driverAuto, setDriverAuto] = useState<boolean>(false)
   const [isRecurring, setIsRecurring] = useState<boolean>(false)
   const [recurringFrequency, setRecurringFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly')
 
@@ -170,6 +174,13 @@ const ExpenseEditForm = ({ expenseId }: ExpenseEditFormProps) => {
         setPaymentStatus(expenseData.paymentStatus)
         setTripId(expenseData.tripId || '')
         setVehicleId(expenseData.vehicleId || '')
+
+        // An expense saved before drivers were recorded gets the suggestion for its
+        // vehicle and date; one that already names a driver keeps it.
+        setDriver(
+          expenseData.driverId ? { id: expenseData.driverId, name: expenseData.driverName || 'Unnamed driver' } : null
+        )
+        setDriverAuto(!expenseData.driverId)
         setIsRecurring(expenseData.isRecurring || false)
         setRecurringFrequency(expenseData.recurringFrequency || 'monthly')
 
@@ -282,6 +293,8 @@ const ExpenseEditForm = ({ expenseId }: ExpenseEditFormProps) => {
         receiptNumber: receiptNumber.trim() || undefined,
         tripId: tripId || undefined,
         vehicleId: vehicleId || undefined,
+        driverId: driver?.id || null,
+        driverName: driver?.name || null,
         paymentMethod,
         paymentStatus,
         isRecurring,
@@ -538,6 +551,19 @@ const ExpenseEditForm = ({ expenseId }: ExpenseEditFormProps) => {
                         value={vehicleId}
                         noOptionsText='No active vehicle matches'
                         onChange={selectedVehicleId => setVehicleId(selectedVehicleId)}
+                      />
+                    </Grid>
+                    {/* Driver the expense was for */}
+                    <Grid item xs={12}>
+                      <ExpenseDriverField
+                        vehicleId={vehicleId}
+                        expenseDate={expenseDate?.isValid() ? expenseDate.toISOString() : ''}
+                        value={driver}
+                        auto={driverAuto}
+                        onChange={(selected, auto) => {
+                          setDriver(selected)
+                          setDriverAuto(auto)
+                        }}
                       />
                     </Grid>
                   </Grid>
