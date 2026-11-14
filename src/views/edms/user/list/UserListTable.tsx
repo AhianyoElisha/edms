@@ -243,7 +243,9 @@ const UserListTable = ({ tableData, onRefresh }: { tableData?: UsersType[]; onRe
         header: 'Email',
         cell: ({ row }) => <Typography>{row.original.email}</Typography>
       }),
-      columnHelper.accessor('role', {
+      // Read as the role's display name so searching and sorting by role work
+      columnHelper.accessor(row => (row.role as any)?.displayName || '', {
+        id: 'role',
         header: 'Role',
         cell: ({ row }) => (
           <div className='flex items-center gap-2'>
@@ -380,7 +382,9 @@ const UserListTable = ({ tableData, onRefresh }: { tableData?: UsersType[]; onRe
 
   useEffect(() => {
     const filteredData = data?.filter(user => {
-      if (role && user.role !== role) return false
+      // A user's role is the whole role record, so compare on its name
+      if (role && (user.role as any)?.name !== role) return false
+
       return true
     })
 
