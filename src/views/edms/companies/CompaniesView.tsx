@@ -155,6 +155,7 @@ const CompaniesView = () => {
                         </Typography>
                         <Typography variant='body2' color='text.secondary'>
                           Code: {company.code}
+                          {company.invoiceCutoffDay ? ` · Two invoices a month, first up to day ${company.invoiceCutoffDay}` : ''}
                         </Typography>
                       </TableCell>
                       <TableCell>

@@ -538,34 +538,52 @@ export async function updateTripWithManifests(
 }
 
 /**
- * Generate unique trip number
+ * Generate a trip number: TRP-<date entered>-<running number for that day>.
+ *
+ * The running number continues from the highest one already issued today. It used to
+ * be "trips dated today, plus one" - but the office enters trips for earlier dates in
+ * batches, none of which are dated today, so every trip in a batch got -0001.
  */
 async function generateTripNumber(): Promise<string> {
   const date = new Date()
   const year = date.getFullYear().toString().slice(-2)
   const month = (date.getMonth() + 1).toString().padStart(2, '0')
   const day = date.getDate().toString().padStart(2, '0')
-  
-  // Get count of trips today to generate sequence
-  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString()
-  const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).toISOString()
-  
+  const prefix = `TRP-${year}${month}${day}-`
+
   try {
-    const todayTrips = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      [
-        Query.greaterThanEqual('tripDate', startOfDay),
-        Query.lessThan('tripDate', endOfDay)
-      ]
-    )
-    
-    const sequence = (todayTrips.total + 1).toString().padStart(4, '0')
-    return `TRP-${year}${month}${day}-${sequence}`
+    // Deleted trips count too, so a number is never handed out twice
+    const latest = await databases.listDocuments(appwriteConfig.database, appwriteConfig.trips, [
+      Query.startsWith('tripNumber', prefix),
+      Query.orderDesc('tripNumber'),
+      Query.select(['$id', 'tripNumber']),
+      Query.limit(1)
+    ])
+
+    const highest = parseInt(String(latest.documents[0]?.tripNumber || '').slice(prefix.length), 10) || 0
+
+    // Two people saving at the same moment can still read the same "highest", so
+    // step past any number that got taken in between
+    for (let sequence = highest + 1; sequence < highest + 25; sequence++) {
+      const candidate = `${prefix}${sequence.toString().padStart(4, '0')}`
+
+      const taken = await databases.listDocuments(appwriteConfig.database, appwriteConfig.trips, [
+        Query.equal('tripNumber', candidate),
+        Query.select(['$id']),
+        Query.limit(1)
+      ])
+
+      if (taken.total === 0) return candidate
+    }
+
+    throw new Error('no free trip number found')
   } catch (error) {
-    // Fallback to random if query fails
-    const random = Math.floor(Math.random() * 9999).toString().padStart(4, '0')
-    return `TRP-${year}${month}${day}-${random}`
+    console.error('Could not work out the next trip number, using a random one:', error)
+
+    // Still unique enough to tell trips apart if the lookup fails
+    const random = Math.floor(1000 + Math.random() * 8999).toString()
+
+    return `${prefix}R${random}`
   }
 }
 
