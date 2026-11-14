@@ -2,6 +2,7 @@
 
 // React Imports
 import { useCallback, useMemo } from 'react'
+import type { HTMLAttributes } from 'react'
 
 // MUI Imports
 import Grid from '@mui/material/Grid'
@@ -19,6 +20,10 @@ import dayjs from 'dayjs'
 
 // Hook Imports
 import { useUrlFilters, useUrlDateFilter } from '@/hooks/useUrlFilters'
+import { useVehicleDrivers } from '@/hooks/useVehicleDrivers'
+
+// Util Imports
+import { matchesVehicleSearch, vehicleLabel } from '@/utils/fleetIdentity'
 
 export type QueueFilterOption = { id: string; label: string }
 
@@ -30,6 +35,49 @@ export type QueueFilterDef<Row> = {
   param: string
   label: string
   pick: (row: Row) => QueueFilterOption | null
+
+  /** 'vehicle' lists each option with its assigned driver, and lets the driver's name find it */
+  kind?: 'vehicle'
+}
+
+type CountedOption = QueueFilterOption & { count: number }
+
+/**
+ * How a dropdown filter draws and searches its options. Vehicle filters show the
+ * driver assigned to each vehicle and match on the driver's name as well as the plate.
+ */
+export const useFilterOptionDisplay = () => {
+  const vehicleDrivers = useVehicleDrivers()
+
+  return (def: { kind?: 'vehicle' }) => {
+    const isVehicle = def.kind === 'vehicle'
+    const driverOf = (option: QueueFilterOption) => (isVehicle ? vehicleDrivers.get(option.id) || '' : '')
+
+    return {
+      getOptionLabel: (option: CountedOption) => (isVehicle ? vehicleLabel(option.label, driverOf(option)) : option.label),
+      ...(isVehicle && {
+        filterOptions: (all: CountedOption[], state: { inputValue: string }) =>
+          all.filter(option =>
+            matchesVehicleSearch(state.inputValue, { vehicleNumber: option.label, driverName: driverOf(option) })
+          )
+      }),
+      renderOption: (props: HTMLAttributes<HTMLLIElement>, option: CountedOption) => (
+        <li {...props} key={option.id}>
+          <span className='flex-1'>
+            {option.label}
+            {isVehicle && (
+              <Typography variant='caption' color='text.secondary' className='block'>
+                {driverOf(option) ? `Driver: ${driverOf(option)}` : 'No driver assigned'}
+              </Typography>
+            )}
+          </span>
+          <Typography variant='caption' color='text.secondary'>
+            {option.count}
+          </Typography>
+        </li>
+      )
+    }
+  }
 }
 
 /**
@@ -130,7 +178,10 @@ type BarProps = {
 }
 
 /** The search box, date range and dropdowns of a review queue. */
-export const QueueFilterBar = ({ bar, search, onSearchChange, searchPlaceholder, shown, total, noun, anyActive, onClear }: BarProps) => (
+export const QueueFilterBar = ({ bar, search, onSearchChange, searchPlaceholder, shown, total, noun, anyActive, onClear }: BarProps) => {
+  const display = useFilterOptionDisplay()
+
+  return (
   <LocalizationProvider dateAdapter={AdapterDayjs}>
     <Grid container spacing={4}>
       <Grid item xs={12} md={6}>
@@ -180,16 +231,8 @@ export const QueueFilterBar = ({ bar, search, onSearchChange, searchPlaceholder,
                 (selectedId ? { id: selectedId, label: 'Not in the queue', count: 0 } : null)
               }
               onChange={(_, option) => bar.setParam(def.param, option?.id || '')}
-              getOptionLabel={option => option.label}
               isOptionEqualToValue={(option, value) => option.id === value.id}
-              renderOption={(props, option) => (
-                <li {...props} key={option.id}>
-                  <span className='flex-1'>{option.label}</span>
-                  <Typography variant='caption' color='text.secondary'>
-                    {option.count}
-                  </Typography>
-                </li>
-              )}
+              {...display(def)}
               renderInput={params => <TextField {...params} label={def.label} placeholder={`All ${options.length}`} />}
               noOptionsText='Nothing in the queue'
             />
@@ -208,7 +251,8 @@ export const QueueFilterBar = ({ bar, search, onSearchChange, searchPlaceholder,
       )}
     </Grid>
   </LocalizationProvider>
-)
+  )
+}
 
 /**
  * Just the dropdown filters, for list pages that already have their own search
@@ -274,7 +318,10 @@ type DropdownsProps = {
 }
 
 /** A wrapping row of the dropdown filters, with a clear button once any is set. */
-export const FilterDropdowns = ({ dropdowns, activeCount, onClear }: DropdownsProps) => (
+export const FilterDropdowns = ({ dropdowns, activeCount, onClear }: DropdownsProps) => {
+  const display = useFilterOptionDisplay()
+
+  return (
   <div className='flex flex-wrap items-center gap-2'>
     {dropdowns.defs.map((def, index) => {
       const options = dropdowns.options[index]
@@ -284,22 +331,14 @@ export const FilterDropdowns = ({ dropdowns, activeCount, onClear }: DropdownsPr
         <Autocomplete
           key={def.param}
           size='small'
-          sx={{ minWidth: 200 }}
+          sx={{ minWidth: def.kind === 'vehicle' ? 260 : 200 }}
           options={options}
           value={
             options.find(o => o.id === selectedId) || (selectedId ? { id: selectedId, label: 'Not in this list', count: 0 } : null)
           }
           onChange={(_, option) => dropdowns.setParam(def.param, option?.id || '')}
-          getOptionLabel={option => option.label}
           isOptionEqualToValue={(option, value) => option.id === value.id}
-          renderOption={(props, option) => (
-            <li {...props} key={option.id}>
-              <span className='flex-1'>{option.label}</span>
-              <Typography variant='caption' color='text.secondary'>
-                {option.count}
-              </Typography>
-            </li>
-          )}
+          {...display(def)}
           renderInput={params => <TextField {...params} label={def.label} placeholder='All' />}
           noOptionsText='None'
         />
@@ -311,4 +350,5 @@ export const FilterDropdowns = ({ dropdowns, activeCount, onClear }: DropdownsPr
       </Button>
     )}
   </div>
-)
+  )
+}

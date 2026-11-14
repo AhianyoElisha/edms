@@ -71,7 +71,7 @@ const refOption = (ref: any, labelKey: string, fallback: string) =>
 
 const TRIP_FILTERS: QueueFilterDef<TripType>[] = [
   { param: 'driverId', label: 'Driver', pick: trip => refOption(trip.driver, 'name', 'Unnamed driver') },
-  { param: 'vehicleId', label: 'Vehicle', pick: trip => refOption(trip.vehicle, 'vehicleNumber', 'Unnamed vehicle') },
+  { param: 'vehicleId', label: 'Vehicle', kind: 'vehicle', pick: trip => refOption(trip.vehicle, 'vehicleNumber', 'Unnamed vehicle') },
   { param: 'routeId', label: 'Route', pick: trip => refOption(trip.route, 'routeName', 'Unnamed route') }
 ]
 

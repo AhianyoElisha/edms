@@ -29,6 +29,7 @@ import { VOLUME_TIERS, getVolumeTierByTonnage, findVolumePriceForTier } from '@/
 
 // Actions
 import { getAllVehicles } from '@/libs/actions/vehicle.actions'
+import VehicleSelect from '@/components/edms/VehicleSelect'
 import { getAllRoutes } from '@/libs/actions/route.actions'
 import { getUserList } from '@/libs/actions/customer.action'
 import { getAllRateCards } from '@/libs/actions/ratecard.actions'
@@ -212,13 +213,13 @@ const StepTripDetails = ({
 
         {/* Vehicle */}
         <Grid item xs={12} sm={6}>
-          <Autocomplete
-            fullWidth
-            options={vehicles}
-            getOptionLabel={v => v.vehicleNumber || ''}
-            value={vehicles.find(v => v.$id === vehicleId) || null}
-            onChange={(_, selected) => {
-              const selectedVehicleId = selected?.$id || ''
+          <VehicleSelect
+            vehicles={vehicles}
+            value={vehicleId}
+            label='Select Vehicle'
+            required
+            noOptionsText='No active vehicle matches'
+            onChange={(selectedVehicleId, selected) => {
               setVehicleId(selectedVehicleId)
               if (selected?.driver) {
                 const driverField = selected.driver as any
@@ -229,24 +230,6 @@ const StepTripDetails = ({
                 }
               }
             }}
-            renderOption={(props, vehicle) => (
-              <li {...props} key={vehicle.$id}>
-                <div>
-                  <Typography variant='body1'>{vehicle.vehicleNumber}</Typography>
-                  <Typography variant='caption' color='text.secondary'>
-                    {(vehicle.driver as any)?.name && (vehicle.driver as any)?.status !== 'deleted'
-                      ? `Driver: ${(vehicle.driver as any).name}`
-                      : 'No driver assigned'}
-                    {vehicle.brand || vehicle.model ? ` · ${[vehicle.brand, vehicle.model].filter(Boolean).join(' ')}` : ''}
-                  </Typography>
-                </div>
-              </li>
-            )}
-            renderInput={params => (
-              <TextField {...params} label='Select Vehicle' required placeholder='Search vehicle...' />
-            )}
-            noOptionsText='No active vehicles available'
-            isOptionEqualToValue={(option, value) => option.$id === value.$id}
           />
         </Grid>
 

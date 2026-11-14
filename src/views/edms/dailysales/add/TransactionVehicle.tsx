@@ -1,14 +1,10 @@
 import Card from '@mui/material/Card'
 import CardHeader from '@mui/material/CardHeader'
 import CardContent from '@mui/material/CardContent'
-import FormControl from '@mui/material/FormControl'
-import InputLabel from '@mui/material/InputLabel'
-import MenuItem from '@mui/material/MenuItem'
-import Select, { SelectChangeEvent } from '@mui/material/Select'
-import FormHelperText from '@mui/material/FormHelperText'
 import { Control, Controller } from 'react-hook-form'
 import { Logistics } from '@/types/apps/ecommerceTypes'
 import { useCallback, useEffect, useState } from 'react'
+import VehicleSelect from '@/components/edms/VehicleSelect'
 import { getLogisticsDetailsById, getLogisticsList } from '@/libs/actions/customer.action'
 import { Grid, Typography } from '@mui/material'
 
@@ -67,30 +63,19 @@ const TransactionVehicle = ({ control, index, name, error, onVehicleSelect }: Pr
           control={control}
           defaultValue=""
           render={({ field: { onChange, value, ref } }) => (
-            <FormControl fullWidth error={!!error}>
-              <InputLabel id="category-label">Select Vehicle</InputLabel>
-              <Select
-                labelId="category-label"
-                id="category-select"
-                label="Select Vehicle"
-                value={value}
-                onChange={(e: SelectChangeEvent) => {
-                  onChange(e.target.value)
-                  handleVehicleChange(e.target.value)
-                }}
-                inputRef={ref}
-              >
-                <MenuItem value="">
-                  <em>None</em>
-                </MenuItem>
-                {vehicleData?.map((item) => (
-                  <MenuItem key={item.$id} value={item.$id}>
-                    {item.vehicleType === 'truck' ? <i className="ri-truck-line text-[14px]"></i> : <i className="ri-e-bike-line text-[14px]"></i> } {item.vehicleNumber}
-                  </MenuItem>
-                ))}
-              </Select>
-              {error && <FormHelperText>{error.message}</FormHelperText>}
-            </FormControl>
+            <VehicleSelect
+              vehicles={vehicleData || []}
+              value={value || ''}
+              label='Select Vehicle'
+              loading={isLoading}
+              error={!!error}
+              helperText={error?.message}
+              inputRef={ref}
+              onChange={vehicleId => {
+                onChange(vehicleId)
+                handleVehicleChange(vehicleId)
+              }}
+            />
           )}
         />
     </Grid>
