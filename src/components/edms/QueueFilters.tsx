@@ -209,3 +209,106 @@ export const QueueFilterBar = ({ bar, search, onSearchChange, searchPlaceholder,
     </Grid>
   </LocalizationProvider>
 )
+
+/**
+ * Just the dropdown filters, for list pages that already have their own search
+ * box and date range. Values are kept in the URL like every other list filter.
+ */
+export function useDropdownFilters<Row>(rows: Row[], defs: QueueFilterDef<Row>[]) {
+  const { searchParams, setParam, setParams } = useUrlFilters()
+  const selectedKey = defs.map(def => searchParams.get(def.param) || '').join('|')
+
+  // Only values that occur in the list are offered, each with how many rows it has
+  const options = useMemo(
+    () =>
+      defs.map(def => {
+        const seen = new Map<string, QueueFilterOption & { count: number }>()
+
+        rows.forEach(row => {
+          const option = def.pick(row)
+
+          if (!option) return
+
+          const existing = seen.get(option.id)
+
+          if (existing) existing.count++
+          else seen.set(option.id, { ...option, count: 1 })
+        })
+
+        return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows]
+  )
+
+  const filtered = useMemo(() => {
+    let result = rows
+    const selected = selectedKey.split('|')
+
+    defs.forEach((def, index) => {
+      if (selected[index]) result = result.filter(row => def.pick(row)?.id === selected[index])
+    })
+
+    return result
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, selectedKey])
+
+  const clear = useCallback(
+    () => setParams(Object.fromEntries(defs.map(def => [def.param, null]))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [setParams]
+  )
+
+  return {
+    filtered,
+    activeCount: selectedKey.split('|').filter(Boolean).length,
+    clear,
+    dropdowns: { defs, options, searchParams, setParam }
+  }
+}
+
+type DropdownsProps = {
+  dropdowns: ReturnType<typeof useDropdownFilters<any>>['dropdowns']
+  activeCount: number
+  onClear: () => void
+}
+
+/** A wrapping row of the dropdown filters, with a clear button once any is set. */
+export const FilterDropdowns = ({ dropdowns, activeCount, onClear }: DropdownsProps) => (
+  <div className='flex flex-wrap items-center gap-2'>
+    {dropdowns.defs.map((def, index) => {
+      const options = dropdowns.options[index]
+      const selectedId = dropdowns.searchParams.get(def.param) || ''
+
+      return (
+        <Autocomplete
+          key={def.param}
+          size='small'
+          sx={{ minWidth: 200 }}
+          options={options}
+          value={
+            options.find(o => o.id === selectedId) || (selectedId ? { id: selectedId, label: 'Not in this list', count: 0 } : null)
+          }
+          onChange={(_, option) => dropdowns.setParam(def.param, option?.id || '')}
+          getOptionLabel={option => option.label}
+          isOptionEqualToValue={(option, value) => option.id === value.id}
+          renderOption={(props, option) => (
+            <li {...props} key={option.id}>
+              <span className='flex-1'>{option.label}</span>
+              <Typography variant='caption' color='text.secondary'>
+                {option.count}
+              </Typography>
+            </li>
+          )}
+          renderInput={params => <TextField {...params} label={def.label} placeholder='All' />}
+          noOptionsText='None'
+        />
+      )
+    })}
+    {activeCount > 0 && (
+      <Button size='small' variant='text' onClick={onClear} startIcon={<i className='ri-filter-off-line' />}>
+        Clear filters
+      </Button>
+    )}
+  </div>
+)

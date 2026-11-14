@@ -61,8 +61,19 @@ import GenericTableExportDialog from '@/components/dialogs/generic-table-export-
 import DeleteConfirmationDialog from '@/components/dialogs/delete-confirmation-dialog'
 import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-table-export-dialog'
 import CompanyFilterSelect from '@/components/edms/CompanyFilterSelect'
+import { FilterDropdowns, useDropdownFilters } from '@/components/edms/QueueFilters'
+import type { QueueFilterDef } from '@/components/edms/QueueFilters'
 
 LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz03MTc0MCxFPTE3MjI1MzA1NTIwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
+
+const refOption = (ref: any, labelKey: string, fallback: string) =>
+  ref && typeof ref === 'object' && ref.$id ? { id: ref.$id as string, label: (ref[labelKey] as string) || fallback } : null
+
+const TRIP_FILTERS: QueueFilterDef<TripType>[] = [
+  { param: 'driverId', label: 'Driver', pick: trip => refOption(trip.driver, 'name', 'Unnamed driver') },
+  { param: 'vehicleId', label: 'Vehicle', pick: trip => refOption(trip.vehicle, 'vehicleNumber', 'Unnamed vehicle') },
+  { param: 'routeId', label: 'Route', pick: trip => refOption(trip.route, 'routeName', 'Unnamed route') }
+]
 
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
   const itemRank = rankItem(row.getValue(columnId), value)
@@ -178,9 +189,12 @@ const TripsOverviewTable = () => {
     loadTrips()
   }, [statusFilter, user, isDriver])
 
+  // Dropdown filters (driver, vehicle, route), applied before the date range
+  const dropdownFilters = useDropdownFilters(tripData, TRIP_FILTERS)
+
   // Client-side date filtering
   const filteredTripData = useMemo(() => {
-    let filtered = tripData
+    let filtered = dropdownFilters.filtered
     if (companyFilter) {
       filtered = filtered.filter(trip => (trip as any).companyId === companyFilter)
     }
@@ -191,7 +205,7 @@ const TripsOverviewTable = () => {
       filtered = filtered.filter(trip => dayjs(trip.tripDate).isBefore(dateTo.endOf('day').add(1, 'ms')))
     }
     return filtered
-  }, [tripData, dateFrom, dateTo, companyFilter])
+  }, [dropdownFilters.filtered, dateFrom, dateTo, companyFilter])
 
   // Export configuration
   const exportColumns: ExportColumn[] = useMemo(() => [
@@ -474,6 +488,14 @@ const TripsOverviewTable = () => {
             </Button>
           )}
         </div>
+        {/* A driver's list is already only their own trips */}
+        {!isDriver && (
+          <FilterDropdowns
+            dropdowns={dropdownFilters.dropdowns}
+            activeCount={dropdownFilters.activeCount}
+            onClear={dropdownFilters.clear}
+          />
+        )}
       </CardContent>
 
       <div className='overflow-x-auto'>
