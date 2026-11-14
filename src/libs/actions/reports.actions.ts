@@ -3,6 +3,7 @@
 
 import { Query } from 'appwrite'
 import { appwriteConfig, databases, tablesDB } from '@/libs/appwrite.config'
+import { listTripsForInvoiceMonth } from './tripMonth.actions'
 
 /**
  * Which trips count towards revenue, shared with the dashboard (edms-dashboard.actions).
@@ -15,6 +16,16 @@ import { appwriteConfig, databases, tablesDB } from '@/libs/appwrite.config'
 export const tripEarnsRevenue = (trip: any) => trip.status !== 'cancelled' && trip.status !== 'deleted'
 
 export const tripRevenue = (trip: any) => Number(trip.tripCost) || Number(trip.clientRate) || 0
+
+/**
+ * A month's trips, in the shape the old one-page queries returned. Trips are counted
+ * in their invoice month: one moved to a later month's invoice leaves this month.
+ */
+const monthTrips = async (month: number, year: number, api: 'rows' | 'documents') => {
+  const rows = await listTripsForInvoiceMonth<any>(month, year, api)
+
+  return { rows, documents: rows, total: rows.length }
+}
 
 // ============================================
 // OPERATIONAL REPORTS
@@ -137,16 +148,7 @@ export async function getDeliveryPerformanceReport(month?: number, year?: number
     const endDate = endOfMonth.toISOString()
 
     // Get all trips for the month
-    const trips = await tablesDB.listRows(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      [
-        Query.greaterThanEqual('tripDate', startDate),
-        Query.lessThanEqual('tripDate', endDate),
-        Query.notEqual('status', 'deleted'),
-        Query.limit(1000)
-      ]
-    )
+    const trips = await monthTrips(currentMonth, currentYear, 'rows')
 
     // Get all manifests for the month
     const manifests = await tablesDB.listRows(
@@ -173,7 +175,9 @@ export async function getDeliveryPerformanceReport(month?: number, year?: number
 
     // Aggregate trip data by day
     trips.rows.forEach((trip: any) => {
-      const tripDay = new Date(trip.tripDate).getDate() - 1
+      // A trip brought in from another month has no day of its own here; it goes on the 1st
+      const tripDate = new Date(trip.tripDate)
+      const tripDay = tripDate.getMonth() === currentMonth && tripDate.getFullYear() === currentYear ? tripDate.getDate() - 1 : 0
       if (tripDay >= 0 && tripDay < daysInMonth) {
         dailyStats[tripDay].trips++
         if (trip.status === 'completed') {
@@ -255,16 +259,7 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
     )
 
     // Get all trips for the month
-    const trips = await tablesDB.listRows(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      [
-        Query.greaterThanEqual('tripDate', startDate),
-        Query.lessThanEqual('tripDate', endDate),
-        Query.notEqual('status', 'deleted'),
-        Query.limit(2000)
-      ]
-    )
+    const trips = await monthTrips(currentMonth, currentYear, 'rows')
 
     // Get expenses for the month
     const expenses = await tablesDB.listRows(
@@ -388,16 +383,7 @@ export async function getRouteAnalysisReport(month?: number, year?: number) {
     )
 
     // Get all trips for the month
-    const trips = await tablesDB.listRows(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      [
-        Query.greaterThanEqual('tripDate', startDate),
-        Query.lessThanEqual('tripDate', endDate),
-        Query.notEqual('status', 'deleted'),
-        Query.limit(2000)
-      ]
-    )
+    const trips = await monthTrips(currentMonth, currentYear, 'rows')
 
     // Get rate cards
     const rateCards = await tablesDB.listRows(
@@ -497,16 +483,7 @@ export async function getRevenueReport(month?: number, year?: number) {
     const endDate = endOfMonth.toISOString()
 
     // Get the month's trips
-    const trips = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      [
-        Query.greaterThanEqual('tripDate', startDate),
-        Query.lessThanEqual('tripDate', endDate),
-        Query.notEqual('status', 'deleted'),
-        Query.limit(2000)
-      ]
-    )
+    const trips = await monthTrips(currentMonth, currentYear, 'documents')
 
     // Calculate daily revenue
     const daysInMonth = endOfMonth.getDate()
@@ -549,16 +526,7 @@ export async function getRevenueReport(month?: number, year?: number) {
     const prevStartOfMonth = new Date(prevYear, prevMonth, 1)
     const prevEndOfMonth = new Date(prevYear, prevMonth + 1, 0, 23, 59, 59, 999)
 
-    const prevTrips = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      [
-        Query.greaterThanEqual('tripDate', prevStartOfMonth.toISOString()),
-        Query.lessThanEqual('tripDate', prevEndOfMonth.toISOString()),
-        Query.notEqual('status', 'deleted'),
-        Query.limit(2000)
-      ]
-    )
+    const prevTrips = await monthTrips(prevMonth, prevYear, 'documents')
 
     const prevRevenue = prevTrips.documents.filter(tripEarnsRevenue).reduce((sum: number, t: any) => sum + tripRevenue(t), 0)
     const revenueChange = prevRevenue > 0 ? (((totalRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1) : '0'
@@ -813,16 +781,7 @@ export async function getInvoicingReport(month?: number, year?: number) {
     const endDate = endOfMonth.toISOString()
 
     // Get all trips for the month
-    const trips = await databases.listDocuments(
-      appwriteConfig.database,
-      appwriteConfig.trips,
-      [
-        Query.greaterThanEqual('tripDate', startDate),
-        Query.lessThanEqual('tripDate', endDate),
-        Query.notEqual('status', 'deleted'),
-        Query.limit(2000)
-      ]
-    )
+    const trips = await monthTrips(currentMonth, currentYear, 'documents')
 
     let totalBilled = 0
     let totalPaid = 0

@@ -124,6 +124,8 @@ export interface TripType {
   startTime: string
   tonnage?: string // e.g., '10' for 10 CBM volume tier
   tripCost?: number // Price from rate card based on route + tonnage
+  // Month the trip is invoiced in ("2026-11") when it was moved out of the month it was run in
+  billingMonth?: string | null
   clientRate?: number
   driverRate?: number
   profit?: number

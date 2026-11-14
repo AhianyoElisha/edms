@@ -1,6 +1,7 @@
 import { Query } from 'appwrite'
 import { appwriteConfig, databases } from '@/libs/appwrite.config'
 import { listAllDocuments } from '@/libs/actions/paginate'
+import { listTripsForInvoiceMonth } from './tripMonth.actions'
 import { tripEarnsRevenue, tripRevenue } from '@/libs/actions/reports.actions'
 
 // Cache for dashboard data
@@ -146,15 +147,7 @@ export async function getTripStatistics(month?: number, year?: number) {
     // The month's trips by trip date, the same field the reports and the Trips page
     // filter on. Filtering on $createdAt put a trip logged a few days late in the wrong
     // month, and emptied every past month when a migration re-stamped the rows.
-    const monthTrips = await listAllDocuments<any>(
-      appwriteConfig.trips,
-      [
-        Query.greaterThanEqual('tripDate', startDate),
-        Query.lessThanEqual('tripDate', endDate),
-        Query.notEqual('status', 'deleted')
-      ],
-      'dashboard trips'
-    )
+    const monthTrips = await listTripsForInvoiceMonth<any>(currentMonth, currentYear)
 
     const completedCount = monthTrips.filter(trip => trip.status === 'completed').length
 
@@ -233,15 +226,7 @@ export async function getDriverPerformance(month?: number, year?: number) {
 
     // Get trips with driver info for the selected month (by trip date, as above)
     const trips = {
-      documents: await listAllDocuments<any>(
-        appwriteConfig.trips,
-        [
-          Query.greaterThanEqual('tripDate', startDate),
-          Query.lessThanEqual('tripDate', endDate),
-          Query.notEqual('status', 'deleted')
-        ],
-        'dashboard driver trips'
-      )
+      documents: await listTripsForInvoiceMonth<any>(currentMonth, currentYear)
     }
 
     // Calculate driver performance
