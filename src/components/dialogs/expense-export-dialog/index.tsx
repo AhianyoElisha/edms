@@ -3,7 +3,7 @@
 // React Imports
 import { useState } from 'react'
 import type { ChangeEvent } from 'react'
-import logo from '@assets/mineral.png'
+import logo from '@assets/edsdark.png'
 
 // MUI Imports
 import Dialog from '@mui/material/Dialog'
@@ -83,6 +83,13 @@ const PAYMENT_STATUS_LABELS: Record<PaymentStatusType, string> = {
 }
 
 const ExpenseExportDialog = ({ open, setOpen, tableData, totals, getExpenseTypeLabel, formatCurrency }: ExpenseExportDialogProps) => {
+  // The PDF's built-in fonts have no cedi sign ("GH₵" came out as "GH µ"), so PDF
+  // amounts carry the currency code instead. Excel keeps the sign.
+  const pdfMoney = (amount: number) =>
+    formatCurrency(amount)
+      .replace(/GH\s?₵\s?/g, 'GHS ')
+      .replace(/₵\s?/g, 'GHS ')
+
   const initialSelected: string = customInputData?.find(item => item.isSelected)?.value || ''
   const [selected, setSelected] = useState<string>(initialSelected)
 
@@ -120,8 +127,9 @@ const ExpenseExportDialog = ({ open, setOpen, tableData, totals, getExpenseTypeL
       const logoBase64 = canvas.toDataURL('image/png')
 
       // Add logo
-      const logoWidth = 50
+      // Kept in the logo's own proportions so it is not stretched
       const logoHeight = 30
+      const logoWidth = img.height > 0 ? (logoHeight * img.width) / img.height : 34
       const logoX = (pageWidth - logoWidth) / 2
       doc.addImage(logoBase64, 'PNG', logoX, 10, logoWidth, logoHeight)
 
@@ -175,11 +183,11 @@ const ExpenseExportDialog = ({ open, setOpen, tableData, totals, getExpenseTypeL
 
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      doc.text(`Total Expenses (${data.length} records): ${formatCurrency(totals.total)}`, 20, yPosition)
+      doc.text(`Total Expenses (${data.length} records): ${pdfMoney(totals.total)}`, 20, yPosition)
       yPosition += 6
-      doc.text(`Paid: ${formatCurrency(totals.paid)}`, 20, yPosition)
+      doc.text(`Paid: ${pdfMoney(totals.paid)}`, 20, yPosition)
       yPosition += 6
-      doc.text(`Pending: ${formatCurrency(totals.pending)}`, 20, yPosition)
+      doc.text(`Pending: ${pdfMoney(totals.pending)}`, 20, yPosition)
       yPosition += 10
 
       // Add horizontal line after summary
@@ -187,13 +195,13 @@ const ExpenseExportDialog = ({ open, setOpen, tableData, totals, getExpenseTypeL
       doc.line(20, yPosition, pageWidth - 20, yPosition)
 
       // Create table data
-      const tableColumn = ['Date', 'Type', 'Description', 'Vendor', 'Amount (GH₵)', 'Status']
+      const tableColumn = ['Date', 'Type', 'Description', 'Vendor', 'Amount (GHS)', 'Status']
       const tableRows = data.map(item => [
         dayjs(item.expenseDate).format('DD MMM YYYY'),
         getExpenseTypeLabel(item.expenseType),
         item.description || '-',
         item.vendor || '-',
-        formatCurrency(item.amount),
+        pdfMoney(item.amount),
         PAYMENT_STATUS_LABELS[item.paymentStatus] || item.paymentStatus
       ])
 
