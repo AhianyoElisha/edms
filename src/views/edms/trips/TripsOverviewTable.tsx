@@ -457,6 +457,16 @@ const TripsOverviewTable = () => {
                 fileName: 'trip-report'
               }}
             />
+            {!isDriver && (
+              <Button
+                variant='outlined'
+                component={Link}
+                href='/edms/trips/monthly'
+                startIcon={<i className='ri-calendar-check-line' />}
+              >
+                Monthly Breakdown
+              </Button>
+            )}
             {hasPermission('trips.create') && (
               <Button
                 variant='contained'

@@ -233,6 +233,9 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
                 {hasAnyPermission(['trips.view']) && (
                   <MenuItem onClick={() => handleNavigation('/edms/trips')}>All Trips</MenuItem>
                 )}
+                {!isDriver && hasAnyPermission(['trips.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/edms/trips/monthly')}>Monthly Breakdown</MenuItem>
+                )}
                 {hasAnyPermission(['trips.create']) && (
                   <MenuItem onClick={() => handleNavigation('/edms/trips/create')}>Create Trip</MenuItem>
                 )}

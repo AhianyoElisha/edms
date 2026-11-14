@@ -1,0 +1,696 @@
+'use client'
+
+// React Imports
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+
+// Next Imports
+import Link from 'next/link'
+
+// MUI Imports
+import Card from '@mui/material/Card'
+import CardContent from '@mui/material/CardContent'
+import Grid from '@mui/material/Grid'
+import Typography from '@mui/material/Typography'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import Chip from '@mui/material/Chip'
+import Checkbox from '@mui/material/Checkbox'
+import TextField from '@mui/material/TextField'
+import MenuItem from '@mui/material/MenuItem'
+import Tabs from '@mui/material/Tabs'
+import Tab from '@mui/material/Tab'
+import Alert from '@mui/material/Alert'
+import Collapse from '@mui/material/Collapse'
+import Table from '@mui/material/Table'
+import TableBody from '@mui/material/TableBody'
+import TableCell from '@mui/material/TableCell'
+import TableContainer from '@mui/material/TableContainer'
+import TableHead from '@mui/material/TableHead'
+import TableRow from '@mui/material/TableRow'
+import TablePagination from '@mui/material/TablePagination'
+import CircularProgress from '@mui/material/CircularProgress'
+
+// Third-party Imports
+import { Query } from 'appwrite'
+import dayjs from 'dayjs'
+import { toast } from 'react-toastify'
+
+// Component Imports
+import CompanyFilterSelect from '@/components/edms/CompanyFilterSelect'
+import OpenDialogOnElementClick from '@/components/dialogs/OpenDialogOnElementClick'
+import GenericTableExportDialog from '@/components/dialogs/generic-table-export-dialog'
+import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-table-export-dialog'
+
+// Hook Imports
+import { useUrlFilters } from '@/hooks/useUrlFilters'
+import { usePermissions } from '@/hooks/usePermissions'
+
+// Action Imports
+import { listTripsAroundMonth, setTripsInvoiceMonth } from '@/libs/actions/tripMonth.actions'
+
+// Util Imports
+import { monthKey, monthLabel, parseMonthKey, shiftMonthKey } from '@/utils/invoiceMonth'
+import { byDriver, sumPrice, toBreakdownTrip } from './breakdown'
+import type { BreakdownTrip } from './breakdown'
+
+// Only what the page shows; the relationship fields keep each page of results small
+const TRIP_FIELDS = [
+  '$id', 'tripNumber', 'tripDate', 'status', 'tripCost', 'clientRate', 'tonnage', 'companyId', 'billingMonth',
+  'driver.$id', 'driver.name', 'vehicle.$id', 'vehicle.vehicleNumber', 'route.$id', 'route.routeName',
+  'manifests.status', 'manifests.deliveryTime', 'manifests.packageCount', 'manifests.deliveredCount',
+  'manifests.shortageCount', 'manifests.surplusCount', 'returnWaybills.packageCount'
+]
+
+type View = 'trips' | 'drivers' | 'losses'
+type Show = 'invoice' | 'movedOut' | 'movedIn' | 'lateClose' | 'all'
+
+const money = (value: number) =>
+  new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', minimumFractionDigits: 2 }).format(value)
+
+const day = (value?: string) => (value ? dayjs(value).format('D MMM YYYY') : '')
+const statusLabel = (status: string) => status.replace(/_/g, ' ')
+
+const MonthlyBreakdown = () => {
+  const { searchParams, setParam, setParams } = useUrlFilters()
+  const { hasPermission, canViewFinancials, isAdmin } = usePermissions()
+  const canMove = isAdmin || hasPermission('trips.manage') || hasPermission('trips.edit')
+
+  const now = new Date()
+  const month = /^\d{4}-\d{2}$/.test(searchParams.get('month') || '') ? searchParams.get('month')! : monthKey(now.getFullYear(), now.getMonth())
+  const nextMonth = shiftMonthKey(month, 1)
+  const view = (searchParams.get('view') || 'trips') as View
+  const show = (searchParams.get('show') || 'invoice') as Show
+  const companyId = searchParams.get('company') || ''
+  const search = searchParams.get('search') || ''
+
+  const [rows, setRows] = useState<BreakdownTrip[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [saving, setSaving] = useState(false)
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(25)
+  const [openDriver, setOpenDriver] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError('')
+
+      const { year, month: monthIndex } = parseMonthKey(month)
+      const { inMonth, movedIn } = await listTripsAroundMonth<any>(monthIndex, year, 'rows', [Query.select(TRIP_FIELDS)])
+
+      setRows(
+        [...inMonth, ...movedIn]
+          .map(trip => toBreakdownTrip(trip, month))
+          .sort((a, b) => a.tripDate.localeCompare(b.tripDate) || a.tripNumber.localeCompare(b.tripNumber))
+      )
+    } catch (loadError) {
+      console.error('Error loading the monthly breakdown:', loadError)
+      setError('Could not load the trips for this month.')
+    } finally {
+      setLoading(false)
+    }
+  }, [month])
+
+  useEffect(() => {
+    setSelected(new Set())
+    load()
+  }, [load])
+
+  useEffect(() => {
+    setPage(0)
+  }, [month, show, companyId, search, view])
+
+  const ofCompany = useMemo(() => (companyId ? rows.filter(trip => trip.companyId === companyId) : rows), [rows, companyId])
+
+  // The month's sums: what was run, what left, what came in, what is invoiced
+  const totals = useMemo(() => {
+    const run = ofCompany.filter(trip => trip.runMonth === month)
+    const movedOut = ofCompany.filter(trip => trip.movedOut)
+    const movedIn = ofCompany.filter(trip => trip.movedIn)
+    const invoice = ofCompany.filter(trip => trip.invoiceMonth === month)
+
+    return { run, movedOut, movedIn, invoice }
+  }, [ofCompany, month])
+
+  const listed = useMemo(() => {
+    const term = search.trim().toLowerCase()
+
+    const base =
+      show === 'movedOut' ? totals.movedOut
+      : show === 'movedIn' ? totals.movedIn
+      : show === 'lateClose' ? totals.invoice.filter(trip => trip.runMonth === month && trip.closedAfterRunMonth)
+      : show === 'all' ? ofCompany
+      : totals.invoice
+
+    return term
+      ? base.filter(trip =>
+          [trip.tripNumber, trip.driverName, trip.vehicleNumber, trip.routeName].some(value => value.toLowerCase().includes(term))
+        )
+      : base
+  }, [show, totals, ofCompany, month, search])
+
+  const drivers = useMemo(() => byDriver(totals.invoice), [totals.invoice])
+  const lateCloseCount = useMemo(() => totals.invoice.filter(trip => trip.runMonth === month && trip.closedAfterRunMonth).length, [totals.invoice, month])
+
+  const selectedTrips = listed.filter(trip => selected.has(trip.$id))
+  const allListedSelected = listed.length > 0 && selectedTrips.length === listed.length
+
+  const toggle = (tripId: string) =>
+    setSelected(current => {
+      const next = new Set(current)
+
+      if (next.has(tripId)) next.delete(tripId)
+      else next.add(tripId)
+
+      return next
+    })
+
+  const move = async (target: string | null) => {
+    if (selectedTrips.length === 0) return
+
+    setSaving(true)
+
+    // A trip sent back to the month it was run in needs no override at all
+    const result = await setTripsInvoiceMonth(selectedTrips.map(trip => trip.$id), target)
+
+    setSaving(false)
+
+    if (result.changed > 0) {
+      toast.success(
+        target
+          ? `${result.changed} trip${result.changed === 1 ? '' : 's'} moved to the ${monthLabel(target)} invoice`
+          : `${result.changed} trip${result.changed === 1 ? '' : 's'} put back in the month ${result.changed === 1 ? 'it was' : 'they were'} run`
+      )
+    }
+
+    if (result.failed > 0) toast.error(`${result.failed} could not be changed: ${result.firstError}`)
+
+    setSelected(new Set())
+    load()
+  }
+
+  const tripColumns: ExportColumn[] = [
+    { header: 'Trip', accessor: (trip: BreakdownTrip) => trip.tripNumber, width: 24, excelWidth: 16 },
+    { header: 'Trip date', accessor: (trip: BreakdownTrip) => day(trip.tripDate), width: 20, excelWidth: 14 },
+    { header: 'Driver', accessor: (trip: BreakdownTrip) => trip.driverName, width: 26, excelWidth: 22 },
+    { header: 'Vehicle', accessor: (trip: BreakdownTrip) => trip.vehicleNumber, width: 20, excelWidth: 14 },
+    { header: 'Route', accessor: (trip: BreakdownTrip) => trip.routeName, width: 34, excelWidth: 32 },
+    ...(canViewFinancials
+      ? [{ header: 'Price (GH₵)', accessor: (trip: BreakdownTrip) => (trip.earns ? trip.price.toFixed(2) : '0.00'), align: 'right' as const, width: 20, excelWidth: 14 }]
+      : []),
+    { header: 'Status', accessor: (trip: BreakdownTrip) => statusLabel(trip.status), width: 20, excelWidth: 18 },
+    { header: 'Closed', accessor: (trip: BreakdownTrip) => day(trip.closedAt), width: 20, excelWidth: 14 },
+    { header: 'Invoice month', accessor: (trip: BreakdownTrip) => monthLabel(trip.invoiceMonth), width: 22, excelWidth: 16 }
+  ]
+
+  const driverExportRows = drivers.flatMap(driver =>
+    driver.lines.map(line => ({ driverName: driver.driverName, ...line }))
+  )
+
+  const driverColumns: ExportColumn[] = [
+    { header: 'Driver', accessor: (row: any) => row.driverName, width: 28, excelWidth: 24 },
+    { header: 'Route', accessor: (row: any) => row.routeName, width: 40, excelWidth: 34 },
+    { header: 'Tonnage', accessor: (row: any) => row.tonnage || '-', align: 'right', width: 16, excelWidth: 10 },
+    { header: 'Trips', accessor: (row: any) => row.trips, align: 'right', width: 14, excelWidth: 8 },
+    ...(canViewFinancials
+      ? [
+          { header: 'Price (GH₵)', accessor: (row: any) => row.price.toFixed(2), align: 'right' as const, width: 20, excelWidth: 14 },
+          { header: 'Amount (GH₵)', accessor: (row: any) => row.amount.toFixed(2), align: 'right' as const, width: 22, excelWidth: 16 }
+        ]
+      : [])
+  ]
+
+  const lossRows = drivers.filter(driver => driver.packagesSent > 0 || driver.packagesShort > 0 || driver.packagesReturned > 0)
+
+  const lossColumns: ExportColumn[] = [
+    { header: 'Driver', accessor: (row: any) => row.driverName, width: 30, excelWidth: 24 },
+    { header: 'Trips', accessor: (row: any) => row.trips + row.cancelled, align: 'right', width: 14, excelWidth: 8 },
+    { header: 'Packages loaded', accessor: (row: any) => row.packagesSent, align: 'right', width: 22, excelWidth: 16 },
+    { header: 'Delivered', accessor: (row: any) => row.packagesDelivered, align: 'right', width: 18, excelWidth: 12 },
+    { header: 'Short', accessor: (row: any) => row.packagesShort, align: 'right', width: 14, excelWidth: 8 },
+    { header: 'Extra', accessor: (row: any) => row.packagesExtra, align: 'right', width: 14, excelWidth: 8 },
+    { header: 'Returned', accessor: (row: any) => row.packagesReturned, align: 'right', width: 16, excelWidth: 10 }
+  ]
+
+  const exportSummary: ExportSummary[] = [
+    { label: 'Month', value: monthLabel(month) },
+    { label: 'Trips on the invoice', value: String(totals.invoice.length) },
+    ...(canViewFinancials ? [{ label: 'Invoice total', value: money(sumPrice(totals.invoice)) }] : [])
+  ]
+
+  const totalShort = drivers.reduce((sum, driver) => sum + driver.packagesShort, 0)
+
+  const exportProps =
+    view === 'drivers'
+      ? { title: `Driver Breakdown - ${monthLabel(month)}`, data: driverExportRows, columns: driverColumns, fileName: `driver-breakdown-${month}` }
+      : view === 'losses'
+        ? { title: `Losses - ${monthLabel(month)}`, data: lossRows, columns: lossColumns, fileName: `losses-${month}` }
+        : { title: `Trips - ${monthLabel(month)}`, data: listed, columns: tripColumns, fileName: `trips-${month}` }
+
+  const cards = [
+    { label: `Run in ${monthLabel(month, 'short')}`, trips: totals.run, hint: 'Trips dated in this month' },
+    { label: 'Moved to a later invoice', trips: totals.movedOut, hint: 'Run this month, invoiced later', sign: '−' },
+    { label: 'Brought in', trips: totals.movedIn, hint: 'Run in another month, invoiced in this one', sign: '+' },
+    { label: `${monthLabel(month, 'short')} invoice`, trips: totals.invoice, hint: 'What this month adds up to', strong: true }
+  ]
+
+  return (
+    <div className='flex flex-col gap-6'>
+      <Card>
+        <CardContent className='flex flex-wrap items-center justify-between gap-4'>
+          <div className='flex items-center gap-2'>
+            <IconButton aria-label='Previous month' onClick={() => setParam('month', shiftMonthKey(month, -1))}>
+              <i className='ri-arrow-left-s-line' />
+            </IconButton>
+            <TextField
+              type='month'
+              size='small'
+              label='Month'
+              value={month}
+              onChange={e => e.target.value && setParam('month', e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+            <IconButton aria-label='Next month' onClick={() => setParam('month', nextMonth)}>
+              <i className='ri-arrow-right-s-line' />
+            </IconButton>
+            <CompanyFilterSelect value={companyId} onChange={value => setParam('company', value)} />
+          </div>
+          <div className='flex items-center gap-2'>
+            <OpenDialogOnElementClick
+              element={Button}
+              elementProps={{
+                variant: 'outlined',
+                startIcon: <i className='ri-download-line' />,
+                children: 'Export',
+                disabled: loading || exportProps.data.length === 0
+              }}
+              dialog={GenericTableExportDialog}
+              dialogProps={{ ...exportProps, summaryItems: exportSummary }}
+            />
+            <Button component={Link} href='/edms/trips' variant='text' startIcon={<i className='ri-list-check' />}>
+              All trips
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Grid container spacing={6}>
+        {cards.map(card => (
+          <Grid item xs={12} sm={6} md={3} key={card.label}>
+            <Card className={card.strong ? 'border border-primary' : ''}>
+              <CardContent>
+                <Typography variant='body2' color='text.secondary'>
+                  {card.label}
+                </Typography>
+                <Typography variant='h4'>
+                  {card.sign && card.trips.length > 0 ? `${card.sign} ` : ''}
+                  {card.trips.length} trip{card.trips.length === 1 ? '' : 's'}
+                </Typography>
+                {canViewFinancials && <Typography color='text.primary'>{money(sumPrice(card.trips))}</Typography>}
+                <Typography variant='caption' color='text.secondary'>
+                  {card.hint}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
+      <Card>
+        <Tabs value={view} onChange={(_, value) => setParam('view', value === 'trips' ? '' : value)} className='border-be'>
+          <Tab value='trips' label='Trips' />
+          <Tab value='drivers' label='By driver' />
+          <Tab value='losses' label={`Losses${totalShort > 0 ? ` (${totalShort})` : ''}`} />
+        </Tabs>
+
+        {error && (
+          <CardContent>
+            <Alert severity='error'>{error}</Alert>
+          </CardContent>
+        )}
+
+        {loading ? (
+          <CardContent className='flex justify-center p-10'>
+            <CircularProgress />
+          </CardContent>
+        ) : view === 'trips' ? (
+          <>
+            <CardContent className='flex flex-col gap-4'>
+              <div className='flex flex-wrap items-center gap-2'>
+                <TextField
+                  select
+                  size='small'
+                  label='Show'
+                  value={show}
+                  onChange={e => setParams({ show: e.target.value === 'invoice' ? '' : e.target.value })}
+                  sx={{ minWidth: 260 }}
+                >
+                  <MenuItem value='invoice'>On the {monthLabel(month)} invoice ({totals.invoice.length})</MenuItem>
+                  <MenuItem value='lateClose'>Closed after the month ended ({lateCloseCount})</MenuItem>
+                  <MenuItem value='movedOut'>Moved to a later invoice ({totals.movedOut.length})</MenuItem>
+                  <MenuItem value='movedIn'>Brought in from another month ({totals.movedIn.length})</MenuItem>
+                  <MenuItem value='all'>Everything ({ofCompany.length})</MenuItem>
+                </TextField>
+                <TextField
+                  size='small'
+                  placeholder='Search trip, driver, vehicle or route'
+                  defaultValue={search}
+                  onChange={e => setParam('search', e.target.value)}
+                  sx={{ minWidth: 280 }}
+                />
+              </div>
+              {canMove ? (
+                <div className='flex flex-wrap items-center gap-2'>
+                  <Typography variant='body2' color='text.secondary'>
+                    {selectedTrips.length > 0
+                      ? `${selectedTrips.length} selected${canViewFinancials ? ` · ${money(sumPrice(selectedTrips))}` : ''}`
+                      : 'Tick the trips the client did not close in this month, then move them.'}
+                  </Typography>
+                  <Button
+                    size='small'
+                    variant='contained'
+                    disabled={saving || selectedTrips.length === 0}
+                    onClick={() => move(nextMonth)}
+                    startIcon={<i className='ri-arrow-right-line' />}
+                  >
+                    Move to {monthLabel(nextMonth)}
+                  </Button>
+                  <Button
+                    size='small'
+                    variant='outlined'
+                    disabled={saving || selectedTrips.every(trip => trip.invoiceMonth === trip.runMonth)}
+                    onClick={() => move(null)}
+                    startIcon={<i className='ri-arrow-go-back-line' />}
+                  >
+                    Put back in the month run
+                  </Button>
+                </div>
+              ) : (
+                <Typography variant='body2' color='text.secondary'>
+                  You can view this breakdown; moving trips between months needs permission to edit trips.
+                </Typography>
+              )}
+            </CardContent>
+            <TableContainer>
+              <Table size='small'>
+                <TableHead>
+                  <TableRow>
+                    {canMove && (
+                      <TableCell padding='checkbox'>
+                        <Checkbox
+                          checked={allListedSelected}
+                          indeterminate={selectedTrips.length > 0 && !allListedSelected}
+                          onChange={() => setSelected(allListedSelected ? new Set() : new Set(listed.map(trip => trip.$id)))}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell>Trip</TableCell>
+                    <TableCell>Trip date</TableCell>
+                    <TableCell>Driver</TableCell>
+                    <TableCell>Vehicle</TableCell>
+                    <TableCell>Route</TableCell>
+                    {canViewFinancials && <TableCell align='right'>Price</TableCell>}
+                    <TableCell>Status</TableCell>
+                    <TableCell>Closed</TableCell>
+                    <TableCell>Invoice month</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {listed.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={10} align='center'>
+                        <Typography color='text.secondary' className='p-4'>
+                          No trips here for {monthLabel(month)}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {listed.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map(trip => (
+                    <TableRow key={trip.$id} hover selected={selected.has(trip.$id)}>
+                      {canMove && (
+                        <TableCell padding='checkbox'>
+                          <Checkbox checked={selected.has(trip.$id)} onChange={() => toggle(trip.$id)} />
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <Typography component={Link} href={`/edms/trips/${trip.$id}`} color='primary' className='font-medium'>
+                          {trip.tripNumber}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{day(trip.tripDate)}</TableCell>
+                      <TableCell>{trip.driverName}</TableCell>
+                      <TableCell>{trip.vehicleNumber}</TableCell>
+                      <TableCell>{trip.routeName}</TableCell>
+                      {canViewFinancials && <TableCell align='right'>{trip.earns ? money(trip.price) : '-'}</TableCell>}
+                      <TableCell className='capitalize'>{statusLabel(trip.status)}</TableCell>
+                      <TableCell>
+                        {trip.closedAt ? (
+                          <Typography variant='body2' color={trip.closedAfterRunMonth ? 'warning.main' : 'text.primary'}>
+                            {day(trip.closedAt)}
+                          </Typography>
+                        ) : (
+                          <Typography variant='body2' color='text.secondary'>
+                            {trip.manifestCount > 0 ? `${trip.deliveredManifests} of ${trip.manifestCount} drops` : 'No manifests'}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {trip.invoiceMonth === trip.runMonth ? (
+                          monthLabel(trip.invoiceMonth, 'short')
+                        ) : (
+                          <Chip size='small' variant='tonal' color='warning' label={`Moved to ${monthLabel(trip.invoiceMonth, 'short')}`} />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              component='div'
+              count={listed.length}
+              page={page}
+              rowsPerPage={rowsPerPage}
+              rowsPerPageOptions={[25, 50, 100]}
+              onPageChange={(_, value) => setPage(value)}
+              onRowsPerPageChange={e => {
+                setRowsPerPage(parseInt(e.target.value, 10))
+                setPage(0)
+              }}
+            />
+          </>
+        ) : view === 'drivers' ? (
+          <>
+            <CardContent>
+              <Typography variant='body2' color='text.secondary'>
+                Trips on the {monthLabel(month)} invoice, by driver. Open a driver to see their trips by route and price.
+              </Typography>
+            </CardContent>
+            <TableContainer>
+              <Table size='small'>
+                <TableHead>
+                  <TableRow>
+                    <TableCell />
+                    <TableCell>Driver</TableCell>
+                    <TableCell align='right'>Trips</TableCell>
+                    <TableCell align='right'>Cancelled</TableCell>
+                    {canViewFinancials && <TableCell align='right'>Amount</TableCell>}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {drivers.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} align='center'>
+                        <Typography color='text.secondary' className='p-4'>
+                          No trips on the {monthLabel(month)} invoice
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {drivers.map(driver => {
+                    const key = driver.driverId || 'none'
+                    const open = openDriver === key
+
+                    return (
+                      <Fragment key={key}>
+                        <TableRow hover className='cursor-pointer' onClick={() => setOpenDriver(open ? '' : key)}>
+                          <TableCell padding='checkbox'>
+                            <i className={open ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line'} />
+                          </TableCell>
+                          <TableCell className='font-medium'>{driver.driverName}</TableCell>
+                          <TableCell align='right'>{driver.trips}</TableCell>
+                          <TableCell align='right'>{driver.cancelled || '-'}</TableCell>
+                          {canViewFinancials && <TableCell align='right'>{money(driver.amount)}</TableCell>}
+                        </TableRow>
+                        <TableRow>
+                          <TableCell colSpan={5} className='p-0 border-0'>
+                            <Collapse in={open} unmountOnExit>
+                              <Table size='small' className='bg-actionHover'>
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell>Route</TableCell>
+                                    <TableCell align='right'>Tonnage</TableCell>
+                                    <TableCell align='right'>Trips</TableCell>
+                                    {canViewFinancials && <TableCell align='right'>Price</TableCell>}
+                                    {canViewFinancials && <TableCell align='right'>Amount</TableCell>}
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {driver.lines.map(line => (
+                                    <TableRow key={`${line.routeName}|${line.tonnage}|${line.price}`}>
+                                      <TableCell>{line.routeName}</TableCell>
+                                      <TableCell align='right'>{line.tonnage || '-'}</TableCell>
+                                      <TableCell align='right'>{line.trips}</TableCell>
+                                      {canViewFinancials && <TableCell align='right'>{money(line.price)}</TableCell>}
+                                      {canViewFinancials && <TableCell align='right'>{money(line.amount)}</TableCell>}
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </Collapse>
+                          </TableCell>
+                        </TableRow>
+                      </Fragment>
+                    )
+                  })}
+                  {drivers.length > 0 && (
+                    <TableRow>
+                      <TableCell />
+                      <TableCell className='font-medium'>Total</TableCell>
+                      <TableCell align='right' className='font-medium'>
+                        {drivers.reduce((sum, driver) => sum + driver.trips, 0)}
+                      </TableCell>
+                      <TableCell align='right'>{drivers.reduce((sum, driver) => sum + driver.cancelled, 0) || '-'}</TableCell>
+                      {canViewFinancials && (
+                        <TableCell align='right' className='font-medium'>
+                          {money(drivers.reduce((sum, driver) => sum + driver.amount, 0))}
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </>
+        ) : (
+          <>
+            <CardContent>
+              <Typography variant='body2' color='text.secondary'>
+                Packages on delivered drops for the {monthLabel(month)} invoice. &ldquo;Short&rdquo; is what the office recorded as
+                missing at a drop, or the gap between what was loaded and what was counted off where both were counted.
+              </Typography>
+            </CardContent>
+            <TableContainer>
+              <Table size='small'>
+                <TableHead>
+                  <TableRow>
+                    <TableCell />
+                    <TableCell>Driver</TableCell>
+                    <TableCell align='right'>Loaded</TableCell>
+                    <TableCell align='right'>Delivered</TableCell>
+                    <TableCell align='right'>Short</TableCell>
+                    <TableCell align='right'>Extra</TableCell>
+                    <TableCell align='right'>Returned</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {lossRows.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} align='center'>
+                        <Typography color='text.secondary' className='p-4'>
+                          No package counts recorded on delivered drops for {monthLabel(month)}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {[...lossRows]
+                    .sort((a, b) => b.packagesShort - a.packagesShort || b.packagesSent - a.packagesSent)
+                    .map(driver => {
+                      const key = `loss-${driver.driverId || 'none'}`
+                      const open = openDriver === key
+                      const canOpen = driver.tripsWithShortage.length > 0
+
+                      return (
+                        <Fragment key={key}>
+                          <TableRow hover className={canOpen ? 'cursor-pointer' : ''} onClick={() => canOpen && setOpenDriver(open ? '' : key)}>
+                            <TableCell padding='checkbox'>
+                              {canOpen && <i className={open ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line'} />}
+                            </TableCell>
+                            <TableCell className='font-medium'>{driver.driverName}</TableCell>
+                            <TableCell align='right'>{driver.packagesSent.toLocaleString()}</TableCell>
+                            <TableCell align='right'>{driver.packagesDelivered.toLocaleString()}</TableCell>
+                            <TableCell align='right'>
+                              {driver.packagesShort > 0 ? (
+                                <Typography color='error.main' className='font-medium'>
+                                  {driver.packagesShort.toLocaleString()}
+                                </Typography>
+                              ) : (
+                                '-'
+                              )}
+                            </TableCell>
+                            <TableCell align='right'>{driver.packagesExtra || '-'}</TableCell>
+                            <TableCell align='right'>{driver.packagesReturned || '-'}</TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell colSpan={7} className='p-0 border-0'>
+                              <Collapse in={open} unmountOnExit>
+                                <Table size='small' className='bg-actionHover'>
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell>Trip</TableCell>
+                                      <TableCell>Trip date</TableCell>
+                                      <TableCell>Route</TableCell>
+                                      <TableCell align='right'>Loaded</TableCell>
+                                      <TableCell align='right'>Delivered</TableCell>
+                                      <TableCell align='right'>Short</TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {driver.tripsWithShortage.map(trip => (
+                                      <TableRow key={trip.$id}>
+                                        <TableCell>
+                                          <Typography component={Link} href={`/edms/trips/${trip.$id}`} color='primary'>
+                                            {trip.tripNumber}
+                                          </Typography>
+                                        </TableCell>
+                                        <TableCell>{day(trip.tripDate)}</TableCell>
+                                        <TableCell>{trip.routeName}</TableCell>
+                                        <TableCell align='right'>{trip.packagesSent.toLocaleString()}</TableCell>
+                                        <TableCell align='right'>{trip.packagesDelivered.toLocaleString()}</TableCell>
+                                        <TableCell align='right'>{trip.packagesShort.toLocaleString()}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </Collapse>
+                            </TableCell>
+                          </TableRow>
+                        </Fragment>
+                      )
+                    })}
+                  {lossRows.length > 0 && (
+                    <TableRow>
+                      <TableCell />
+                      <TableCell className='font-medium'>Total</TableCell>
+                      <TableCell align='right'>{lossRows.reduce((sum, d) => sum + d.packagesSent, 0).toLocaleString()}</TableCell>
+                      <TableCell align='right'>{lossRows.reduce((sum, d) => sum + d.packagesDelivered, 0).toLocaleString()}</TableCell>
+                      <TableCell align='right' className='font-medium'>
+                        {totalShort.toLocaleString()}
+                      </TableCell>
+                      <TableCell align='right'>{lossRows.reduce((sum, d) => sum + d.packagesExtra, 0) || '-'}</TableCell>
+                      <TableCell align='right'>{lossRows.reduce((sum, d) => sum + d.packagesReturned, 0) || '-'}</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </>
+        )}
+      </Card>
+    </div>
+  )
+}
+
+export default MonthlyBreakdown
