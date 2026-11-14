@@ -1,5 +1,6 @@
 // Util Imports
-import { monthKeyOfDate, tripDateMonth } from '@/utils/invoiceMonth'
+import { monthKeyOfDate, tripDateMonth, tripDatePeriod, tripInvoicePeriod } from '@/utils/invoiceMonth'
+import type { InvoicePeriod } from '@/utils/invoiceMonth'
 
 /**
  * Turns a month's trips into the rows and totals of the monthly breakdown.
@@ -30,9 +31,20 @@ export type BreakdownTrip = {
   invoiced: boolean
   paid: boolean
 
-  /** Moved to another month's invoice / brought into this one from another month */
+  /** Which of the month's two invoices its date puts it on, and the one it is on (0: one invoice a month) */
+  runPeriod: InvoicePeriod
+  invoicePeriod: InvoicePeriod
+
+  /** Run in / invoiced in the month - or the single invoice - being looked at */
+  runIn: boolean
+  invoiceIn: boolean
+
+  /** Moved to a later invoice / brought into this one from another */
   movedOut: boolean
   movedIn: boolean
+
+  /** On a different invoice from the one its trip date puts it on */
+  moved: boolean
 
   manifestCount: number
   deliveredManifests: number
@@ -40,7 +52,7 @@ export type BreakdownTrip = {
   /** When the last drop was delivered, if every drop has been */
   closedAt: string
 
-  /** Every drop delivered, but the last one after the month the trip was run in */
+  /** Every drop delivered, but the last one after the invoice its trip date puts it on had closed */
   closedAfterRunMonth: boolean
 
   packagesSent: number
@@ -53,7 +65,11 @@ export type BreakdownTrip = {
 const DELIVERED = new Set(['delivered', 'completed'])
 const number = (value: unknown) => Number(value) || 0
 
-export const toBreakdownTrip = (trip: any, month: string): BreakdownTrip => {
+/**
+ * `period` is the invoice being looked at: 0 for the whole month, 1 or 2 for one of
+ * a twice-monthly client's invoices. `cutoffDay` is that trip's client's cut-off.
+ */
+export const toBreakdownTrip = (trip: any, month: string, cutoffDay: number | null = null, period: InvoicePeriod = 0): BreakdownTrip => {
   const manifests: any[] = Array.isArray(trip.manifests) ? trip.manifests.filter((m: any) => m && typeof m === 'object') : []
   const delivered = manifests.filter(m => DELIVERED.has(m.status))
   const allDelivered = manifests.length > 0 && delivered.length === manifests.length
@@ -67,6 +83,17 @@ export const toBreakdownTrip = (trip: any, month: string): BreakdownTrip => {
 
   const runMonth = tripDateMonth(trip)
   const invoiceMonth = trip.billingMonth || runMonth
+  const runPeriod = tripDatePeriod(trip, cutoffDay)
+  const invoicePeriod = tripInvoicePeriod(trip, cutoffDay)
+  const runIn = runMonth === month && (period === 0 || runPeriod === period)
+  const invoiceIn = invoiceMonth === month && (period === 0 || invoicePeriod === period)
+
+  // Closed too late for the invoice its date puts it on: after the cut-off for a
+  // first-invoice trip, after the month for the rest
+  const closedLate =
+    !!closedAt &&
+    (monthKeyOfDate(closedAt) > runMonth ||
+      (runPeriod === 1 && !!cutoffDay && monthKeyOfDate(closedAt) === runMonth && new Date(closedAt).getDate() > cutoffDay))
 
   let sent = 0
   let deliveredPackages = 0
@@ -105,12 +132,17 @@ export const toBreakdownTrip = (trip: any, month: string): BreakdownTrip => {
     invoiceMonth,
     invoiced: !!trip.invoiceGenerated,
     paid: !!trip.invoiceGenerated && trip.paymentStatus === 'paid',
-    movedOut: runMonth === month && invoiceMonth !== month,
-    movedIn: runMonth !== month && invoiceMonth === month,
+    runPeriod,
+    invoicePeriod,
+    runIn,
+    invoiceIn,
+    movedOut: runIn && !invoiceIn,
+    movedIn: invoiceIn && !runIn,
+    moved: invoiceMonth !== runMonth || invoicePeriod !== runPeriod,
     manifestCount: manifests.length,
     deliveredManifests: delivered.length,
     closedAt,
-    closedAfterRunMonth: !!closedAt && monthKeyOfDate(closedAt) > runMonth,
+    closedAfterRunMonth: closedLate,
     packagesSent: sent,
     packagesDelivered: deliveredPackages,
     packagesShort: short,

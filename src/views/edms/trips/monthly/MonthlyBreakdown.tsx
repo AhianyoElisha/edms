@@ -47,15 +47,17 @@ import { usePermissions } from '@/hooks/usePermissions'
 
 // Action Imports
 import { listTripsAroundMonth, setTripsBilling, setTripsInvoiceMonth } from '@/libs/actions/tripMonth.actions'
+import { getCompanies } from '@/libs/actions/company.actions'
 
 // Util Imports
-import { monthKey, monthLabel, parseMonthKey, shiftMonthKey } from '@/utils/invoiceMonth'
+import { monthKey, monthLabel, parseMonthKey, periodLabel, shiftMonthKey } from '@/utils/invoiceMonth'
+import type { InvoicePeriod } from '@/utils/invoiceMonth'
 import { byDriver, sumPrice, toBreakdownTrip } from './breakdown'
 import type { BreakdownTrip } from './breakdown'
 
 // Only what the page shows; the relationship fields keep each page of results small
 const TRIP_FIELDS = [
-  '$id', 'tripNumber', 'tripDate', 'status', 'tripCost', 'clientRate', 'tonnage', 'companyId', 'billingMonth', 'invoiceGenerated', 'paymentStatus',
+  '$id', 'tripNumber', 'tripDate', 'status', 'tripCost', 'clientRate', 'tonnage', 'companyId', 'billingMonth', 'billingPeriod', 'invoiceGenerated', 'paymentStatus',
   'driver.$id', 'driver.name', 'vehicle.$id', 'vehicle.vehicleNumber', 'route.$id', 'route.routeName',
   'manifests.status', 'manifests.deliveryTime', 'manifests.packageCount', 'manifests.deliveredCount',
   'manifests.shortageCount', 'manifests.surplusCount', 'returnWaybills.packageCount'
@@ -83,7 +85,13 @@ const MonthlyBreakdown = () => {
   const companyId = searchParams.get('company') || ''
   const search = searchParams.get('search') || ''
 
-  const [rows, setRows] = useState<BreakdownTrip[]>([])
+  // Which of a twice-monthly client's invoices is being looked at; 0 is the whole month
+  const period = (['1', '2'].includes(searchParams.get('invoice') || '') ? Number(searchParams.get('invoice')) : 0) as InvoicePeriod
+
+  const [trips, setTrips] = useState<any[]>([])
+
+  // Each company's cut-off day, for those invoiced twice a month
+  const [cutoffs, setCutoffs] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -100,11 +108,7 @@ const MonthlyBreakdown = () => {
       const { year, month: monthIndex } = parseMonthKey(month)
       const { inMonth, movedIn } = await listTripsAroundMonth<any>(monthIndex, year, 'rows', [Query.select(TRIP_FIELDS)])
 
-      setRows(
-        [...inMonth, ...movedIn]
-          .map(trip => toBreakdownTrip(trip, month))
-          .sort((a, b) => a.tripDate.localeCompare(b.tripDate) || a.tripNumber.localeCompare(b.tripNumber))
-      )
+      setTrips([...inMonth, ...movedIn])
     } catch (loadError) {
       console.error('Error loading the monthly breakdown:', loadError)
       setError('Could not load the trips for this month.')
@@ -119,20 +123,45 @@ const MonthlyBreakdown = () => {
   }, [load])
 
   useEffect(() => {
+    getCompanies()
+      .then(companies =>
+        setCutoffs(new Map(companies.filter(c => c.invoiceCutoffDay).map(c => [c.$id, c.invoiceCutoffDay as number])))
+      )
+      .catch(loadError => console.error('Error loading companies:', loadError))
+  }, [])
+
+  const rows = useMemo(
+    () =>
+      trips
+        .map(trip => toBreakdownTrip(trip, month, cutoffs.get(trip.companyId) || null, period))
+        .sort((a, b) => a.tripDate.localeCompare(b.tripDate) || a.tripNumber.localeCompare(b.tripNumber)),
+    [trips, month, cutoffs, period]
+  )
+
+  // The first/second invoice choice only means something for a twice-monthly client
+  const hasPeriods = companyId ? cutoffs.has(companyId) : cutoffs.size > 0
+  const cutoffDay = companyId ? cutoffs.get(companyId) : cutoffs.size === 1 ? [...cutoffs.values()][0] : undefined
+  const slotLabel = (style: 'long' | 'short' = 'long') => `${monthLabel(month, style)}${period ? `, ${periodLabel(period)}` : ''}`
+
+  // "October 2026 invoice", or "October 2026 1st invoice" for one of two
+  const invoiceName = `${monthLabel(month)} ${period ? periodLabel(period) : 'invoice'}`
+
+  useEffect(() => {
     setPage(0)
-  }, [month, show, companyId, search, view])
+    setSelected(new Set())
+  }, [month, show, companyId, search, view, period])
 
   const ofCompany = useMemo(() => (companyId ? rows.filter(trip => trip.companyId === companyId) : rows), [rows, companyId])
 
   // The month's sums: what was run, what left, what came in, what is invoiced
   const totals = useMemo(() => {
-    const run = ofCompany.filter(trip => trip.runMonth === month)
+    const run = ofCompany.filter(trip => trip.runIn)
     const movedOut = ofCompany.filter(trip => trip.movedOut)
     const movedIn = ofCompany.filter(trip => trip.movedIn)
-    const invoice = ofCompany.filter(trip => trip.invoiceMonth === month)
+    const invoice = ofCompany.filter(trip => trip.invoiceIn)
 
     return { run, movedOut, movedIn, invoice }
-  }, [ofCompany, month])
+  }, [ofCompany])
 
   const listed = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -140,7 +169,7 @@ const MonthlyBreakdown = () => {
     const base =
       show === 'movedOut' ? totals.movedOut
       : show === 'movedIn' ? totals.movedIn
-      : show === 'lateClose' ? totals.invoice.filter(trip => trip.runMonth === month && trip.closedAfterRunMonth)
+      : show === 'lateClose' ? totals.invoice.filter(trip => trip.runIn && trip.closedAfterRunMonth)
       : show === 'all' ? ofCompany
       : totals.invoice
 
@@ -149,10 +178,10 @@ const MonthlyBreakdown = () => {
           [trip.tripNumber, trip.driverName, trip.vehicleNumber, trip.routeName].some(value => value.toLowerCase().includes(term))
         )
       : base
-  }, [show, totals, ofCompany, month, search])
+  }, [show, totals, ofCompany, search])
 
   const drivers = useMemo(() => byDriver(totals.invoice), [totals.invoice])
-  const lateCloseCount = useMemo(() => totals.invoice.filter(trip => trip.runMonth === month && trip.closedAfterRunMonth).length, [totals.invoice, month])
+  const lateCloseCount = useMemo(() => totals.invoice.filter(trip => trip.runIn && trip.closedAfterRunMonth).length, [totals.invoice])
 
   const selectedTrips = listed.filter(trip => selected.has(trip.$id))
   const allListedSelected = listed.length > 0 && selectedTrips.length === listed.length
@@ -167,20 +196,22 @@ const MonthlyBreakdown = () => {
       return next
     })
 
-  const move = async (target: string | null) => {
+  // `targetPeriod` names one of the month's two invoices; without it a trip moved to
+  // another month lands on that month's first
+  const move = async (target: string | null, targetPeriod: 1 | 2 | null = null) => {
     if (selectedTrips.length === 0) return
 
     setSaving(true)
 
     // A trip sent back to the month it was run in needs no override at all
-    const result = await setTripsInvoiceMonth(selectedTrips.map(trip => trip.$id), target)
+    const result = await setTripsInvoiceMonth(selectedTrips.map(trip => trip.$id), target, targetPeriod)
 
     setSaving(false)
 
     if (result.changed > 0) {
       toast.success(
         target
-          ? `${result.changed} trip${result.changed === 1 ? '' : 's'} moved to the ${monthLabel(target)} invoice`
+          ? `${result.changed} trip${result.changed === 1 ? '' : 's'} moved to the ${monthLabel(target)}${targetPeriod ? ` ${periodLabel(targetPeriod)}` : ' invoice'}`
           : `${result.changed} trip${result.changed === 1 ? '' : 's'} put back in the month ${result.changed === 1 ? 'it was' : 'they were'} run`
       )
     }
@@ -219,7 +250,7 @@ const MonthlyBreakdown = () => {
       : []),
     { header: 'Status', accessor: (trip: BreakdownTrip) => statusLabel(trip.status), width: 20, excelWidth: 18 },
     { header: 'Closed', accessor: (trip: BreakdownTrip) => day(trip.closedAt), width: 20, excelWidth: 14 },
-    { header: 'Invoice month', accessor: (trip: BreakdownTrip) => monthLabel(trip.invoiceMonth), width: 22, excelWidth: 16 },
+    { header: 'Invoice month', accessor: (trip: BreakdownTrip) => `${monthLabel(trip.invoiceMonth)}${trip.invoicePeriod ? `, ${periodLabel(trip.invoicePeriod)}` : ''}`, width: 30, excelWidth: 24 },
     { header: 'Invoice', accessor: (trip: BreakdownTrip) => (trip.paid ? 'Paid' : trip.invoiced ? 'Invoiced' : 'Not invoiced'), width: 20, excelWidth: 14 }
   ]
 
@@ -253,7 +284,7 @@ const MonthlyBreakdown = () => {
   ]
 
   const exportSummary: ExportSummary[] = [
-    { label: 'Month', value: monthLabel(month) },
+    { label: 'Invoice', value: slotLabel() },
     { label: 'Trips on the invoice', value: String(totals.invoice.length) },
     ...(canViewFinancials ? [{ label: 'Invoice total', value: money(sumPrice(totals.invoice)) }] : [])
   ]
@@ -262,16 +293,24 @@ const MonthlyBreakdown = () => {
 
   const exportProps =
     view === 'drivers'
-      ? { title: `Driver Breakdown - ${monthLabel(month)}`, data: driverExportRows, columns: driverColumns, fileName: `driver-breakdown-${month}` }
+      ? { title: `Driver Breakdown - ${slotLabel()}`, data: driverExportRows, columns: driverColumns, fileName: `driver-breakdown-${month}${period ? `-invoice-${period}` : ''}` }
       : view === 'losses'
-        ? { title: `Losses - ${monthLabel(month)}`, data: lossRows, columns: lossColumns, fileName: `losses-${month}` }
-        : { title: `Trips - ${monthLabel(month)}`, data: listed, columns: tripColumns, fileName: `trips-${month}` }
+        ? { title: `Losses - ${slotLabel()}`, data: lossRows, columns: lossColumns, fileName: `losses-${month}${period ? `-invoice-${period}` : ''}` }
+        : { title: `Trips - ${slotLabel()}`, data: listed, columns: tripColumns, fileName: `trips-${month}${period ? `-invoice-${period}` : ''}` }
 
   const cards = [
-    { label: `Run in ${monthLabel(month, 'short')}`, trips: totals.run, hint: 'Trips dated in this month' },
-    { label: 'Moved to a later invoice', trips: totals.movedOut, hint: 'Run this month, invoiced later', sign: '−' },
-    { label: 'Brought in', trips: totals.movedIn, hint: 'Run in another month, invoiced in this one', sign: '+' },
-    { label: `${monthLabel(month, 'short')} invoice`, trips: totals.invoice, hint: 'What this month adds up to', strong: true }
+    {
+      label: period ? `Run for the ${periodLabel(period)}` : `Run in ${monthLabel(month, 'short')}`,
+      trips: totals.run,
+      hint: period
+        ? cutoffDay
+          ? `Trips dated ${period === 1 ? `1 to ${cutoffDay}` : `${cutoffDay + 1} to month end`}`
+          : `Trips dated in the ${period === 1 ? 'first' : 'second'} part of the month`
+        : 'Trips dated in this month'
+    },
+    { label: 'Moved to a later invoice', trips: totals.movedOut, hint: period ? 'Run for this invoice, invoiced later' : 'Run this month, invoiced later', sign: '−' },
+    { label: 'Brought in', trips: totals.movedIn, hint: period ? 'From an earlier invoice' : 'Run in another month, invoiced in this one', sign: '+' },
+    { label: period ? `${monthLabel(month, 'short')}, ${periodLabel(period)}` : `${monthLabel(month, 'short')} invoice`, trips: totals.invoice, hint: 'What this invoice adds up to', strong: true }
   ]
 
   return (
@@ -294,6 +333,20 @@ const MonthlyBreakdown = () => {
               <i className='ri-arrow-right-s-line' />
             </IconButton>
             <CompanyFilterSelect value={companyId} onChange={value => setParam('company', value)} />
+            {hasPeriods && (
+              <TextField
+                select
+                size='small'
+                label='Invoice'
+                value={String(period)}
+                onChange={e => setParam('invoice', e.target.value === '0' ? '' : e.target.value)}
+                sx={{ minWidth: 190 }}
+              >
+                <MenuItem value='0'>Whole month</MenuItem>
+                <MenuItem value='1'>1st invoice{cutoffDay ? ` (1 to ${cutoffDay})` : ''}</MenuItem>
+                <MenuItem value='2'>2nd invoice{cutoffDay ? ` (${cutoffDay + 1} to end)` : ''}</MenuItem>
+              </TextField>
+            )}
           </div>
           <div className='flex items-center gap-2'>
             <OpenDialogOnElementClick
@@ -365,10 +418,10 @@ const MonthlyBreakdown = () => {
                   onChange={e => setParams({ show: e.target.value === 'invoice' ? '' : e.target.value })}
                   sx={{ minWidth: 260 }}
                 >
-                  <MenuItem value='invoice'>On the {monthLabel(month)} invoice ({totals.invoice.length})</MenuItem>
-                  <MenuItem value='lateClose'>Closed after the month ended ({lateCloseCount})</MenuItem>
+                  <MenuItem value='invoice'>On the {invoiceName} ({totals.invoice.length})</MenuItem>
+                  <MenuItem value='lateClose'>{period === 1 ? 'Closed after the cut-off' : 'Closed after the month ended'} ({lateCloseCount})</MenuItem>
                   <MenuItem value='movedOut'>Moved to a later invoice ({totals.movedOut.length})</MenuItem>
-                  <MenuItem value='movedIn'>Brought in from another month ({totals.movedIn.length})</MenuItem>
+                  <MenuItem value='movedIn'>Brought in from another {period ? 'invoice' : 'month'} ({totals.movedIn.length})</MenuItem>
                   <MenuItem value='all'>Everything ({ofCompany.length})</MenuItem>
                 </TextField>
                 <TextField
@@ -384,11 +437,22 @@ const MonthlyBreakdown = () => {
                   <Typography variant='body2' color='text.secondary'>
                     {selectedTrips.length > 0
                       ? `${selectedTrips.length} selected${canViewFinancials ? ` · ${money(sumPrice(selectedTrips))}` : ''}`
-                      : 'Tick the trips the client did not close in this month, then move them.'}
+                      : `Tick the trips the client did not close in time for this ${period ? 'invoice' : 'month'}, then move them.`}
                   </Typography>
+                  {period === 1 && (
+                    <Button
+                      size='small'
+                      variant='contained'
+                      disabled={saving || selectedTrips.length === 0}
+                      onClick={() => move(month, 2)}
+                      startIcon={<i className='ri-arrow-right-line' />}
+                    >
+                      Move to the 2nd invoice
+                    </Button>
+                  )}
                   <Button
                     size='small'
-                    variant='contained'
+                    variant={period === 1 ? 'outlined' : 'contained'}
                     disabled={saving || selectedTrips.length === 0}
                     onClick={() => move(nextMonth)}
                     startIcon={<i className='ri-arrow-right-line' />}
@@ -398,11 +462,11 @@ const MonthlyBreakdown = () => {
                   <Button
                     size='small'
                     variant='outlined'
-                    disabled={saving || selectedTrips.every(trip => trip.invoiceMonth === trip.runMonth)}
+                    disabled={saving || selectedTrips.every(trip => !trip.moved)}
                     onClick={() => move(null)}
                     startIcon={<i className='ri-arrow-go-back-line' />}
                   >
-                    Put back in the month run
+                    Put back where it was run
                   </Button>
                   <span className='is-px bs-6 bg-[var(--mui-palette-divider)]' />
                   <Button
@@ -469,7 +533,7 @@ const MonthlyBreakdown = () => {
                     <TableRow>
                       <TableCell colSpan={11} align='center'>
                         <Typography color='text.secondary' className='p-4'>
-                          No trips here for {monthLabel(month)}
+                          No trips here for {slotLabel()}
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -504,10 +568,15 @@ const MonthlyBreakdown = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        {trip.invoiceMonth === trip.runMonth ? (
-                          monthLabel(trip.invoiceMonth, 'short')
+                        {!trip.moved ? (
+                          `${monthLabel(trip.invoiceMonth, 'short')}${trip.invoicePeriod ? `, ${periodLabel(trip.invoicePeriod)}` : ''}`
                         ) : (
-                          <Chip size='small' variant='tonal' color='warning' label={`Moved to ${monthLabel(trip.invoiceMonth, 'short')}`} />
+                          <Chip
+                            size='small'
+                            variant='tonal'
+                            color='warning'
+                            label={`Moved to ${monthLabel(trip.invoiceMonth, 'short')}${trip.invoicePeriod ? `, ${periodLabel(trip.invoicePeriod)}` : ''}`}
+                          />
                         )}
                       </TableCell>
                       <TableCell>
@@ -543,7 +612,7 @@ const MonthlyBreakdown = () => {
           <>
             <CardContent>
               <Typography variant='body2' color='text.secondary'>
-                Trips on the {monthLabel(month)} invoice, by driver. Open a driver to see their trips by route and price.
+                Trips on the {invoiceName}, by driver. Open a driver to see their trips by route and price.
               </Typography>
             </CardContent>
             <TableContainer>
@@ -562,7 +631,7 @@ const MonthlyBreakdown = () => {
                     <TableRow>
                       <TableCell colSpan={5} align='center'>
                         <Typography color='text.secondary' className='p-4'>
-                          No trips on the {monthLabel(month)} invoice
+                          No trips on the {invoiceName}
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -636,7 +705,7 @@ const MonthlyBreakdown = () => {
           <>
             <CardContent>
               <Typography variant='body2' color='text.secondary'>
-                Packages on delivered drops for the {monthLabel(month)} invoice. &ldquo;Short&rdquo; is what the office recorded as
+                Packages on delivered drops for the {invoiceName}. &ldquo;Short&rdquo; is what the office recorded as
                 missing at a drop, or the gap between what was loaded and what was counted off where both were counted.
               </Typography>
             </CardContent>
