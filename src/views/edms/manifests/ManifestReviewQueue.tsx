@@ -178,7 +178,15 @@ const FILTERS: Array<{
     param: 'company',
     label: 'Company',
     pick: (m, routeCompanies) => {
-      const company = companyOf(m, routeCompanies)
+      const name = companyOf(m, routeCompanies)
+
+      // Prefer the company record the manifest or its trip is linked to
+      const companyId =
+        m.companyId || tripOf(m)?.companyId || (name ? routeCompanies[`name:${name.trim().toLowerCase()}`] : '')
+
+      if (companyId) return { id: companyId, label: routeCompanies[`id:${companyId}`] || name || 'Unknown company' }
+
+      const company = name
 
       // Matched without regard to case so "Jumia" and "JUMIA" are one option
       return company ? { id: company.trim().toLowerCase(), label: company.trim() } : null
@@ -249,6 +257,13 @@ const ManifestReviewQueue = () => {
 
           if (routeId) map[routeId] = card.clientName
           if (card.routeCode) map[card.routeCode] = card.clientName
+
+          // Both directions between a company's id and its name, so the filter can
+          // match on the id (as the Trips and Manifests lists do) and show the name
+          if (card.companyId) {
+            map[`id:${card.companyId}`] = card.clientName
+            map[`name:${card.clientName.trim().toLowerCase()}`] = card.companyId
+          }
         })
 
         setRouteCompanies(map)
