@@ -35,6 +35,7 @@ import '@assets/iconify-icons/generated-icons.css'
 import { AppwriteProvider } from '@/contexts/AppwriteProvider'
 import MaintenanceBanner from './MaintenanceBanner'
 import PwaRegister from '@components/PwaRegister'
+import NewVersionBanner from '@components/NewVersionBanner'
 
 // Configure Inter font
 const inter = Inter({
@@ -98,6 +99,7 @@ const Layout = ({ children }: ChildrenType) => {
                         </ScrollToTop>
                   {/* </AuthWrapper> */}
                       <DynamicAttentionBanner />
+                      <NewVersionBanner />
                     </FrontLayout>
                   </IntersectionProvider>
               </BlankLayout>
