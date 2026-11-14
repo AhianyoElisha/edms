@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 // Always answered by the running deployment, never from a cache
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 /**
  * Which build is live right now. Open tabs compare this with the build they were
