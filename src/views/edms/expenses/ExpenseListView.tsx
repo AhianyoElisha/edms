@@ -45,6 +45,7 @@ import dayjs, { Dayjs } from 'dayjs'
 import { getAllExpenses, markExpenseAsPaid } from '@/libs/actions/expense.actions'
 import { getAllVehicles } from '@/libs/actions/vehicle.actions'
 import { matchesVehicleSearch, vehicleDriverName } from '@/utils/fleetIdentity'
+import { normalizePlate } from '@/utils/vehicleCustody'
 import { getAllUsers } from '@/libs/actions/auth.actions'
 
 // Hook Imports
@@ -109,8 +110,6 @@ const getExpenseTypeIcon = (type: ExpenseTypeCategory): string => {
  * Vehicle filters look at the linked record when there is one AND at the text.
  */
 
-// "AW 3773-26", "aw3773 - 26" and "AW-3773-26" are the same plate.
-const normalizePlate = (value: string): string => value.toUpperCase().replace(/[^A-Z0-9]/g, '')
 
 const expenseText = (expense: ExpenseType): string =>
   [expense.description, expense.vendor, expense.subCategory, expense.receiptNumber, expense.driverName]
@@ -336,20 +335,10 @@ const ExpenseListView = () => {
 
     if (filterType) result = result.filter(expense => expense.expenseType === filterType)
     if (filterStatus) result = result.filter(expense => expense.paymentStatus === filterStatus)
+    // A driver's name typed into the vehicle filter finds the expenses that were for
+    // that driver - not everything on the vehicle they happen to have today
     if (filterVehicle) {
-      // A driver's name typed into the vehicle filter finds the vehicles they drive
-      const words = filterVehicle.toLowerCase().split(/\s+/).filter(Boolean)
-      const driverPlates = new Set<string>()
-
-      driverByVehicleNumber.forEach((driverName, number) => {
-        if (words.every(word => driverName.toLowerCase().includes(word))) driverPlates.add(normalizePlate(number))
-      })
-
-      result = result.filter(
-        expense =>
-          matchesVehicle(expense, filterVehicle) ||
-          (!!expense.vehicleNumber && driverPlates.has(normalizePlate(expense.vehicleNumber)))
-      )
+      result = result.filter(expense => matchesVehicle(expense, filterVehicle) || matchesDriver(expense, filterVehicle))
     }
     if (filterDriver) result = result.filter(expense => matchesDriver(expense, filterDriver))
 
@@ -399,7 +388,7 @@ const ExpenseListView = () => {
     })
 
     return result
-  }, [expenses, searchQuery, filterType, filterStatus, filterVehicle, filterDriver, driverByVehicleNumber, order, orderBy])
+  }, [expenses, searchQuery, filterType, filterStatus, filterVehicle, filterDriver, order, orderBy])
 
   // A filter change can leave the table on a page that no longer exists, which
   // showed "No expenses found" even though there were matches on page one.

@@ -37,6 +37,8 @@ import { createExpenseWithReceipt } from '@/libs/actions/expense.actions'
 import { getAllTrips } from '@/libs/actions/trip.actions'
 import { getAllVehicles } from '@/libs/actions/vehicle.actions'
 import VehicleSelect from '@/components/edms/VehicleSelect'
+import ExpenseDriverField from './ExpenseDriverField'
+import type { ExpenseDriver } from './ExpenseDriverField'
 
 // Type Imports
 import type { 
@@ -122,6 +124,8 @@ const ExpenseCreateForm = () => {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatusType>('paid')
   const [tripId, setTripId] = useState<string>(tripIdFromUrl || '')
   const [vehicleId, setVehicleId] = useState<string>(vehicleIdFromUrl || '')
+  const [driver, setDriver] = useState<ExpenseDriver | null>(null)
+  const [driverAuto, setDriverAuto] = useState<boolean>(true)
   const [isRecurring, setIsRecurring] = useState<boolean>(false)
   const [recurringFrequency, setRecurringFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly')
 
@@ -227,6 +231,8 @@ const ExpenseCreateForm = () => {
         receiptNumber: receiptNumber.trim() || undefined,
         tripId: tripId || undefined,
         vehicleId: vehicleId || undefined,
+        driverId: driver?.id || null,
+        driverName: driver?.name || null,
         paymentMethod,
         paymentStatus,
         isRecurring,
@@ -495,6 +501,20 @@ const ExpenseCreateForm = () => {
                         disabled={dataLoading}
                         noOptionsText='No active vehicle matches'
                         onChange={selectedVehicleId => setVehicleId(selectedVehicleId)}
+                      />
+                    </Grid>
+                    {/* Driver the expense was for */}
+                    <Grid item xs={12}>
+                      <ExpenseDriverField
+                        vehicleId={vehicleId}
+                        expenseDate={expenseDate.toISOString()}
+                        value={driver}
+                        auto={driverAuto}
+                        disabled={dataLoading}
+                        onChange={(selected, auto) => {
+                          setDriver(selected)
+                          setDriverAuto(auto)
+                        }}
                       />
                     </Grid>
                   </Grid>
