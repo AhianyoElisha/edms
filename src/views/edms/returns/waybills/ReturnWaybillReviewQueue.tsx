@@ -43,6 +43,7 @@ import {
   getReturnWaybillsAwaitingVerification,
   verifyReturnWaybillDetails
 } from '@/libs/actions/returnwaybill.actions'
+import { getCompanies } from '@/libs/actions/company.actions'
 
 const RETURN_REASONS: { value: ReturnReasonType; label: string }[] = [
   { value: 'customer_return', label: 'Customer Return' },
@@ -103,7 +104,7 @@ const locationOption = (location: any) =>
   location && typeof location === 'object' && location.$id ? { id: location.$id, label: locationName(location) } : null
 
 // The dropdown filters, same idea as the manifest review queue
-const FILTERS: QueueFilterDef<any>[] = [
+const BASE_FILTERS: QueueFilterDef<any>[] = [
   {
     param: 'tripId',
     label: 'Trip',
@@ -176,14 +177,20 @@ const ReturnWaybillReviewQueue = () => {
   const [savingId, setSavingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [lightbox, setLightbox] = useState<string | null>(null)
+  const [companyNames, setCompanyNames] = useState<Record<string, string>>({})
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
 
   const loadQueue = useCallback(async () => {
     try {
       setLoading(true)
-      const data = await getReturnWaybillsAwaitingVerification()
+      // Company names arrive with the queue so the Company filter can label its options
+      const [data, companyList] = await Promise.all([
+        getReturnWaybillsAwaitingVerification(),
+        getCompanies().catch(() => [])
+      ])
 
+      setCompanyNames(Object.fromEntries(companyList.map(company => [company.$id, company.name])))
       setWaybills(data)
     } catch (error: any) {
       console.error('Error loading return review queue:', error)
@@ -198,7 +205,24 @@ const ReturnWaybillReviewQueue = () => {
   }, [loadQueue])
 
   // Dropdown and date filters live in the URL (existing ?tripId= links keep working)
-  const filters = useQueueFilters(waybills, FILTERS, w => w.returnDate || w.$createdAt)
+  // A return belongs to the company of the trip it came back on
+  const filterDefs = useMemo<QueueFilterDef<any>[]>(
+    () => [
+      ...BASE_FILTERS,
+      {
+        param: 'company',
+        label: 'Company',
+        pick: w => {
+          const companyId = tripOf(w)?.companyId
+
+          return companyId ? { id: companyId, label: companyNames[companyId] || 'Unknown company' } : null
+        }
+      }
+    ],
+    [companyNames]
+  )
+
+  const filters = useQueueFilters(waybills, filterDefs, w => w.returnDate || w.$createdAt)
 
   const visibleWaybills = useMemo(() => {
     let rows = filters.filtered
@@ -215,6 +239,7 @@ const ReturnWaybillReviewQueue = () => {
           trip?.driver?.name,
           trip?.vehicle?.vehicleNumber,
           trip?.route?.routeName,
+          companyNames[trip?.companyId],
           locationName(w.dropofflocation),
           locationName(w.pickuplocation)
         ]
@@ -224,7 +249,7 @@ const ReturnWaybillReviewQueue = () => {
     }
 
     return rows
-  }, [filters.filtered, search])
+  }, [filters.filtered, search, companyNames])
 
   // One page at a time: drawing every card (a photo and several inputs each) at once
   // made the page slow to open and to type in
@@ -342,7 +367,7 @@ const ReturnWaybillReviewQueue = () => {
             bar={filters.bar}
             search={search}
             onSearchChange={setSearch}
-            searchPlaceholder='Search by waybill, trip, driver, vehicle, route or location…'
+            searchPlaceholder='Search by waybill, trip, driver, vehicle, route, company or location…'
             shown={visibleWaybills.length}
             total={waybills.length}
             noun='returns'
