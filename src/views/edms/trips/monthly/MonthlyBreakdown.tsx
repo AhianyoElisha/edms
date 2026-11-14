@@ -46,7 +46,7 @@ import { useUrlFilters } from '@/hooks/useUrlFilters'
 import { usePermissions } from '@/hooks/usePermissions'
 
 // Action Imports
-import { listTripsAroundMonth, setTripsInvoiceMonth } from '@/libs/actions/tripMonth.actions'
+import { listTripsAroundMonth, setTripsBilling, setTripsInvoiceMonth } from '@/libs/actions/tripMonth.actions'
 
 // Util Imports
 import { monthKey, monthLabel, parseMonthKey, shiftMonthKey } from '@/utils/invoiceMonth'
@@ -55,7 +55,7 @@ import type { BreakdownTrip } from './breakdown'
 
 // Only what the page shows; the relationship fields keep each page of results small
 const TRIP_FIELDS = [
-  '$id', 'tripNumber', 'tripDate', 'status', 'tripCost', 'clientRate', 'tonnage', 'companyId', 'billingMonth',
+  '$id', 'tripNumber', 'tripDate', 'status', 'tripCost', 'clientRate', 'tonnage', 'companyId', 'billingMonth', 'invoiceGenerated', 'paymentStatus',
   'driver.$id', 'driver.name', 'vehicle.$id', 'vehicle.vehicleNumber', 'route.$id', 'route.routeName',
   'manifests.status', 'manifests.deliveryTime', 'manifests.packageCount', 'manifests.deliveredCount',
   'manifests.shortageCount', 'manifests.surplusCount', 'returnWaybills.packageCount'
@@ -191,6 +191,23 @@ const MonthlyBreakdown = () => {
     load()
   }
 
+  // Record that the ticked trips were invoiced to the client, paid, or neither
+  const bill = async (update: { invoiced: boolean; paid?: boolean }, done: string) => {
+    if (selectedTrips.length === 0) return
+
+    setSaving(true)
+
+    const result = await setTripsBilling(selectedTrips.map(trip => trip.$id), update)
+
+    setSaving(false)
+
+    if (result.changed > 0) toast.success(`${result.changed} trip${result.changed === 1 ? '' : 's'} ${done}`)
+    if (result.failed > 0) toast.error(`${result.failed} could not be changed: ${result.firstError}`)
+
+    setSelected(new Set())
+    load()
+  }
+
   const tripColumns: ExportColumn[] = [
     { header: 'Trip', accessor: (trip: BreakdownTrip) => trip.tripNumber, width: 24, excelWidth: 16 },
     { header: 'Trip date', accessor: (trip: BreakdownTrip) => day(trip.tripDate), width: 20, excelWidth: 14 },
@@ -202,7 +219,8 @@ const MonthlyBreakdown = () => {
       : []),
     { header: 'Status', accessor: (trip: BreakdownTrip) => statusLabel(trip.status), width: 20, excelWidth: 18 },
     { header: 'Closed', accessor: (trip: BreakdownTrip) => day(trip.closedAt), width: 20, excelWidth: 14 },
-    { header: 'Invoice month', accessor: (trip: BreakdownTrip) => monthLabel(trip.invoiceMonth), width: 22, excelWidth: 16 }
+    { header: 'Invoice month', accessor: (trip: BreakdownTrip) => monthLabel(trip.invoiceMonth), width: 22, excelWidth: 16 },
+    { header: 'Invoice', accessor: (trip: BreakdownTrip) => (trip.paid ? 'Paid' : trip.invoiced ? 'Invoiced' : 'Not invoiced'), width: 20, excelWidth: 14 }
   ]
 
   const driverExportRows = drivers.flatMap(driver =>
@@ -386,6 +404,34 @@ const MonthlyBreakdown = () => {
                   >
                     Put back in the month run
                   </Button>
+                  <span className='is-px bs-6 bg-[var(--mui-palette-divider)]' />
+                  <Button
+                    size='small'
+                    variant='outlined'
+                    color='info'
+                    disabled={saving || selectedTrips.length === 0}
+                    onClick={() => bill({ invoiced: true }, 'marked invoiced')}
+                  >
+                    Mark invoiced
+                  </Button>
+                  <Button
+                    size='small'
+                    variant='outlined'
+                    color='success'
+                    disabled={saving || selectedTrips.length === 0}
+                    onClick={() => bill({ invoiced: true, paid: true }, 'marked paid')}
+                  >
+                    Mark paid
+                  </Button>
+                  <Button
+                    size='small'
+                    variant='text'
+                    color='secondary'
+                    disabled={saving || selectedTrips.every(trip => !trip.invoiced)}
+                    onClick={() => bill({ invoiced: false }, 'set back to not invoiced')}
+                  >
+                    Not invoiced
+                  </Button>
                 </div>
               ) : (
                 <Typography variant='body2' color='text.secondary'>
@@ -415,12 +461,13 @@ const MonthlyBreakdown = () => {
                     <TableCell>Status</TableCell>
                     <TableCell>Closed</TableCell>
                     <TableCell>Invoice month</TableCell>
+                    <TableCell>Invoice</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {listed.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={10} align='center'>
+                      <TableCell colSpan={11} align='center'>
                         <Typography color='text.secondary' className='p-4'>
                           No trips here for {monthLabel(month)}
                         </Typography>
@@ -461,6 +508,17 @@ const MonthlyBreakdown = () => {
                           monthLabel(trip.invoiceMonth, 'short')
                         ) : (
                           <Chip size='small' variant='tonal' color='warning' label={`Moved to ${monthLabel(trip.invoiceMonth, 'short')}`} />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {trip.paid ? (
+                          <Chip size='small' variant='tonal' color='success' label='Paid' />
+                        ) : trip.invoiced ? (
+                          <Chip size='small' variant='tonal' color='info' label='Invoiced' />
+                        ) : (
+                          <Typography variant='body2' color='text.secondary'>
+                            Not invoiced
+                          </Typography>
                         )}
                       </TableCell>
                     </TableRow>

@@ -285,6 +285,11 @@ const DriverPerformanceReport = () => {
         <StatCard
           title='Total Expenses'
           value={`GH₵ ${reportData.summary.totalExpenses.toLocaleString()}`}
+          subtitle={
+            reportData.summary.unassignedExpenseCount > 0
+              ? `GH₵ ${Number(reportData.summary.unassignedExpenses).toLocaleString()} more names no driver`
+              : 'tied to a driver'
+          }
           icon='ri-wallet-3-line'
           color='warning'
         />
