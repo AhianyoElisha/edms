@@ -34,6 +34,10 @@ import { PickupLocationType, DropoffLocationType } from '@/types/apps/deliveryTy
 import { createManifest } from '@/libs/actions/manifest.actions'
 import { getAllPickupLocations } from '@/libs/actions/location.actions'
 import { getAllDropoffLocations } from '@/libs/actions/location.actions'
+import { getAllVehicles } from '@/libs/actions/vehicle.actions'
+
+// Component Imports
+import VehicleSelect from '@/components/edms/VehicleSelect'
 
 const CreateManifestForm = () => {
   const router = useRouter()
@@ -57,7 +61,8 @@ const CreateManifestForm = () => {
   // Data for dropdowns
   const [pickupLocations, setPickupLocations] = useState<PickupLocationType[]>([])
   const [dropoffLocations, setDropoffLocations] = useState<DropoffLocationType[]>([])
-  const [vehicles] = useState<VehicleType[]>([]) // TODO: Implement vehicle fetching
+  const [vehicles, setVehicles] = useState<VehicleType[]>([])
+  const [vehiclesLoading, setVehiclesLoading] = useState(true)
   const [drivers] = useState<any[]>([]) // TODO: Implement driver fetching
 
   // Fetch data on component mount
@@ -78,6 +83,12 @@ const CreateManifestForm = () => {
     }
 
     fetchData()
+
+    // Loaded on its own so a vehicle problem does not hide the locations
+    getAllVehicles({ status: 'active' })
+      .then(setVehicles)
+      .catch(error => console.error('Error fetching vehicles:', error))
+      .finally(() => setVehiclesLoading(false))
   }, [])
 
   const handleInputChange = (field: string, value: any) => {
@@ -272,25 +283,14 @@ const CreateManifestForm = () => {
             </Grid>
 
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Vehicle</InputLabel>
-                <Select
-                  value={formData.vehicle}
-                  onChange={(e) => handleInputChange('vehicle', e.target.value)}
-                  label="Vehicle"
-                >
-                  {vehicles.length === 0 && (
-                    <MenuItem disabled>
-                      <em>No vehicles available</em>
-                    </MenuItem>
-                  )}
-                  {vehicles.map((vehicle) => (
-                    <MenuItem key={vehicle.$id} value={vehicle.$id}>
-                      {vehicle.vehicleNumber} - {vehicle.vehicleType}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <VehicleSelect
+                vehicles={vehicles}
+                value={formData.vehicle}
+                required
+                loading={vehiclesLoading}
+                noOptionsText={vehiclesLoading ? 'Loading vehicles…' : 'No active vehicle matches'}
+                onChange={vehicleId => handleInputChange('vehicle', vehicleId)}
+              />
             </Grid>
 
             <Grid item xs={12} sm={6}>
