@@ -68,6 +68,7 @@ interface DeliveryRow {
   packageCount: number
   deliveredCount: number
   shortage: number
+  surplus: number
   awaitingReview: boolean
   deliveryTime: string | null
 }
@@ -79,6 +80,7 @@ interface DeliveryGroup {
   rows: DeliveryRow[]
   packages: number
   shortage: number
+  surplus: number
   awaitingReview: number
 }
 
@@ -103,6 +105,8 @@ const toRow = (manifest: any): DeliveryRow => {
     deliveredCount,
     // A shortage may be recorded on its own, or implied by delivered < total.
     shortage: manifest.shortageCount || (packageCount > 0 ? Math.max(0, packageCount - deliveredCount) : 0),
+    // Packages carried over and above the manifest
+    surplus: manifest.surplusCount || 0,
     awaitingReview: isManifestAwaitingVerification(manifest),
     deliveryTime: manifest.deliveryTime || manifest.arrivalTime || null
   }
@@ -189,13 +193,14 @@ const DeliveredPackagesTable = () => {
       let group = byKey.get(key)
 
       if (!group) {
-        group = { key, driver: row.driver, route: row.route, rows: [], packages: 0, shortage: 0, awaitingReview: 0 }
+        group = { key, driver: row.driver, route: row.route, rows: [], packages: 0, shortage: 0, surplus: 0, awaitingReview: 0 }
         byKey.set(key, group)
       }
 
       group.rows.push(row)
       group.packages += row.deliveredCount || row.packageCount
       group.shortage += row.shortage
+      group.surplus += row.surplus
       if (row.awaitingReview) group.awaitingReview++
     })
 
@@ -215,6 +220,7 @@ const DeliveredPackagesTable = () => {
 
   const totalPackages = useMemo(() => groups.reduce((sum, group) => sum + group.packages, 0), [groups])
   const totalShortage = useMemo(() => groups.reduce((sum, group) => sum + group.shortage, 0), [groups])
+  const totalSurplus = useMemo(() => groups.reduce((sum, group) => sum + group.surplus, 0), [groups])
 
   // Any filter change can leave the current page past the end.
   useEffect(() => {
@@ -243,6 +249,7 @@ const DeliveredPackagesTable = () => {
         'Total Packages': row.awaitingReview && !row.packageCount ? '' : row.packageCount,
         Delivered: row.awaitingReview && !row.packageCount ? '' : row.deliveredCount,
         Shortages: row.shortage,
+        Surplus: row.surplus,
         'Delivered At': formatDateTime(row.deliveryTime),
         Status: row.awaitingReview ? 'Awaiting office review' : 'Delivered'
       }))
@@ -334,6 +341,7 @@ const DeliveredPackagesTable = () => {
             />
             {totalPackages > 0 && <Chip label={`${totalPackages} packages`} variant='tonal' />}
             {totalShortage > 0 && <Chip label={`${totalShortage} short`} color='error' variant='tonal' />}
+            {totalSurplus > 0 && <Chip label={`${totalSurplus} extra`} color='warning' variant='tonal' />}
           </div>
           <div className='flex flex-wrap items-center gap-3 max-sm:is-full'>
             <Button
@@ -370,7 +378,7 @@ const DeliveredPackagesTable = () => {
                 <th>Trip / Vehicle</th>
                 <th>Company</th>
                 <th>Packages</th>
-                <th>Shortages</th>
+                <th>Short / Extra</th>
                 <th>Delivered At</th>
                 <th />
               </tr>
@@ -409,6 +417,9 @@ const DeliveredPackagesTable = () => {
                               )}
                               {group.shortage > 0 && (
                                 <Chip size='small' variant='tonal' color='error' label={`${group.shortage} short`} />
+                              )}
+                              {group.surplus > 0 && (
+                                <Chip size='small' variant='tonal' color='warning' label={`${group.surplus} extra`} />
                               )}
                               {group.awaitingReview > 0 && (
                                 <Chip
@@ -472,11 +483,13 @@ const DeliveredPackagesTable = () => {
                           )}
                         </td>
                         <td>
-                          {row.shortage > 0 ? (
-                            <Chip label={row.shortage} variant='tonal' color='error' size='small' />
-                          ) : (
-                            <Typography color='text.secondary'>—</Typography>
+                          {row.shortage > 0 && (
+                            <Chip label={`${row.shortage} short`} variant='tonal' color='error' size='small' />
                           )}
+                          {row.surplus > 0 && (
+                            <Chip label={`${row.surplus} extra`} variant='tonal' color='warning' size='small' />
+                          )}
+                          {row.shortage === 0 && row.surplus === 0 && <Typography color='text.secondary'>—</Typography>}
                         </td>
                         <td>
                           <Typography>{formatDateTime(row.deliveryTime)}</Typography>

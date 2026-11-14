@@ -56,6 +56,7 @@ export type PortalManifest = {
   packageCount: number
   deliveredCount: number
   shortageCount: number
+  surplusCount: number
   deliveryTime: string | null
   hasManifestPhoto: boolean
   hasDeliveryPhoto: boolean
@@ -173,7 +174,7 @@ export async function portalListManifests(jwt: string): Promise<PortalManifest[]
     Query.orderDesc('$createdAt'),
     Query.select([
       '$id', 'manifestNumber', 'manifestDate', 'status', 'packageSize', 'packageCount', 'deliveredCount',
-      'shortageCount', 'deliveryTime', 'manifestImage', 'proofOfDeliveryImage',
+      'shortageCount', 'surplusCount', 'deliveryTime', 'manifestImage', 'proofOfDeliveryImage',
       'trip.$id', 'trip.tripNumber', 'trip.status',
       'dropofflocation.locationName', 'dropofflocation.city', 'dropofflocation.address'
     ])
@@ -193,6 +194,7 @@ export async function portalListManifests(jwt: string): Promise<PortalManifest[]
       packageCount: manifest.packageCount || 0,
       deliveredCount: manifest.deliveredCount || 0,
       shortageCount: manifest.shortageCount || 0,
+      surplusCount: manifest.surplusCount || 0,
       deliveryTime: manifest.deliveryTime || null,
       hasManifestPhoto: !!manifest.manifestImage,
       hasDeliveryPhoto: !!manifest.proofOfDeliveryImage

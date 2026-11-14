@@ -37,6 +37,8 @@ const ATTRIBUTES = [
     [
       // Packages that did not arrive; recorded without needing a package count.
       { key: 'shortageCount', type: 'integer', required: false, min: 0 },
+      // Packages delivered over and above what the manifest lists (carried by mistake).
+      { key: 'surplusCount', type: 'integer', required: false, min: 0 },
       // The company the goods belong to - manifests are no longer Jumia-only.
       { key: 'clientName', type: 'string', size: 255, required: false }
     ]

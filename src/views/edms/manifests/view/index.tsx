@@ -417,7 +417,7 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                 This delivery was logged in the field with a photo. The office will enter the manifest number, package
                 size and quantity from the photo below.
               </Typography>
-              {(manifestData.clientName || manifestData.packageCount > 0 || manifestData.shortageCount > 0) && (
+              {(manifestData.clientName || manifestData.packageCount > 0 || manifestData.shortageCount > 0 || manifestData.surplusCount > 0) && (
                 <div className='flex flex-wrap gap-2 mt-2'>
                   {manifestData.clientName && (
                     <Chip size='small' variant='tonal' color='primary' label={manifestData.clientName} />
@@ -427,6 +427,9 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
                   )}
                   {manifestData.shortageCount > 0 && (
                     <Chip size='small' variant='tonal' color='error' label={`${manifestData.shortageCount} short`} />
+                  )}
+                  {manifestData.surplusCount > 0 && (
+                    <Chip size='small' variant='tonal' color='warning' label={`${manifestData.surplusCount} extra`} />
                   )}
                 </div>
               )}
@@ -454,6 +457,9 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
             )}
             {manifestData.shortageCount > 0 && (
               <Chip size='small' variant='tonal' color='error' label={`${manifestData.shortageCount} short`} />
+            )}
+            {manifestData.surplusCount > 0 && (
+              <Chip size='small' variant='tonal' color='warning' label={`${manifestData.surplusCount} extra`} />
             )}
           </div>
           

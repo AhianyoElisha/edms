@@ -353,6 +353,8 @@ export interface ManifestType {
   // Packages that did not arrive. Recorded on its own - it does not need a
   // packageCount to subtract from, because not every client's manifest has one.
   shortageCount?: number | null
+  // Packages delivered over and above what the manifest lists (carried by mistake)
+  surplusCount?: number | null
   // The company the goods belong to (JUMIA, CENTRAL POINT, ...). Manifests are no
   // longer assumed to be Jumia's.
   clientName?: string | null

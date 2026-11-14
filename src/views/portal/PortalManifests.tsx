@@ -194,6 +194,7 @@ const ManifestsTable = () => {
                   <TableCell align='right'>Packages</TableCell>
                   <TableCell align='right'>Delivered</TableCell>
                   <TableCell align='right'>Short</TableCell>
+                  <TableCell align='right'>Extra</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Delivered at</TableCell>
                   <TableCell align='right'>Photos</TableCell>
@@ -224,6 +225,7 @@ const ManifestsTable = () => {
                           '—'
                         )}
                       </TableCell>
+                      <TableCell align='right'>{manifest.surplusCount > 0 ? `+${manifest.surplusCount}` : '—'}</TableCell>
                       <TableCell>
                         <Chip size='small' variant='tonal' label={state.label} color={state.color as any} />
                       </TableCell>

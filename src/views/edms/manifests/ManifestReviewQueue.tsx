@@ -60,6 +60,7 @@ interface DraftDetails {
   packageSize: string
   packageCount: string
   shortageCount: string
+  surplusCount: string
 }
 
 // Start each form from whatever is already known: figures the driver typed at
@@ -72,7 +73,8 @@ const initialDraft = (manifest: any): DraftDetails => {
     clientName: manifest.clientName || trip?.rateCard?.clientName || '',
     packageSize: manifest.packageSize || '',
     packageCount: manifest.packageCount > 0 ? String(manifest.packageCount) : '',
-    shortageCount: manifest.shortageCount > 0 ? String(manifest.shortageCount) : ''
+    shortageCount: manifest.shortageCount > 0 ? String(manifest.shortageCount) : '',
+    surplusCount: manifest.surplusCount > 0 ? String(manifest.surplusCount) : ''
   }
 }
 
@@ -372,6 +374,7 @@ const ManifestReviewQueue = () => {
     // count - so only what was actually typed gets checked.
     const packageCount = parseOptionalCount(draft.packageCount)
     const shortageCount = parseOptionalCount(draft.shortageCount)
+    const surplusCount = parseOptionalCount(draft.surplusCount)
 
     if (packageCount === 'invalid') {
       toast.error('Total packages must be a whole number, or left blank')
@@ -381,6 +384,18 @@ const ManifestReviewQueue = () => {
 
     if (shortageCount === 'invalid') {
       toast.error('Shortages must be a whole number, or left blank')
+
+      return
+    }
+
+    if (surplusCount === 'invalid') {
+      toast.error('Surplus must be a whole number, or left blank')
+
+      return
+    }
+
+    if ((shortageCount ?? 0) > 0 && (surplusCount ?? 0) > 0) {
+      toast.error('Enter either shortages or surplus, not both')
 
       return
     }
@@ -401,7 +416,8 @@ const ManifestReviewQueue = () => {
           clientName: draft.clientName.trim(),
           packageSize: draft.packageSize || null,
           packageCount,
-          shortageCount
+          shortageCount,
+          surplusCount
         },
         user?.name || user?.email
       )
@@ -702,6 +718,19 @@ const ManifestReviewQueue = () => {
                             inputProps={{ min: 0 }}
                             disabled={!canVerify || isSaving}
                             helperText='Optional – packages missing'
+                          />
+                        </Grid>
+                        <Grid item xs={6} sm={4}>
+                          <TextField
+                            fullWidth
+                            size='small'
+                            type='number'
+                            label='Surplus'
+                            value={draft.surplusCount}
+                            onChange={e => updateDraft(manifest, 'surplusCount', e.target.value)}
+                            inputProps={{ min: 0 }}
+                            disabled={!canVerify || isSaving}
+                            helperText='Optional – extra packages carried'
                           />
                         </Grid>
                       </Grid>
