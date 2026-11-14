@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { ChangeEvent } from 'react'
-import logo from '@assets/mineral.png'
+import logo from '@assets/edsdark.png'
 
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
@@ -100,9 +100,24 @@ const GenericTableExportDialog = ({ open, setOpen, title, data, columns, summary
     setOpen(false)
   }
 
+  // The PDF's built-in fonts have no cedi sign: "GH₵" came out as "GH µ". The
+  // currency code prints correctly everywhere. (Excel keeps the sign.)
+  const pdfText = (value: string | number) =>
+    String(value)
+      .replace(/GH\s?₵\s?/g, 'GHS ')
+      .replace(/₵\s?/g, 'GHS ')
+      .replace(/\(GHS \)/g, '(GHS)')
+
   const exportToPDF = () => {
-    const doc = new jsPDF()
+    // A table with many columns is unreadable squeezed onto a portrait page
+    const doc = new jsPDF({ orientation: columns.length >= 9 ? 'landscape' : 'portrait' })
     const pageWidth = doc.internal.pageSize.width
+
+    // Column widths are given as proportions; stretch or shrink them to fill the
+    // space between the margins so a table neither runs off the page nor stops short
+    const tableMargin = 14
+    const givenWidth = columns.reduce((sum, col) => sum + (col.width || 0), 0)
+    const widthScale = columns.every(col => col.width) && givenWidth > 0 ? (pageWidth - tableMargin * 2) / givenWidth : 1
 
     const img = new Image()
     img.src = logo.src
@@ -115,8 +130,9 @@ const GenericTableExportDialog = ({ open, setOpen, title, data, columns, summary
       ctx?.drawImage(img, 0, 0)
       const logoBase64 = canvas.toDataURL('image/png')
 
-      const logoWidth = 50
+      // Kept in the logo's own proportions so it is not stretched
       const logoHeight = 30
+      const logoWidth = img.height > 0 ? (logoHeight * img.width) / img.height : 34
       doc.addImage(logoBase64, 'PNG', (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight)
 
       doc.setFontSize(16)
@@ -136,7 +152,7 @@ const GenericTableExportDialog = ({ open, setOpen, title, data, columns, summary
 
       doc.setFontSize(14)
       doc.setFont('helvetica', 'bold')
-      doc.text(title, 20, yPos + 10)
+      doc.text(pdfText(title), 20, yPos + 10)
       doc.setFontSize(11)
       doc.setFont('helvetica', 'normal')
       doc.text(`Generated: ${timestamp}`, pageWidth - 20 - doc.getStringUnitWidth(`Generated: ${timestamp}`) * 11 / doc.internal.scaleFactor, yPos + 10)
@@ -153,7 +169,7 @@ const GenericTableExportDialog = ({ open, setOpen, title, data, columns, summary
         doc.setFontSize(10)
         doc.setFont('helvetica', 'normal')
         summaryItems.forEach(item => {
-          doc.text(`${item.label}: ${item.value}`, 20, yPos)
+          doc.text(pdfText(`${item.label}: ${item.value}`), 20, yPos)
           yPos += 6
         })
         yPos += 4
@@ -161,19 +177,20 @@ const GenericTableExportDialog = ({ open, setOpen, title, data, columns, summary
         doc.line(20, yPos, pageWidth - 20, yPos)
       }
 
-      const tableHead = columns.map(col => col.header)
-      const tableBody = data.map(row => columns.map(col => String(col.accessor(row))))
+      const tableHead = columns.map(col => pdfText(col.header))
+      const tableBody = data.map(row => columns.map(col => pdfText(col.accessor(row))))
 
       autoTable(doc, {
         head: [tableHead],
         body: tableBody,
         startY: yPos + 5,
+        margin: { left: tableMargin, right: tableMargin },
         theme: 'grid',
         headStyles: { fillColor: [51, 51, 51] },
         styles: { halign: 'center', valign: 'middle', fontSize: 9 },
         columnStyles: Object.fromEntries(columns.map((col, i) => [i, {
           halign: col.align || 'left',
-          ...(col.width ? { cellWidth: col.width } : {})
+          ...(col.width ? { cellWidth: col.width * widthScale } : {})
         }]))
       })
 

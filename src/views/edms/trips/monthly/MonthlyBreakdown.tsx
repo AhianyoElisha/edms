@@ -240,18 +240,18 @@ const MonthlyBreakdown = () => {
   }
 
   const tripColumns: ExportColumn[] = [
-    { header: 'Trip', accessor: (trip: BreakdownTrip) => trip.tripNumber, width: 24, excelWidth: 16 },
-    { header: 'Trip date', accessor: (trip: BreakdownTrip) => day(trip.tripDate), width: 20, excelWidth: 14 },
-    { header: 'Driver', accessor: (trip: BreakdownTrip) => trip.driverName, width: 26, excelWidth: 22 },
-    { header: 'Vehicle', accessor: (trip: BreakdownTrip) => trip.vehicleNumber, width: 20, excelWidth: 14 },
-    { header: 'Route', accessor: (trip: BreakdownTrip) => trip.routeName, width: 34, excelWidth: 32 },
+    { header: 'Trip', accessor: (trip: BreakdownTrip) => trip.tripNumber, width: 20, excelWidth: 16 },
+    { header: 'Trip date', accessor: (trip: BreakdownTrip) => day(trip.tripDate), width: 16, excelWidth: 14 },
+    { header: 'Driver', accessor: (trip: BreakdownTrip) => trip.driverName, width: 22, excelWidth: 22 },
+    { header: 'Vehicle', accessor: (trip: BreakdownTrip) => trip.vehicleNumber, width: 16, excelWidth: 14 },
+    { header: 'Route', accessor: (trip: BreakdownTrip) => trip.routeName, width: 28, excelWidth: 32 },
     ...(canViewFinancials
-      ? [{ header: 'Price (GH₵)', accessor: (trip: BreakdownTrip) => (trip.earns ? trip.price.toFixed(2) : '0.00'), align: 'right' as const, width: 20, excelWidth: 14 }]
+      ? [{ header: 'Price (GH₵)', accessor: (trip: BreakdownTrip) => (trip.earns ? trip.price.toFixed(2) : '0.00'), align: 'right' as const, width: 16, excelWidth: 14 }]
       : []),
-    { header: 'Status', accessor: (trip: BreakdownTrip) => statusLabel(trip.status), width: 20, excelWidth: 18 },
-    { header: 'Closed', accessor: (trip: BreakdownTrip) => day(trip.closedAt), width: 20, excelWidth: 14 },
-    { header: 'Invoice month', accessor: (trip: BreakdownTrip) => `${monthLabel(trip.invoiceMonth)}${trip.invoicePeriod ? `, ${periodLabel(trip.invoicePeriod)}` : ''}`, width: 30, excelWidth: 24 },
-    { header: 'Invoice', accessor: (trip: BreakdownTrip) => (trip.paid ? 'Paid' : trip.invoiced ? 'Invoiced' : 'Not invoiced'), width: 20, excelWidth: 14 }
+    { header: 'Status', accessor: (trip: BreakdownTrip) => statusLabel(trip.status), width: 15, excelWidth: 18 },
+    { header: 'Closed', accessor: (trip: BreakdownTrip) => day(trip.closedAt), width: 16, excelWidth: 14 },
+    { header: 'Invoice month', accessor: (trip: BreakdownTrip) => `${monthLabel(trip.invoiceMonth)}${trip.invoicePeriod ? `, ${periodLabel(trip.invoicePeriod)}` : ''}`, width: 20, excelWidth: 24 },
+    { header: 'Invoice', accessor: (trip: BreakdownTrip) => (trip.paid ? 'Paid' : trip.invoiced ? 'Invoiced' : 'Not invoiced'), width: 13, excelWidth: 14 }
   ]
 
   const driverExportRows = drivers.flatMap(driver =>
@@ -259,14 +259,14 @@ const MonthlyBreakdown = () => {
   )
 
   const driverColumns: ExportColumn[] = [
-    { header: 'Driver', accessor: (row: any) => row.driverName, width: 28, excelWidth: 24 },
-    { header: 'Route', accessor: (row: any) => row.routeName, width: 40, excelWidth: 34 },
-    { header: 'Tonnage', accessor: (row: any) => row.tonnage || '-', align: 'right', width: 16, excelWidth: 10 },
-    { header: 'Trips', accessor: (row: any) => row.trips, align: 'right', width: 14, excelWidth: 8 },
+    { header: 'Driver', accessor: (row: any) => row.driverName, width: 34, excelWidth: 24 },
+    { header: 'Route', accessor: (row: any) => row.routeName, width: 60, excelWidth: 34 },
+    { header: 'Tonnage', accessor: (row: any) => row.tonnage || '-', align: 'right', width: 20, excelWidth: 10 },
+    { header: 'Trips', accessor: (row: any) => row.trips, align: 'right', width: 16, excelWidth: 8 },
     ...(canViewFinancials
       ? [
-          { header: 'Price (GH₵)', accessor: (row: any) => row.price.toFixed(2), align: 'right' as const, width: 20, excelWidth: 14 },
-          { header: 'Amount (GH₵)', accessor: (row: any) => row.amount.toFixed(2), align: 'right' as const, width: 22, excelWidth: 16 }
+          { header: 'Price (GH₵)', accessor: (row: any) => row.price.toFixed(2), align: 'right' as const, width: 24, excelWidth: 14 },
+          { header: 'Amount (GH₵)', accessor: (row: any) => row.amount.toFixed(2), align: 'right' as const, width: 28, excelWidth: 16 }
         ]
       : [])
   ]
@@ -274,13 +274,13 @@ const MonthlyBreakdown = () => {
   const lossRows = drivers.filter(driver => driver.packagesSent > 0 || driver.packagesShort > 0 || driver.packagesReturned > 0)
 
   const lossColumns: ExportColumn[] = [
-    { header: 'Driver', accessor: (row: any) => row.driverName, width: 30, excelWidth: 24 },
-    { header: 'Trips', accessor: (row: any) => row.trips + row.cancelled, align: 'right', width: 14, excelWidth: 8 },
-    { header: 'Packages loaded', accessor: (row: any) => row.packagesSent, align: 'right', width: 22, excelWidth: 16 },
-    { header: 'Delivered', accessor: (row: any) => row.packagesDelivered, align: 'right', width: 18, excelWidth: 12 },
-    { header: 'Short', accessor: (row: any) => row.packagesShort, align: 'right', width: 14, excelWidth: 8 },
-    { header: 'Extra', accessor: (row: any) => row.packagesExtra, align: 'right', width: 14, excelWidth: 8 },
-    { header: 'Returned', accessor: (row: any) => row.packagesReturned, align: 'right', width: 16, excelWidth: 10 }
+    { header: 'Driver', accessor: (row: any) => row.driverName, width: 52, excelWidth: 24 },
+    { header: 'Trips', accessor: (row: any) => row.trips + row.cancelled, align: 'right', width: 18, excelWidth: 8 },
+    { header: 'Packages loaded', accessor: (row: any) => row.packagesSent, align: 'right', width: 28, excelWidth: 16 },
+    { header: 'Delivered', accessor: (row: any) => row.packagesDelivered, align: 'right', width: 24, excelWidth: 12 },
+    { header: 'Short', accessor: (row: any) => row.packagesShort, align: 'right', width: 18, excelWidth: 8 },
+    { header: 'Extra', accessor: (row: any) => row.packagesExtra, align: 'right', width: 18, excelWidth: 8 },
+    { header: 'Returned', accessor: (row: any) => row.packagesReturned, align: 'right', width: 24, excelWidth: 10 }
   ]
 
   const exportSummary: ExportSummary[] = [
