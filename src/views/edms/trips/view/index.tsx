@@ -428,7 +428,7 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
         </Card>
       )}
 
-      {/* Office prompt: the driver has logged returns that still need their figures. */}
+      {/* Office prompt: the driver has logged returns the office has not checked yet. */}
       {!isDriver && returnsAwaitingReviewCount > 0 && (
         <Card className='mb-6 border border-warning'>
           <CardContent className='flex flex-col sm:flex-row sm:items-center gap-4'>
@@ -437,11 +437,11 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
             </Avatar>
             <div className='flex-1'>
               <Typography variant='h6'>
-                {returnsAwaitingReviewCount} return{returnsAwaitingReviewCount === 1 ? '' : 's'} awaiting your details
+                {returnsAwaitingReviewCount} return{returnsAwaitingReviewCount === 1 ? '' : 's'} awaiting review
               </Typography>
               <Typography variant='body2' color='text.secondary'>
                 The driver logged {returnsAwaitingReviewCount === 1 ? 'this return' : 'these returns'} with a photo of
-                the waybill. Enter the package count and reason to finish the record.
+                the waybill. Check the photo to finish the record.
               </Typography>
             </div>
             <Button
@@ -1058,10 +1058,8 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                       <TableRow>
                         <TableCell>Waybill Number</TableCell>
                         <TableCell>Status</TableCell>
-                        <TableCell>Return Reason</TableCell>
                         <TableCell>Pickup Location</TableCell>
                         <TableCell>Dropoff Location</TableCell>
-                        <TableCell>Package Count</TableCell>
                         <TableCell>Return Date</TableCell>
                         <TableCell align='right'>Actions</TableCell>
                       </TableRow>
@@ -1079,17 +1077,23 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Chip
-                                label={waybill.status?.replace('_', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
-                                variant='tonal'
-                                color={getStatusColor(waybill.status)}
-                                size='small'
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant='body2'>
-                                {waybill.returnReason?.replace('_', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || 'N/A'}
-                              </Typography>
+                              <div className='flex flex-wrap items-center gap-1'>
+                                <Chip
+                                  label={waybill.status?.replace('_', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                                  variant='tonal'
+                                  color={getStatusColor(waybill.status)}
+                                  size='small'
+                                />
+                                {isReturnWaybillAwaitingVerification(waybill) && (
+                                  <Chip
+                                    label={isDriver ? 'Waiting on the office' : 'Needs review'}
+                                    size='small'
+                                    color='warning'
+                                    variant='tonal'
+                                    icon={<i className='ri-error-warning-line' />}
+                                  />
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <Typography variant='body2'>
@@ -1104,21 +1108,6 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                                   ? dropoffLoc.locationName || dropoffLoc.address || dropoffLoc.city
                                   : dropoffLoc || 'N/A'}
                               </Typography>
-                            </TableCell>
-                            <TableCell>
-                              {isReturnWaybillAwaitingVerification(waybill) ? (
-                                <Chip
-                                  label={isDriver ? 'Pending office entry' : 'Needs review'}
-                                  size='small'
-                                  color='warning'
-                                  variant='tonal'
-                                  icon={<i className='ri-error-warning-line' />}
-                                />
-                              ) : (
-                                <Typography variant='body2'>
-                                  {waybill.packageCount || 0} packages
-                                </Typography>
-                              )}
                             </TableCell>
                             <TableCell>
                               <Typography variant='body2'>

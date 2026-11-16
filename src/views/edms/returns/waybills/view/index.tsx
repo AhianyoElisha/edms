@@ -57,44 +57,6 @@ const getStatusColor = (status: ReturnWaybillStatusType): 'default' | 'primary' 
   }
 }
 
-// Helper function to get reason label
-const getReasonLabel = (reason: string): string => {
-  const labels: Record<string, string> = {
-    'rejected': 'Customer Rejected',
-    'damaged': 'Damaged Package',
-    'wrong_delivery': 'Wrong Delivery',
-    'customer_return': 'Customer Return',
-    'other': 'Other Reason'
-  }
-  return labels[reason] || reason || 'Unknown'
-}
-
-// Helper function to get reason color
-const getReasonColor = (reason: string): 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' => {
-  switch (reason) {
-    case 'rejected':
-      return 'error'
-    case 'damaged':
-      return 'warning'
-    case 'wrong_delivery':
-      return 'info'
-    case 'customer_return':
-      return 'primary'
-    default:
-      return 'default'
-  }
-}
-
-// Package size labels
-const getPackageSizeLabel = (size: string): string => {
-  const labels: Record<string, string> = {
-    'small': 'Small Packages',
-    'medium': 'Medium Packages',
-    'big': 'Big Packages'
-  }
-  return labels[size] || size || 'Unknown'
-}
-
 interface ReturnWaybillViewProps {
   waybillData: ReturnWaybillType
   onRefetch?: () => Promise<void>
@@ -117,7 +79,7 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
   const router = useRouter()
   const { isDriver, hasAnyPermission } = usePermissions()
 
-  // Entering the package figures is the office's job, never the driver's.
+  // Checking field returns is the office's job, never the driver's.
   const canVerify = !isDriver && hasAnyPermission(['deliveries.edit', 'deliveries.manage'])
 
   // A return the driver logged in the field with only a photo - no count yet.
@@ -127,13 +89,6 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
   const trip = waybillData.trip
   const dropoffLocation = waybillData?.dropofflocation
   const pickupLocation = waybillData?.pickuplocation
-
-  // Parse packageDetails if it's a string
-  const packageDetails = waybillData.packageDetails 
-    ? (typeof waybillData.packageDetails === 'string' 
-        ? JSON.parse(waybillData.packageDetails) 
-        : waybillData.packageDetails)
-    : null
 
   // Check if waybill can be updated
   const isPending = waybillData.status === 'pending'
@@ -348,12 +303,6 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
                 color={getStatusColor(waybillData.status)}
                 size='small'
               />
-              <Chip
-                label={getReasonLabel(waybillData.returnReason)}
-                variant='tonal'
-                color={getReasonColor(waybillData.returnReason)}
-                size='small'
-              />
             </div>
             <div className='flex flex-wrap gap-2'>
               {isPending && (
@@ -449,22 +398,8 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
                     {waybillData.returnDate ? new Date(waybillData.returnDate).toLocaleDateString() : 'N/A'}
                   </Typography>
                 </Grid>
-                <Grid item xs={12} md={6}>
-                  <Typography color='text.secondary'>Package Count</Typography>
-                  {needsReview ? (
-                    <Chip
-                      label={isDriver ? 'Pending office entry' : 'Needs review'}
-                      size='small'
-                      color='warning'
-                      variant='tonal'
-                      icon={<i className='ri-error-warning-line' />}
-                    />
-                  ) : (
-                    <Typography className='font-medium'>{waybillData.packageCount || 0} packages</Typography>
-                  )}
-                </Grid>
 
-                {/* Field capture: the figures are not in yet, so say so instead of showing zeros. */}
+                {/* Field capture: the office has not checked the photo yet. */}
                 {needsReview && (
                   <Grid item xs={12}>
                     <Alert
@@ -478,65 +413,18 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
                             variant='contained'
                             onClick={() => router.push('/edms/returns/waybills/review')}
                           >
-                            Enter Details
+                            Review
                           </Button>
                         ) : undefined
                       }
                     >
-                      <Typography variant='subtitle2'>Package details pending</Typography>
+                      <Typography variant='subtitle2'>Waiting on the office</Typography>
                       <Typography variant='body2'>
-                        This return was logged in the field with a photo of the waybill. The office will enter the
-                        package count and confirm the reason from the photo.
+                        This return was logged in the field with a photo of the waybill. The office will check the
+                        photo.
                       </Typography>
                     </Alert>
                   </Grid>
-                )}
-                
-                {/* Package Details Breakdown */}
-                {packageDetails && !needsReview && (
-                  <>
-                    <Grid item xs={12}>
-                      <Typography variant='subtitle2' className='mb-2'>Package Breakdown:</Typography>
-                      <Box display='flex' gap={2} flexWrap='wrap'>
-                        {packageDetails.small > 0 && (
-                          <Chip 
-                            icon={<i className='ri-inbox-line' />}
-                            label={`Small: ${packageDetails.small}`} 
-                            variant='outlined' 
-                            color='info'
-                          />
-                        )}
-                        {packageDetails.medium > 0 && (
-                          <Chip 
-                            icon={<i className='ri-inbox-2-line' />}
-                            label={`Medium: ${packageDetails.medium}`} 
-                            variant='outlined' 
-                            color='primary'
-                          />
-                        )}
-                        {packageDetails.big > 0 && (
-                          <Chip 
-                            icon={<i className='ri-archive-line' />}
-                            label={`Big: ${packageDetails.big}`} 
-                            variant='outlined' 
-                            color='warning'
-                          />
-                        )}
-                      </Box>
-                    </Grid>
-                  </>
-                )}
-
-                {waybillData.reasonNotes && (
-                  <>
-                    <Grid item xs={12}>
-                      <Divider />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Typography color='text.secondary'>Reason Notes</Typography>
-                      <Typography className='font-medium'>{waybillData.reasonNotes}</Typography>
-                    </Grid>
-                  </>
                 )}
 
                 {waybillData.notes && (

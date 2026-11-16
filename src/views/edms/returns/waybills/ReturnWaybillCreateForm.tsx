@@ -12,7 +12,6 @@ import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import MenuItem from '@mui/material/MenuItem'
-import Divider from '@mui/material/Divider'
 import Alert from '@mui/material/Alert'
 import Chip from '@mui/material/Chip'
 import Box from '@mui/material/Box'
@@ -30,8 +29,6 @@ import { toast } from 'react-toastify'
 // Type Imports
 import type { 
   ReturnWaybillInput, 
-  ReturnReasonType, 
-  PackageBreakdown,
   TripType,
   PickupLocationType,
   DropoffLocationType
@@ -46,14 +43,6 @@ import { getRouteDropoffLocations } from '@/libs/actions/route.actions'
 interface ReturnWaybillCreateFormProps {
   tripId?: string
 }
-
-const returnReasons: { value: ReturnReasonType; label: string }[] = [
-  { value: 'rejected', label: 'Rejected by Customer' },
-  { value: 'damaged', label: 'Damaged Goods' },
-  { value: 'wrong_delivery', label: 'Wrong Delivery' },
-  { value: 'customer_return', label: 'Customer Return' },
-  { value: 'other', label: 'Other' }
-]
 
 const ReturnWaybillCreateForm = ({ tripId: initialTripId }: ReturnWaybillCreateFormProps) => {
   const router = useRouter()
@@ -82,12 +71,6 @@ const ReturnWaybillCreateForm = ({ tripId: initialTripId }: ReturnWaybillCreateF
   const [dropoffLocationId, setDropoffLocationId] = useState(preselectedDropoffId || '')
   const [pickupLocationId, setPickupLocationId] = useState('')
   const [returnDate, setReturnDate] = useState<dayjs.Dayjs | null>(dayjs())
-  const [returnReason, setReturnReason] = useState<ReturnReasonType>('rejected')
-  const [reasonNotes, setReasonNotes] = useState('')
-  const [packageCount, setPackageCount] = useState('')
-  const [smallPackages, setSmallPackages] = useState('')
-  const [mediumPackages, setMediumPackages] = useState('')
-  const [bigPackages, setBigPackages] = useState('')
   const [notes, setNotes] = useState('')
 
   // Load initial data
@@ -210,54 +193,23 @@ const ReturnWaybillCreateForm = ({ tripId: initialTripId }: ReturnWaybillCreateF
     loadData()
   }, [preselectedTripId, preselectedDropoffId])
 
-  // Calculate total package count from breakdown
-  useEffect(() => {
-    const small = parseInt(smallPackages) || 0
-    const medium = parseInt(mediumPackages) || 0
-    const big = parseInt(bigPackages) || 0
-    
-    if (small > 0 || medium > 0 || big > 0) {
-      setPackageCount((small + medium + big).toString())
-    }
-  }, [smallPackages, mediumPackages, bigPackages])
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // Validation
-    if (!tripId || !dropoffLocationId || !pickupLocationId || !returnDate || !packageCount) {
+    if (!tripId || !dropoffLocationId || !pickupLocationId || !returnDate) {
       toast.error('Please fill in all required fields')
-      return
-    }
-
-    const count = parseInt(packageCount)
-    if (isNaN(count) || count <= 0) {
-      toast.error('Please enter a valid package count')
       return
     }
 
     try {
       setSubmitting(true)
 
-      // Build package details if breakdown is provided
-      let packageDetails: PackageBreakdown | undefined
-      const small = parseInt(smallPackages) || 0
-      const medium = parseInt(mediumPackages) || 0
-      const big = parseInt(bigPackages) || 0
-      
-      if (small > 0 || medium > 0 || big > 0) {
-        packageDetails = { small, medium, big }
-      }
-
       const waybillData: ReturnWaybillInput = {
         tripId,
         dropoffLocationId,
         pickupLocationId,
         returnDate: returnDate.toISOString(),
-        returnReason,
-        reasonNotes: reasonNotes.trim() || undefined,
-        packageCount: count,
-        packageDetails,
         manifestId: manifestId || undefined,
         notes: notes.trim() || undefined
       }
@@ -496,101 +448,6 @@ const ReturnWaybillCreateForm = ({ tripId: initialTripId }: ReturnWaybillCreateF
                           helperText: 'Date the return was initiated'
                         }
                       }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      select
-                      label='Return Reason *'
-                      value={returnReason}
-                      onChange={e => setReturnReason(e.target.value as ReturnReasonType)}
-                    >
-                      {returnReasons.map(reason => (
-                        <MenuItem key={reason.value} value={reason.value}>
-                          {reason.label}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={2}
-                      label='Reason Notes'
-                      placeholder='Additional details about the return reason...'
-                      value={reasonNotes}
-                      onChange={e => setReasonNotes(e.target.value)}
-                    />
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Package Information */}
-          <Grid item xs={12}>
-            <Card>
-              <CardContent>
-                <Typography variant='h6' className='mb-4'>
-                  Package Information
-                </Typography>
-                <Typography variant='body2' color='text.secondary' className='mb-4'>
-                  Enter total package count or provide breakdown by size
-                </Typography>
-                <Grid container spacing={4}>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      type='number'
-                      label='Total Package Count *'
-                      placeholder='10'
-                      value={packageCount}
-                      onChange={e => setPackageCount(e.target.value)}
-                      inputProps={{ min: 1 }}
-                      helperText='Total number of packages being returned'
-                    />
-                  </Grid>
-                </Grid>
-                
-                <Divider className='my-4' />
-                
-                <Typography variant='subtitle2' className='mb-4'>
-                  Package Breakdown (Optional)
-                </Typography>
-                <Grid container spacing={4}>
-                  <Grid item xs={12} md={4}>
-                    <TextField
-                      fullWidth
-                      type='number'
-                      label='Small Packages'
-                      placeholder='0'
-                      value={smallPackages}
-                      onChange={e => setSmallPackages(e.target.value)}
-                      inputProps={{ min: 0 }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={4}>
-                    <TextField
-                      fullWidth
-                      type='number'
-                      label='Medium Packages'
-                      placeholder='0'
-                      value={mediumPackages}
-                      onChange={e => setMediumPackages(e.target.value)}
-                      inputProps={{ min: 0 }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={4}>
-                    <TextField
-                      fullWidth
-                      type='number'
-                      label='Big Packages'
-                      placeholder='0'
-                      value={bigPackages}
-                      onChange={e => setBigPackages(e.target.value)}
-                      inputProps={{ min: 0 }}
                     />
                   </Grid>
                 </Grid>

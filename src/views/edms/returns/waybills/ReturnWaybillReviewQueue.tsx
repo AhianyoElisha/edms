@@ -11,13 +11,9 @@ import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
 import Grid from '@mui/material/Grid'
-import TextField from '@mui/material/TextField'
-import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
 import Box from '@mui/material/Box'
-import Divider from '@mui/material/Divider'
-import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
 import DialogContent from '@mui/material/DialogContent'
@@ -35,34 +31,12 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { QueueFilterBar, useQueueFilters } from '@/components/edms/QueueFilters'
 import type { QueueFilterDef } from '@/components/edms/QueueFilters'
 
-// Type Imports
-import type { ReturnReasonType } from '@/types/apps/deliveryTypes'
-
 // Action Imports
 import {
   getReturnWaybillsAwaitingVerification,
   verifyReturnWaybillDetails
 } from '@/libs/actions/returnwaybill.actions'
 import { getCompanies } from '@/libs/actions/company.actions'
-
-const RETURN_REASONS: { value: ReturnReasonType; label: string }[] = [
-  { value: 'customer_return', label: 'Customer Return' },
-  { value: 'rejected', label: 'Rejected by Customer' },
-  { value: 'damaged', label: 'Damaged Goods' },
-  { value: 'wrong_delivery', label: 'Wrong Delivery' },
-  { value: 'other', label: 'Other' }
-]
-
-interface DraftDetails {
-  returnReason: string
-  packageCount: string
-  small: string
-  medium: string
-  big: string
-  reasonNotes: string
-}
-
-const emptyDraft: DraftDetails = { returnReason: '', packageCount: '', small: '', medium: '', big: '', reasonNotes: '' }
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return '—'
@@ -147,14 +121,6 @@ const BASE_FILTERS: QueueFilterDef<any>[] = [
   },
   { param: 'fromId', label: 'Returned from', pick: w => locationOption(w.dropofflocation) },
   { param: 'toId', label: 'Returning to', pick: w => locationOption(w.pickuplocation) },
-  {
-    param: 'reason',
-    label: 'Reason',
-    pick: w =>
-      w.returnReason
-        ? { id: w.returnReason, label: RETURN_REASONS.find(r => r.value === w.returnReason)?.label || w.returnReason }
-        : null
-  },
   { param: 'status', label: 'Status', pick: w => (w.status ? { id: w.status, label: statusLabel(w.status) } : null) }
 ]
 
@@ -162,19 +128,17 @@ const BASE_FILTERS: QueueFilterDef<any>[] = [
  * The back office's catch-up screen for returns.
  *
  * Drivers log a return in the field with nothing but a photo of the paper
- * waybill, which leaves the package count and reason blank. This queue lists
- * every one of those waybills, photo beside the fields, so an admin can work
- * through them without opening a trip at a time.
+ * waybill. This queue lists every one of those waybills so an admin can check
+ * the photos without opening a trip at a time.
  */
 const ReturnWaybillReviewQueue = () => {
   const { user, hasAnyPermission, isDriver, isLoading: permissionsLoading } = usePermissions()
 
-  // Entering the figures is the office's job - drivers never see this queue.
+  // Checking returns is the office's job - drivers never see this queue.
   const canVerify = !isDriver && hasAnyPermission(['deliveries.edit', 'deliveries.manage'])
 
   const [waybills, setWaybills] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [drafts, setDrafts] = useState<Record<string, DraftDetails>>({})
   const [savingId, setSavingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [lightbox, setLightbox] = useState<string | null>(null)
@@ -271,60 +235,17 @@ const ReturnWaybillReviewQueue = () => {
     filters.clear()
   }
 
-  const draftFor = (waybill: any): DraftDetails => drafts[waybill.$id] || { ...emptyDraft, returnReason: waybill.returnReason || '' }
-
-  const updateDraft = (waybill: any, field: keyof DraftDetails, value: string) => {
-    setDrafts(prev => ({ ...prev, [waybill.$id]: { ...draftFor(waybill), ...(prev[waybill.$id] || {}), [field]: value } }))
-  }
-
   const handleVerify = async (waybill: any) => {
-    const draft = draftFor(waybill)
-    const small = parseInt(draft.small, 10) || 0
-    const medium = parseInt(draft.medium, 10) || 0
-    const big = parseInt(draft.big, 10) || 0
-    const breakdownTotal = small + medium + big
-
-    // Either a plain total or a size breakdown is fine - whichever the paper gives.
-    const packageCount = draft.packageCount.trim() ? parseInt(draft.packageCount, 10) : breakdownTotal
-
-    if (!Number.isFinite(packageCount) || packageCount < 1) {
-      toast.error('Enter the number of packages coming back')
-
-      return
-    }
-
-    if (breakdownTotal > 0 && breakdownTotal !== packageCount) {
-      toast.error(`The size breakdown adds up to ${breakdownTotal}, not ${packageCount}`)
-
-      return
-    }
-
     try {
       setSavingId(waybill.$id)
 
-      await verifyReturnWaybillDetails(
-        waybill.$id,
-        {
-          packageCount,
-          packageDetails: breakdownTotal > 0 ? { small, medium, big } : undefined,
-          returnReason: (draft.returnReason as ReturnReasonType) || undefined,
-          reasonNotes: draft.reasonNotes.trim() || undefined
-        },
-        user?.name || user?.email
-      )
+      await verifyReturnWaybillDetails(waybill.$id, {}, user?.name || user?.email)
 
-      toast.success('Return waybill details saved')
+      toast.success('Return marked as checked')
       setWaybills(prev => prev.filter(w => w.$id !== waybill.$id))
-      setDrafts(prev => {
-        const next = { ...prev }
-
-        delete next[waybill.$id]
-
-        return next
-      })
     } catch (error: any) {
       console.error('Error verifying return waybill:', error)
-      toast.error(error?.message || 'Could not save the return waybill details')
+      toast.error(error?.message || 'Could not mark the return as checked')
     } finally {
       setSavingId(null)
     }
@@ -348,7 +269,7 @@ const ReturnWaybillReviewQueue = () => {
           <div className='flex-1'>
             <Typography variant='h5'>Returns Awaiting Review</Typography>
             <Typography variant='body2' color='text.secondary'>
-              Returns drivers logged in the field. Read the figures off each waybill photo and complete the record.
+              Returns drivers logged in the field. Check each waybill photo and mark it as checked.
             </Typography>
           </div>
           <Chip
@@ -394,7 +315,7 @@ const ReturnWaybillReviewQueue = () => {
                 <i className='ri-checkbox-circle-line text-6xl text-success' />
                 <Typography variant='h6'>Nothing waiting on you</Typography>
                 <Typography variant='body2' color='text.secondary'>
-                  Every logged return has its package details recorded.
+                  Every logged return has been checked.
                 </Typography>
               </>
             )}
@@ -404,7 +325,6 @@ const ReturnWaybillReviewQueue = () => {
         <div className='flex flex-col gap-6'>
           {pagedWaybills.map(waybill => {
             const trip = typeof waybill.trip === 'object' ? waybill.trip : null
-            const draft = draftFor(waybill)
             const photo = waybill.waybillImage || waybill.proofOfDelivery
             const isSaving = savingId === waybill.$id
 
@@ -477,89 +397,6 @@ const ReturnWaybillReviewQueue = () => {
                         {waybill.receivedBy ? ` • received by ${waybill.receivedBy}` : ''}
                       </Typography>
 
-                      <Divider className='mb-4' />
-
-                      <Grid container spacing={3}>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            select
-                            fullWidth
-                            size='small'
-                            label='Return Reason'
-                            value={draft.returnReason}
-                            onChange={e => updateDraft(waybill, 'returnReason', e.target.value)}
-                            disabled={!canVerify || isSaving}
-                            helperText='The driver picked one on the road; correct it from the paper'
-                          >
-                            {RETURN_REASONS.map(reason => (
-                              <MenuItem key={reason.value} value={reason.value}>
-                                {reason.label}
-                              </MenuItem>
-                            ))}
-                          </TextField>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            size='small'
-                            type='number'
-                            label='Total Packages'
-                            value={draft.packageCount}
-                            onChange={e => updateDraft(waybill, 'packageCount', e.target.value)}
-                            inputProps={{ min: 1 }}
-                            disabled={!canVerify || isSaving}
-                            helperText='Or fill in the size breakdown below'
-                          />
-                        </Grid>
-                        <Grid item xs={4}>
-                          <TextField
-                            fullWidth
-                            size='small'
-                            type='number'
-                            label='Small'
-                            value={draft.small}
-                            onChange={e => updateDraft(waybill, 'small', e.target.value)}
-                            inputProps={{ min: 0 }}
-                            disabled={!canVerify || isSaving}
-                          />
-                        </Grid>
-                        <Grid item xs={4}>
-                          <TextField
-                            fullWidth
-                            size='small'
-                            type='number'
-                            label='Medium'
-                            value={draft.medium}
-                            onChange={e => updateDraft(waybill, 'medium', e.target.value)}
-                            inputProps={{ min: 0 }}
-                            disabled={!canVerify || isSaving}
-                          />
-                        </Grid>
-                        <Grid item xs={4}>
-                          <TextField
-                            fullWidth
-                            size='small'
-                            type='number'
-                            label='Big'
-                            value={draft.big}
-                            onChange={e => updateDraft(waybill, 'big', e.target.value)}
-                            inputProps={{ min: 0 }}
-                            disabled={!canVerify || isSaving}
-                          />
-                        </Grid>
-                        <Grid item xs={12}>
-                          <TextField
-                            fullWidth
-                            size='small'
-                            label='Reason Notes'
-                            placeholder='Anything written on the waybill worth keeping'
-                            value={draft.reasonNotes}
-                            onChange={e => updateDraft(waybill, 'reasonNotes', e.target.value)}
-                            disabled={!canVerify || isSaving}
-                          />
-                        </Grid>
-                      </Grid>
-
                       <div className='flex flex-wrap gap-2 mt-4'>
                         <Button
                           variant='contained'
@@ -569,7 +406,7 @@ const ReturnWaybillReviewQueue = () => {
                             isSaving ? <CircularProgress size={16} color='inherit' /> : <i className='ri-check-line' />
                           }
                         >
-                          {isSaving ? 'Saving…' : 'Save & Verify'}
+                          {isSaving ? 'Saving…' : 'Mark as Checked'}
                         </Button>
                         <Button variant='outlined' href={`/edms/returns/waybills/${waybill.$id}`}>
                           Open Waybill

@@ -59,7 +59,6 @@ export type BreakdownTrip = {
   packagesDelivered: number
   packagesShort: number
   packagesExtra: number
-  packagesReturned: number
 }
 
 const DELIVERED = new Set(['delivered', 'completed'])
@@ -113,8 +112,6 @@ export const toBreakdownTrip = (trip: any, month: string, cutoffDay: number | nu
     short += number(m.shortageCount) || (count > 0 && got > 0 ? Math.max(0, count - got) : 0)
   })
 
-  const returns: any[] = Array.isArray(trip.returnWaybills) ? trip.returnWaybills.filter((r: any) => r && typeof r === 'object') : []
-
   return {
     $id: trip.$id,
     tripNumber: trip.tripNumber || '',
@@ -146,8 +143,7 @@ export const toBreakdownTrip = (trip: any, month: string, cutoffDay: number | nu
     packagesSent: sent,
     packagesDelivered: deliveredPackages,
     packagesShort: short,
-    packagesExtra: extra,
-    packagesReturned: returns.reduce((sum, r) => sum + number(r.packageCount), 0)
+    packagesExtra: extra
   }
 }
 
@@ -166,7 +162,6 @@ export type DriverBreakdown = {
   packagesDelivered: number
   packagesShort: number
   packagesExtra: number
-  packagesReturned: number
   tripsWithShortage: BreakdownTrip[]
 }
 
@@ -190,7 +185,6 @@ export const byDriver = (trips: BreakdownTrip[]): DriverBreakdown[] => {
         packagesDelivered: 0,
         packagesShort: 0,
         packagesExtra: 0,
-        packagesReturned: 0,
         tripsWithShortage: []
       })
     }
@@ -201,7 +195,6 @@ export const byDriver = (trips: BreakdownTrip[]): DriverBreakdown[] => {
     driver.packagesDelivered += trip.packagesDelivered
     driver.packagesShort += trip.packagesShort
     driver.packagesExtra += trip.packagesExtra
-    driver.packagesReturned += trip.packagesReturned
     if (trip.packagesShort > 0) driver.tripsWithShortage.push(trip)
 
     if (!trip.earns) {

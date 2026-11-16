@@ -37,7 +37,7 @@ import type { ColumnDef, FilterFn } from '@tanstack/react-table'
 import { toast } from 'react-toastify'
 
 // Type Imports
-import type { ReturnWaybillType, ReturnWaybillStatusType, ReturnReasonType } from '@/types/apps/deliveryTypes'
+import type { ReturnWaybillType, ReturnWaybillStatusType } from '@/types/apps/deliveryTypes'
 
 // Component Imports
 import Link from '@/components/Link'
@@ -86,23 +86,6 @@ const getStatusColor = (status: ReturnWaybillStatusType) => {
   }
 }
 
-const getReasonLabel = (reason: ReturnReasonType) => {
-  switch (reason) {
-    case 'rejected':
-      return 'Rejected'
-    case 'damaged':
-      return 'Damaged'
-    case 'wrong_delivery':
-      return 'Wrong Delivery'
-    case 'customer_return':
-      return 'Customer Return'
-    case 'other':
-      return 'Other'
-    default:
-      return reason
-  }
-}
-
 const ReturnWaybillOverviewTable = () => {
   const { hasPermission } = usePermissions()
   // Hooks
@@ -113,7 +96,6 @@ const ReturnWaybillOverviewTable = () => {
   const [loading, setLoading] = useState(true)
   const [globalFilter, setGlobalFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [reasonFilter, setReasonFilter] = useState<string>('all')
 
   // Company is kept in the URL, like on the Trips and Manifests lists, so links can carry it
   const { searchParams, setParam } = useUrlFilters()
@@ -134,9 +116,6 @@ const ReturnWaybillOverviewTable = () => {
         if (statusFilter !== 'all') {
           filters.status = statusFilter
         }
-        if (reasonFilter !== 'all') {
-          filters.returnReason = reasonFilter
-        }
         
         const waybills = await getAllReturnWaybills(Object.keys(filters).length > 0 ? filters : undefined)
         setWaybillData(waybills)
@@ -148,7 +127,7 @@ const ReturnWaybillOverviewTable = () => {
     }
 
     loadWaybills()
-  }, [statusFilter, reasonFilter])
+  }, [statusFilter])
 
   const handleMarkInTransit = async (waybillId: string) => {
     try {
@@ -300,41 +279,26 @@ const ReturnWaybillOverviewTable = () => {
           )
         }
       }),
-      columnHelper.accessor('packageCount', {
-        header: 'Packages',
-        cell: ({ row }) =>
-          isReturnWaybillAwaitingVerification(row.original) ? (
-            <Chip
-              label='Needs review'
-              size='small'
-              color='warning'
-              variant='tonal'
-              icon={<i className='ri-error-warning-line' />}
-            />
-          ) : (
-            <Typography color='text.primary'>{row.original.packageCount || 0} pkg(s)</Typography>
-          )
-      }),
-      columnHelper.accessor('returnReason', {
-        header: 'Reason',
-        cell: ({ row }) => (
-          <Chip
-            label={getReasonLabel(row.original.returnReason)}
-            color='default'
-            size='small'
-            variant='tonal'
-          />
-        )
-      }),
       columnHelper.accessor('status', {
         header: 'Status',
         cell: ({ row }) => (
-          <Chip
-            label={row.original.status.replace('_', ' ').toUpperCase()}
-            color={getStatusColor(row.original.status)}
-            size='small'
-            variant='tonal'
-          />
+          <div className='flex flex-wrap items-center gap-1'>
+            <Chip
+              label={row.original.status.replace('_', ' ').toUpperCase()}
+              color={getStatusColor(row.original.status)}
+              size='small'
+              variant='tonal'
+            />
+            {isReturnWaybillAwaitingVerification(row.original) && (
+              <Chip
+                label='Needs review'
+                size='small'
+                color='warning'
+                variant='tonal'
+                icon={<i className='ri-error-warning-line' />}
+              />
+            )}
+          </div>
         )
       }),
       columnHelper.accessor('receivedBy', {
@@ -435,20 +399,6 @@ const ReturnWaybillOverviewTable = () => {
               <MenuItem value='in_transit'>In Transit</MenuItem>
               <MenuItem value='delivered'>Delivered</MenuItem>
               <MenuItem value='processed'>Processed</MenuItem>
-            </TextField>
-            <TextField
-              select
-              value={reasonFilter}
-              onChange={e => setReasonFilter(e.target.value)}
-              className='min-w-[150px]'
-              size='small'
-            >
-              <MenuItem value='all'>All Reasons</MenuItem>
-              <MenuItem value='rejected'>Rejected</MenuItem>
-              <MenuItem value='damaged'>Damaged</MenuItem>
-              <MenuItem value='wrong_delivery'>Wrong Delivery</MenuItem>
-              <MenuItem value='customer_return'>Customer Return</MenuItem>
-              <MenuItem value='other'>Other</MenuItem>
             </TextField>
             <CompanyFilterSelect value={companyFilter} onChange={value => setParam('company', value)} />
             <TextField
