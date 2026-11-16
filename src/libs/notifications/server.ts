@@ -138,8 +138,7 @@ const buildContent = async (request: NotifyRequest): Promise<AlertContent> => {
 
     const details = [
       trip?.tripNumber ? `Trip ${trip.tripNumber}` : null,
-      trip?.vehicle?.vehicleNumber || null,
-      waybill.returnReason ? String(waybill.returnReason).replace(/_/g, ' ') : null
+      trip?.vehicle?.vehicleNumber || null
     ].filter(Boolean)
 
     return {

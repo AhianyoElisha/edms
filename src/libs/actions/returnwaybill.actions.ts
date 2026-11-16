@@ -7,8 +7,7 @@ import type {
   ReturnWaybillType, 
   ReturnWaybillInput, 
   ReturnWaybillFilters,
-  ReturnWaybillStatusType,
-  PackageBreakdown
+  ReturnWaybillStatusType
 } from '@/types/apps/deliveryTypes'
 
 /**
@@ -211,7 +210,7 @@ export async function getPendingReturnWaybills(): Promise<ReturnWaybillType[]> {
 
 /**
  * A return waybill still waiting on the back office is one the driver captured
- * in the field: it was never verified and carries no package count.
+ * in the field and nobody has checked the photo of yet.
  *
  * Rows predating the detailsVerified attribute are left null by Appwrite, and
  * every one of them already has a count, so none of them is misread as pending.
@@ -224,9 +223,8 @@ export const isReturnWaybillAwaitingVerification = (waybill: any): boolean =>
  *
  * At the dropoff the driver picks the stop and takes one photo of the paper
  * return waybill. That creates the waybill and puts it straight into transit,
- * since the goods are on the truck heading back. Package count, breakdown and
- * the real reason are left for an admin to read off the photo in the review
- * queue, so the driver is never held up on data entry.
+ * since the goods are on the truck heading back. An admin checks the photo in
+ * the review queue, so the driver is never held up on data entry.
  *
  * The waybill is closed out later with markReturnWaybillDelivered() when the
  * driver hands the goods over at the pickup location.
@@ -236,10 +234,9 @@ export async function logFieldReturn(params: {
   dropoffLocationId: string
   pickupLocationId: string
   photoUrl: string
-  returnReason?: ReturnWaybillInput['returnReason']
   notes?: string
 }): Promise<ReturnWaybillType> {
-  const { tripId, dropoffLocationId, pickupLocationId, photoUrl, returnReason, notes } = params
+  const { tripId, dropoffLocationId, pickupLocationId, photoUrl, notes } = params
 
   try {
     const waybill = await databases.createDocument(
@@ -252,10 +249,10 @@ export async function logFieldReturn(params: {
         dropofflocation: dropoffLocationId,
         pickuplocation: pickupLocationId,
         returnDate: new Date().toISOString(),
-        // The reason is required by the schema; the office corrects it on review.
-        returnReason: returnReason || 'customer_return',
+        // Returns no longer record a reason or package figures; the reason
+        // column is still required by the schema.
+        returnReason: 'other',
         reasonNotes: null,
-        // Figures are unknown in the field - the admin supplies them on review.
         packageCount: 0,
         packageDetails: null,
         status: 'in_transit',
@@ -283,32 +280,19 @@ export async function logFieldReturn(params: {
 }
 
 /**
- * Fill in the details a driver could not capture in the field and mark the
- * return waybill verified.
+ * Mark a field-captured return waybill as checked by the office.
  */
 export async function verifyReturnWaybillDetails(
   waybillId: string,
-  details: {
-    packageCount: number
-    packageDetails?: PackageBreakdown
-    returnReason?: ReturnWaybillInput['returnReason']
-    reasonNotes?: string
-    notes?: string
-  },
+  details: { notes?: string },
   verifiedBy?: string
 ): Promise<ReturnWaybillType> {
   try {
-    const packageCount = Math.max(0, details.packageCount)
-
     const updateData: Record<string, unknown> = {
-      packageCount,
-      packageDetails: details.packageDetails ? JSON.stringify(details.packageDetails) : null,
       detailsVerified: true,
       verifiedAt: new Date().toISOString()
     }
 
-    if (details.returnReason) updateData.returnReason = details.returnReason
-    if (details.reasonNotes !== undefined) updateData.reasonNotes = details.reasonNotes || null
     if (details.notes !== undefined) updateData.notes = details.notes || null
     if (verifiedBy) updateData.verifiedBy = verifiedBy
 
@@ -327,7 +311,7 @@ export async function verifyReturnWaybillDetails(
 }
 
 /**
- * Every return waybill waiting on the back office to supply its figures, newest first.
+ * Every return waybill waiting on the back office to check its photo, newest first.
  */
 export async function getReturnWaybillsAwaitingVerification(): Promise<ReturnWaybillType[]> {
   try {
@@ -401,7 +385,8 @@ export async function createReturnWaybill(
         dropofflocation: waybillData.dropoffLocationId,
         pickuplocation: waybillData.pickupLocationId,
         returnDate: waybillData.returnDate,
-        returnReason: waybillData.returnReason,
+        // The reason column is still required by the schema
+        returnReason: waybillData.returnReason || 'other',
         reasonNotes: waybillData.reasonNotes || null,
         packageCount: waybillData.packageCount ?? 0,
         packageDetails: packageDetailsString,

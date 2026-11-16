@@ -60,7 +60,7 @@ const TRIP_FIELDS = [
   '$id', 'tripNumber', 'tripDate', 'status', 'tripCost', 'clientRate', 'tonnage', 'companyId', 'billingMonth', 'billingPeriod', 'invoiceGenerated', 'paymentStatus',
   'driver.$id', 'driver.name', 'vehicle.$id', 'vehicle.vehicleNumber', 'route.$id', 'route.routeName',
   'manifests.status', 'manifests.deliveryTime', 'manifests.packageCount', 'manifests.deliveredCount',
-  'manifests.shortageCount', 'manifests.surplusCount', 'returnWaybills.packageCount'
+  'manifests.shortageCount', 'manifests.surplusCount'
 ]
 
 type View = 'trips' | 'drivers' | 'losses'
@@ -271,7 +271,7 @@ const MonthlyBreakdown = () => {
       : [])
   ]
 
-  const lossRows = drivers.filter(driver => driver.packagesSent > 0 || driver.packagesShort > 0 || driver.packagesReturned > 0)
+  const lossRows = drivers.filter(driver => driver.packagesSent > 0 || driver.packagesShort > 0)
 
   const lossColumns: ExportColumn[] = [
     { header: 'Driver', accessor: (row: any) => row.driverName, width: 52, excelWidth: 24 },
@@ -279,8 +279,7 @@ const MonthlyBreakdown = () => {
     { header: 'Packages loaded', accessor: (row: any) => row.packagesSent, align: 'right', width: 28, excelWidth: 16 },
     { header: 'Delivered', accessor: (row: any) => row.packagesDelivered, align: 'right', width: 24, excelWidth: 12 },
     { header: 'Short', accessor: (row: any) => row.packagesShort, align: 'right', width: 18, excelWidth: 8 },
-    { header: 'Extra', accessor: (row: any) => row.packagesExtra, align: 'right', width: 18, excelWidth: 8 },
-    { header: 'Returned', accessor: (row: any) => row.packagesReturned, align: 'right', width: 24, excelWidth: 10 }
+    { header: 'Extra', accessor: (row: any) => row.packagesExtra, align: 'right', width: 18, excelWidth: 8 }
   ]
 
   const exportSummary: ExportSummary[] = [
@@ -719,13 +718,12 @@ const MonthlyBreakdown = () => {
                     <TableCell align='right'>Delivered</TableCell>
                     <TableCell align='right'>Short</TableCell>
                     <TableCell align='right'>Extra</TableCell>
-                    <TableCell align='right'>Returned</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {lossRows.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} align='center'>
+                      <TableCell colSpan={6} align='center'>
                         <Typography color='text.secondary' className='p-4'>
                           No package counts recorded on delivered drops for {monthLabel(month)}
                         </Typography>
@@ -758,10 +756,9 @@ const MonthlyBreakdown = () => {
                               )}
                             </TableCell>
                             <TableCell align='right'>{driver.packagesExtra || '-'}</TableCell>
-                            <TableCell align='right'>{driver.packagesReturned || '-'}</TableCell>
                           </TableRow>
                           <TableRow>
-                            <TableCell colSpan={7} className='p-0 border-0'>
+                            <TableCell colSpan={6} className='p-0 border-0'>
                               <Collapse in={open} unmountOnExit>
                                 <Table size='small' className='bg-actionHover'>
                                   <TableHead>
@@ -807,7 +804,6 @@ const MonthlyBreakdown = () => {
                         {totalShort.toLocaleString()}
                       </TableCell>
                       <TableCell align='right'>{lossRows.reduce((sum, d) => sum + d.packagesExtra, 0) || '-'}</TableCell>
-                      <TableCell align='right'>{lossRows.reduce((sum, d) => sum + d.packagesReturned, 0) || '-'}</TableCell>
                     </TableRow>
                   )}
                 </TableBody>

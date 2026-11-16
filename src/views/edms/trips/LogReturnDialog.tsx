@@ -22,7 +22,7 @@ import type { Theme } from '@mui/material/styles'
 import { toast } from 'react-toastify'
 
 // Type Imports
-import type { RouteStopType, ReturnReasonType } from '@/types/apps/deliveryTypes'
+import type { RouteStopType } from '@/types/apps/deliveryTypes'
 
 // Action Imports
 import { getRouteDropoffLocations } from '@/libs/actions/route.actions'
@@ -38,21 +38,13 @@ interface LogReturnDialogProps {
   onLogged?: () => void
 }
 
-const QUICK_REASONS: { value: ReturnReasonType; label: string }[] = [
-  { value: 'customer_return', label: 'Customer return' },
-  { value: 'rejected', label: 'Rejected' },
-  { value: 'damaged', label: 'Damaged' },
-  { value: 'wrong_delivery', label: 'Wrong delivery' },
-  { value: 'other', label: 'Other' }
-]
-
 /**
  * One-touch return logging for drivers.
  *
  * At the dropoff the driver picks the stop and takes a photo of the paper return
  * waybill - nothing else. That creates the return waybill and puts it in transit
- * back to the pickup point. Package count, breakdown and notes are left for an
- * admin to fill in from the review queue, so paperwork never holds up the road.
+ * back to the pickup point. The office checks the photo later from the review
+ * queue, so paperwork never holds up the road.
  */
 const LogReturnDialog = ({ open, onClose, tripData, onLogged }: LogReturnDialogProps) => {
   const fullScreen = useMediaQuery((theme: Theme) => theme.breakpoints.down('sm'))
@@ -60,7 +52,6 @@ const LogReturnDialog = ({ open, onClose, tripData, onLogged }: LogReturnDialogP
   const [stops, setStops] = useState<RouteStopType[]>([])
   const [loadingStops, setLoadingStops] = useState(true)
   const [selectedStop, setSelectedStop] = useState<RouteStopType | null>(null)
-  const [reason, setReason] = useState<ReturnReasonType>('customer_return')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -116,7 +107,6 @@ const LogReturnDialog = ({ open, onClose, tripData, onLogged }: LogReturnDialogP
     if (open) return
 
     setSelectedStop(null)
-    setReason('customer_return')
     setPhotoFile(null)
     setPhotoPreview(prev => {
       if (prev) URL.revokeObjectURL(prev)
@@ -185,8 +175,7 @@ const LogReturnDialog = ({ open, onClose, tripData, onLogged }: LogReturnDialogP
         tripId: tripData.$id,
         dropoffLocationId: selectedStop.locationId,
         pickupLocationId,
-        photoUrl,
-        returnReason: reason
+        photoUrl
       })
 
       // Ring the office; never blocks the driver.
@@ -214,8 +203,7 @@ const LogReturnDialog = ({ open, onClose, tripData, onLogged }: LogReturnDialogP
 
       <DialogContent dividers>
         <Alert severity='info' icon={<i className='ri-arrow-go-back-line' />} className='mb-5'>
-          Pick the stop the goods are coming back from and snap the return waybill. The office fills in the package
-          count later.
+          Pick the stop the goods are coming back from and snap the return waybill.
           {pickupLocationName && (
             <>
               {' '}
@@ -289,27 +277,10 @@ const LogReturnDialog = ({ open, onClose, tripData, onLogged }: LogReturnDialogP
           </Box>
         )}
 
-        {/* Step 2 - why (one tap, optional to change) */}
-        <Typography variant='subtitle2' className='mb-2 font-medium'>
-          2. Why is it coming back? <span className='text-textSecondary font-normal'>(optional)</span>
-        </Typography>
-        <Box className='flex flex-wrap gap-2 mb-6'>
-          {QUICK_REASONS.map(option => (
-            <Chip
-              key={option.value}
-              label={option.label}
-              clickable
-              color={reason === option.value ? 'primary' : 'default'}
-              variant={reason === option.value ? 'filled' : 'outlined'}
-              onClick={() => setReason(option.value)}
-              disabled={submitting}
-            />
-          ))}
-        </Box>
 
-        {/* Step 3 - the photo */}
+        {/* Step 2 - the photo */}
         <Typography variant='subtitle2' className='mb-2 font-medium'>
-          3. Photo of the return waybill
+          2. Photo of the return waybill
         </Typography>
 
         {photoPreview ? (

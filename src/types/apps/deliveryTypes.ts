@@ -622,13 +622,15 @@ export interface ReturnWaybillType {
   dropofflocation: string | any // Origin of return (dropoff location)
   pickuplocation: string | any // Destination (pickup location)
   returnDate: string // Date the return was initiated
+  // No longer asked for. Older waybills still carry a reason and package figures;
+  // new ones store 'other' (the column is required) and a count of 0.
   returnReason: ReturnReasonType
-  reasonNotes?: string // Additional details about return reason
-  packageCount: number // Total count of packages being returned (0 until the office verifies a field capture)
-  packageDetails?: string | PackageBreakdown // JSON breakdown by size or parsed object
+  reasonNotes?: string
+  packageCount: number
+  packageDetails?: string | PackageBreakdown
   status: ReturnWaybillStatusType
-  // Field capture: a driver logs the return with a photo of the paper waybill and
-  // no figures; an admin fills them in later from the review queue.
+  // Field capture: a driver logs the return with a photo of the paper waybill;
+  // an admin checks the photo later from the review queue.
   detailsVerified?: boolean
   verifiedAt?: string | null
   verifiedBy?: string | null
@@ -648,7 +650,7 @@ export interface ReturnWaybillInput {
   dropoffLocationId: string
   pickupLocationId: string
   returnDate: string
-  returnReason: ReturnReasonType
+  returnReason?: ReturnReasonType
   reasonNotes?: string
   packageCount?: number
   packageDetails?: PackageBreakdown
