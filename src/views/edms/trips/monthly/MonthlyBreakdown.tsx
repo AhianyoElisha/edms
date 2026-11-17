@@ -48,6 +48,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 // Action Imports
 import { listTripsAroundMonth, setTripsBilling, setTripsInvoiceMonth } from '@/libs/actions/tripMonth.actions'
 import { getCompanies } from '@/libs/actions/company.actions'
+import { getLossesForTrips, owedValue } from '@/libs/actions/driverloss.actions'
 
 // Util Imports
 import { monthKey, monthLabel, parseMonthKey, periodLabel, shiftMonthKey } from '@/utils/invoiceMonth'
@@ -181,6 +182,39 @@ const MonthlyBreakdown = () => {
   }, [show, totals, ofCompany, search])
 
   const drivers = useMemo(() => byDriver(totals.invoice), [totals.invoice])
+
+  // What the loss sheet charges each driver for this invoice's trips (priced items still owed)
+  const [lossValues, setLossValues] = useState<Record<string, number>>({})
+  const invoiceTripKey = totals.invoice.map(trip => trip.$id).join(',')
+
+  useEffect(() => {
+    if (view !== 'losses' || !invoiceTripKey) {
+      setLossValues({})
+
+      return
+    }
+
+    let cancelled = false
+
+    getLossesForTrips(invoiceTripKey.split(','))
+      .then(losses => {
+        if (cancelled) return
+
+        const byDriver: Record<string, number> = {}
+
+        losses.forEach(loss => {
+          byDriver[loss.driverId] = (byDriver[loss.driverId] || 0) + owedValue(loss)
+        })
+        setLossValues(byDriver)
+      })
+      .catch(loadError => console.error('Error loading loss values:', loadError))
+
+    return () => {
+      cancelled = true
+    }
+  }, [view, invoiceTripKey])
+
+  const lossValue = (driverId: string) => Math.round((lossValues[driverId] || 0) * 100) / 100
   const lateCloseCount = useMemo(() => totals.invoice.filter(trip => trip.runIn && trip.closedAfterRunMonth).length, [totals.invoice])
 
   const selectedTrips = listed.filter(trip => selected.has(trip.$id))
@@ -271,7 +305,7 @@ const MonthlyBreakdown = () => {
       : [])
   ]
 
-  const lossRows = drivers.filter(driver => driver.packagesSent > 0 || driver.packagesShort > 0)
+  const lossRows = drivers.filter(driver => driver.packagesSent > 0 || driver.packagesShort > 0 || lossValue(driver.driverId) > 0)
 
   const lossColumns: ExportColumn[] = [
     { header: 'Driver', accessor: (row: any) => row.driverName, width: 52, excelWidth: 24 },
@@ -279,7 +313,8 @@ const MonthlyBreakdown = () => {
     { header: 'Packages loaded', accessor: (row: any) => row.packagesSent, align: 'right', width: 28, excelWidth: 16 },
     { header: 'Delivered', accessor: (row: any) => row.packagesDelivered, align: 'right', width: 24, excelWidth: 12 },
     { header: 'Short', accessor: (row: any) => row.packagesShort, align: 'right', width: 18, excelWidth: 8 },
-    { header: 'Extra', accessor: (row: any) => row.packagesExtra, align: 'right', width: 18, excelWidth: 8 }
+    { header: 'Extra', accessor: (row: any) => row.packagesExtra, align: 'right', width: 18, excelWidth: 8 },
+    { header: 'Owed (GH₵)', accessor: (row: any) => lossValue(row.driverId).toFixed(2), align: 'right', width: 26, excelWidth: 14 }
   ]
 
   const exportSummary: ExportSummary[] = [
@@ -706,6 +741,7 @@ const MonthlyBreakdown = () => {
               <Typography variant='body2' color='text.secondary'>
                 Packages on delivered drops for the {invoiceName}. &ldquo;Short&rdquo; is what the office recorded as
                 missing at a drop, or the gap between what was loaded and what was counted off where both were counted.
+                &ldquo;Owed&rdquo; is what the loss sheet charges the driver for these trips (priced items not found).
               </Typography>
             </CardContent>
             <TableContainer>
@@ -718,12 +754,13 @@ const MonthlyBreakdown = () => {
                     <TableCell align='right'>Delivered</TableCell>
                     <TableCell align='right'>Short</TableCell>
                     <TableCell align='right'>Extra</TableCell>
+                    <TableCell align='right'>Owed</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {lossRows.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} align='center'>
+                      <TableCell colSpan={7} align='center'>
                         <Typography color='text.secondary' className='p-4'>
                           No package counts recorded on delivered drops for {monthLabel(month)}
                         </Typography>
@@ -756,9 +793,18 @@ const MonthlyBreakdown = () => {
                               )}
                             </TableCell>
                             <TableCell align='right'>{driver.packagesExtra || '-'}</TableCell>
+                            <TableCell align='right' onClick={event => event.stopPropagation()}>
+                              {driver.driverId ? (
+                                <Typography component={Link} href={`/edms/losses/${driver.driverId}`} color={lossValue(driver.driverId) > 0 ? 'error.main' : 'text.secondary'}>
+                                  {lossValue(driver.driverId) > 0 ? money(lossValue(driver.driverId)) : '-'}
+                                </Typography>
+                              ) : (
+                                '-'
+                              )}
+                            </TableCell>
                           </TableRow>
                           <TableRow>
-                            <TableCell colSpan={6} className='p-0 border-0'>
+                            <TableCell colSpan={7} className='p-0 border-0'>
                               <Collapse in={open} unmountOnExit>
                                 <Table size='small' className='bg-actionHover'>
                                   <TableHead>
@@ -804,6 +850,9 @@ const MonthlyBreakdown = () => {
                         {totalShort.toLocaleString()}
                       </TableCell>
                       <TableCell align='right'>{lossRows.reduce((sum, d) => sum + d.packagesExtra, 0) || '-'}</TableCell>
+                      <TableCell align='right' className='font-medium'>
+                        {money(lossRows.reduce((sum, d) => sum + lossValue(d.driverId), 0))}
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>

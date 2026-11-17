@@ -30,6 +30,9 @@ export const appwriteConfig = {
   manifests: process.env.NEXT_PUBLIC_MANIFESTS_COLLECTION_ID!,
   deliveries: process.env.NEXT_PUBLIC_DELIVERIES_COLLECTION_ID!,
   returnwaybills: process.env.NEXT_PUBLIC_RETURN_WAYBILLS_COLLECTION_ID!,
+  // Driver loss sheet: lost items charged to a driver, and what they have paid back
+  driverlosses: process.env.NEXT_PUBLIC_DRIVER_LOSSES_COLLECTION_ID || 'driverlosses',
+  driverlosspayments: process.env.NEXT_PUBLIC_DRIVER_LOSS_PAYMENTS_COLLECTION_ID || 'driverlosspayments',
   
   // EDMS - Finance
   expenses: process.env.NEXT_PUBLIC_EXPENSES_COLLECTION_ID!,

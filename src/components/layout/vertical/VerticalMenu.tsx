@@ -236,6 +236,10 @@ const VerticalMenu = ({ dictionary, scrollMenu }: Props) => {
                 {!isDriver && hasAnyPermission(['trips.view']) && (
                   <MenuItem onClick={() => handleNavigation('/edms/trips/monthly')}>Monthly Breakdown</MenuItem>
                 )}
+                {/* Office: every driver's losses and payments. Drivers: their own, read-only. */}
+                {hasAnyPermission(['trips.view']) && (
+                  <MenuItem onClick={() => handleNavigation('/edms/losses')}>{isDriver ? 'My Losses' : 'Loss Sheet'}</MenuItem>
+                )}
                 {hasAnyPermission(['trips.create']) && (
                   <MenuItem onClick={() => handleNavigation('/edms/trips/create')}>Create Trip</MenuItem>
                 )}

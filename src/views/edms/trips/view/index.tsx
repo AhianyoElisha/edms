@@ -37,6 +37,7 @@ import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
 import DeleteConfirmationDialog from '@/components/dialogs/delete-confirmation-dialog'
 import LogDeliveryDialog from '@/views/edms/trips/LogDeliveryDialog'
 import LogReturnDialog from '@/views/edms/trips/LogReturnDialog'
+import TripLosses from '@/views/edms/losses/TripLosses'
 
 // Action Imports
 import { getReturnWaybillsByTrip, isReturnWaybillAwaitingVerification } from '@/libs/actions/returnwaybill.actions'
@@ -101,7 +102,7 @@ const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | '
 }
 
 const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => void }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'manifests' | 'checkpoints' | 'returns'>('manifests')
+  const [activeTab, setActiveTab] = useState<'overview' | 'manifests' | 'checkpoints' | 'returns' | 'losses'>('manifests')
   const [logDeliveryOpen, setLogDeliveryOpen] = useState(false)
   const [logReturnOpen, setLogReturnOpen] = useState(false)
   const [returnWaybills, setReturnWaybills] = useState<any[]>([])
@@ -141,6 +142,9 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
   const completedManifests = manifests.filter((m: any) => 
     m.status === 'delivered' || m.status === 'completed'
   ).length
+
+  // Manifests with packages still missing, for the Losses tab label
+  const shortManifestCount = manifests.filter((m: any) => (m.shortageCount || 0) > 0).length
 
   // Manifests the driver captured in the field that the office has not priced up yet.
   const awaitingReviewCount = manifests.filter(isManifestAwaitingVerification).length
@@ -540,6 +544,12 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
             label={`Returns (${returnWaybills.length})`}
             value='returns'
             icon={<i className='ri-arrow-go-back-line' />}
+            iconPosition='start'
+          />
+          <Tab
+            label={shortManifestCount > 0 ? `Losses (${shortManifestCount} short)` : 'Losses'}
+            value='losses'
+            icon={<i className='ri-error-warning-line' />}
             iconPosition='start'
           />
           <Tab
@@ -1040,6 +1050,16 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
                 </div>
               )}
             </div>
+          )}
+
+          {/* Losses Tab: missing packages and other losses charged to the driver */}
+          {activeTab === 'losses' && (
+            <TripLosses
+              tripId={tripData.$id}
+              manifests={manifests}
+              driverId={typeof tripData.driver === 'object' && tripData.driver !== null ? tripData.driver.$id : tripData.driver}
+              onManifestsChanged={onRefresh}
+            />
           )}
 
           {/* Returns Tab */}

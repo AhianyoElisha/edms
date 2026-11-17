@@ -758,3 +758,51 @@ export interface ExpenseFilters {
   }
   search?: string
 }
+// ============================================
+// DRIVER LOSS SHEET
+// ============================================
+
+// owed: counts against the driver. found: the item turned up, nothing owed.
+// waived: the office wrote it off.
+export type DriverLossStatus = 'owed' | 'found' | 'waived'
+
+// shortage: one missing package from a manifest's shortage count, kept in step
+// with that count. manual: added by the office on a trip (damage, other losses).
+export type DriverLossSource = 'shortage' | 'manual'
+
+export interface DriverLossType {
+  $id: string
+  driverId: string
+  tripId: string
+  manifestId?: string | null
+  companyId?: string | null
+  source: DriverLossSource
+  description?: string | null
+  // Empty until the office prices the item; an unpriced item counts as 0.
+  value?: number | null
+  status: DriverLossStatus
+  lossDate?: string | null
+  resolvedAt?: string | null
+  resolvedBy?: string | null
+  notes?: string | null
+  createdBy?: string | null
+  $createdAt: string
+  $updatedAt: string
+}
+
+// cash / momo: the driver paid. deduction: an amount the office took off what
+// it pays the driver (entered by hand; the system never works out driver pay).
+export type DriverLossPaymentMethod = 'cash' | 'momo' | 'deduction' | 'other'
+
+export interface DriverLossPaymentType {
+  $id: string
+  driverId: string
+  amount: number
+  paidAt: string
+  method: DriverLossPaymentMethod
+  reference?: string | null
+  notes?: string | null
+  recordedBy?: string | null
+  $createdAt: string
+  $updatedAt: string
+}

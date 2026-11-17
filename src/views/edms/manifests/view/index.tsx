@@ -29,6 +29,7 @@ import LinearProgress from '@mui/material/LinearProgress'
 
 // Component Imports
 import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
+import EditShortageDialog from '@/views/edms/losses/EditShortageDialog'
 
 // Action Imports
 import { isManifestAwaitingVerification } from '@/libs/actions/manifest.actions'
@@ -82,8 +83,9 @@ const getPackageSizeIcon = (size: string): string => {
   return icons[size] || 'ri-inbox-line'
 }
 
-const ManifestView = ({ manifestData }: { manifestData: any }) => {
+const ManifestView = ({ manifestData, onRefresh }: { manifestData: any; onRefresh?: () => void }) => {
   const [uploading, setUploading] = useState(false)
+  const [shortageOpen, setShortageOpen] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState<{ 
     open: boolean
     action: 'update-count' | 'submit' | null
@@ -92,7 +94,7 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
   
   const router = useRouter()
   const [refreshKey, setRefreshKey] = useState(0)
-  const { isDriver, hasPermission } = usePermissions()
+  const { isDriver, hasPermission, user } = usePermissions()
 
   // Only the back office fills in the figures a driver skipped in the field.
   const canVerify = !isDriver && hasPermission('manifests.edit')
@@ -461,7 +463,22 @@ const ManifestView = ({ manifestData }: { manifestData: any }) => {
             {manifestData.surplusCount > 0 && (
               <Chip size='small' variant='tonal' color='warning' label={`${manifestData.surplusCount} extra`} />
             )}
+            <div className='flex-1' />
+            {/* Missing packages turned up, or more are missing: the driver's loss sheet follows */}
+            {canVerify && !(manifestData.surplusCount > 0) && (
+              <Button size='small' variant='outlined' startIcon={<i className='ri-search-eye-line' />} onClick={() => setShortageOpen(true)}>
+                {manifestData.shortageCount > 0 ? 'Items found / change shortage' : 'Record a shortage'}
+              </Button>
+            )}
           </div>
+
+          <EditShortageDialog
+            open={shortageOpen}
+            onClose={() => setShortageOpen(false)}
+            manifest={manifestData}
+            actorName={user?.name || user?.email}
+            onSaved={onRefresh}
+          />
           
           <Grid container spacing={4}>
             {/* Package Size Type */}
