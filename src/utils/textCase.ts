@@ -87,7 +87,9 @@ export const TEXT_CASE_RULES = {
   companies: { name: 'name', contactPerson: 'name', contactEmail: 'email', notes: 'free' },
   trips: { notes: 'free', deletedBy: 'name' },
   manifests: { notes: 'free', verifiedBy: 'name' },
-  returnwaybills: { notes: 'free' }
+  returnwaybills: { notes: 'free' },
+  driverlosses: { description: 'free', notes: 'free', resolvedBy: 'name', createdBy: 'name' },
+  driverlosspayments: { reference: 'free', notes: 'free', recordedBy: 'name' }
 } satisfies Record<string, TextCaseRules>
 
 /** A copy of `data` with its typed text fields written the standard way. */

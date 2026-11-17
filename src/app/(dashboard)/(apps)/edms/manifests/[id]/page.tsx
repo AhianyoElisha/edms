@@ -99,7 +99,10 @@ const ManifestDetailsPage = () => {
 
   return (
     <PermissionGuard permissions={['manifests.view', 'manifests.manage']}>
-      <ManifestView manifestData={manifestData} />
+      <ManifestView
+        manifestData={manifestData}
+        onRefresh={async () => setManifestData(await getManifestByIdWithRelations(params.id as string))}
+      />
     </PermissionGuard>
   )
 }

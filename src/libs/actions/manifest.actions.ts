@@ -3,6 +3,7 @@ import { databases, appwriteConfig, tablesDB } from '@/libs/appwrite.config'
 import type { ManifestType, ManifestFilters, ManifestStats } from '@/types/apps/deliveryTypes'
 import { listAllDocuments } from './paginate'
 import { companyIdForName, companyIdForTrip, getCompanies } from './company.actions'
+import { syncManifestLosses } from './driverloss.actions'
 
 // Database and Collection IDs
 const DATABASE_ID = appwriteConfig.database
@@ -1227,11 +1228,80 @@ export const verifyManifestDetails = async (
       }
     }
 
+    // A confirmed shortage is charged to the driver on the loss sheet. If this
+    // fails the trip's Losses tab catches it up the next time it is opened.
+    try {
+      await syncManifestLosses(manifestId, { by: verifiedBy })
+    } catch (error) {
+      console.warn('Could not update the loss sheet after verification:', error)
+    }
+
     return manifest as unknown as ManifestType
   } catch (error) {
     console.error('Error verifying manifest details:', error)
     throw new Error('Failed to save manifest details')
   }
+}
+
+/**
+ * Change the shortage on a manifest the office has already verified - most often
+ * because missing packages turned up. The loss sheet follows: the driver is
+ * charged for new missing packages, and cleared for the ones found.
+ *
+ * `foundIds` names the loss-sheet rows that were found, for when the missing
+ * packages were priced differently.
+ */
+export const updateManifestShortage = async (
+  manifestId: string,
+  shortageCount: number,
+  options: { foundIds?: string[]; by?: string } = {}
+): Promise<ManifestType> => {
+  const count = Math.max(0, Math.floor(shortageCount))
+  const stored = (await databases.getDocument(DATABASE_ID, MANIFESTS_COLLECTION_ID, manifestId)) as any
+  const packageCount = stored.packageCount || 0
+
+  if (packageCount > 0 && count > packageCount) {
+    throw new Error(`The manifest only lists ${packageCount} package${packageCount === 1 ? '' : 's'}`)
+  }
+
+  if (count > 0 && (stored.surplusCount || 0) > 0) {
+    throw new Error('This manifest has extra packages recorded, so it cannot also be short')
+  }
+
+  const deliveredCount = packageCount > 0 ? packageCount - count : 0
+
+  // Who cleared which item, and when, is kept on the loss-sheet rows
+  const manifest = (await databases.updateDocument(DATABASE_ID, MANIFESTS_COLLECTION_ID, manifestId, {
+    shortageCount: count,
+    deliveredCount
+  })) as any
+
+  const tripId = typeof stored.trip === 'object' ? stored.trip?.$id : stored.trip
+
+  if (tripId) {
+    try {
+      const trip = (await databases.getDocument(DATABASE_ID, appwriteConfig.trips, tripId)) as any
+
+      if (trip.checkpoints) {
+        const checkpoints = JSON.parse(trip.checkpoints)
+        const index = checkpoints.findIndex((cp: any) => cp.manifestId === manifestId)
+
+        if (index !== -1) {
+          checkpoints[index] = { ...checkpoints[index], packagesDelivered: deliveredCount, packagesMissing: count }
+
+          await databases.updateDocument(DATABASE_ID, appwriteConfig.trips, tripId, {
+            checkpoints: JSON.stringify(checkpoints)
+          })
+        }
+      }
+    } catch (error) {
+      console.warn('Could not update the trip checkpoint after a shortage change:', error)
+    }
+  }
+
+  await syncManifestLosses(manifestId, { foundIds: options.foundIds, by: options.by })
+
+  return manifest as unknown as ManifestType
 }
 
 /**

@@ -441,7 +441,11 @@ const ManifestReviewQueue = () => {
         user?.name || user?.email
       )
 
-      toast.success('Manifest details saved')
+      toast.success(
+        (shortageCount ?? 0) > 0
+          ? `Manifest saved. ${shortageCount} missing package${shortageCount === 1 ? '' : 's'} added to the driver's loss sheet - price them on the trip's Losses tab.`
+          : 'Manifest details saved'
+      )
       setManifests(prev => prev.filter(m => m.$id !== manifest.$id))
       setDrafts(prev => {
         const next = { ...prev }

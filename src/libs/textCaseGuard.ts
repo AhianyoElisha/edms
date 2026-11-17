@@ -25,7 +25,9 @@ const rulesByCollectionId = (): Record<string, TextCaseRules> => {
     companies: process.env.NEXT_PUBLIC_COMPANIES_COLLECTION_ID || 'companies',
     trips: process.env.NEXT_PUBLIC_TRIPS_COLLECTION_ID,
     manifests: process.env.NEXT_PUBLIC_MANIFESTS_COLLECTION_ID,
-    returnwaybills: process.env.NEXT_PUBLIC_RETURN_WAYBILLS_COLLECTION_ID
+    returnwaybills: process.env.NEXT_PUBLIC_RETURN_WAYBILLS_COLLECTION_ID,
+    driverlosses: process.env.NEXT_PUBLIC_DRIVER_LOSSES_COLLECTION_ID || 'driverlosses',
+    driverlosspayments: process.env.NEXT_PUBLIC_DRIVER_LOSS_PAYMENTS_COLLECTION_ID || 'driverlosspayments'
   }
 
   const map: Record<string, TextCaseRules> = {}
