@@ -261,7 +261,48 @@ export const sendTestAlert = async (): Promise<{ sent: number; pushConfigured: b
 /*  Sound + vibration                                                          */
 /* -------------------------------------------------------------------------- */
 
+/*
+ * The chime goes through the Web Audio API. Browsers start a page "muted" until
+ * someone taps, clicks or types on it; once a tap has resumed the AudioContext it
+ * stays allowed for the life of the page, background tab included. An <audio>
+ * element is kept as the fallback for browsers without Web Audio.
+ *
+ * The old unlock listened for one `pointerdown` and gave up after it. On a phone a
+ * touch `pointerdown` does not count as a tap for autoplay, so the unlock failed
+ * and the chime stayed silent until something else (like the bell) was tapped.
+ */
+
+let audioContext: AudioContext | null = null
+let alertBuffer: AudioBuffer | null = null
+let bufferLoading: Promise<AudioBuffer | null> | null = null
+let currentSource: AudioBufferSourceNode | null = null
 let alertAudio: HTMLAudioElement | null = null
+let htmlAudioUnlocked = false
+
+const soundListeners = new Set<(ready: boolean) => void>()
+
+const getContext = (): AudioContext | null => {
+  if (typeof window === 'undefined') return null
+
+  if (!audioContext) {
+    const Context = window.AudioContext || (window as any).webkitAudioContext
+
+    if (!Context) return null
+
+    try {
+      audioContext = new Context() as AudioContext
+      audioContext.addEventListener('statechange', () => {
+        const ready = isAlertSoundReady()
+
+        soundListeners.forEach(listener => listener(ready))
+      })
+    } catch {
+      return null
+    }
+  }
+
+  return audioContext
+}
 
 const getAudio = (): HTMLAudioElement | null => {
   if (typeof window === 'undefined') return null
@@ -274,15 +315,89 @@ const getAudio = (): HTMLAudioElement | null => {
   return alertAudio
 }
 
+const loadBuffer = (context: AudioContext): Promise<AudioBuffer | null> => {
+  if (alertBuffer) return Promise.resolve(alertBuffer)
+
+  if (!bufferLoading) {
+    bufferLoading = fetch(ALERT_SOUND)
+      .then(response => response.arrayBuffer())
+      .then(
+        data =>
+          new Promise<AudioBuffer>((resolve, reject) => {
+            // The callback form, for older Safari
+            context.decodeAudioData(data, resolve, reject)
+          })
+      )
+      .then(buffer => (alertBuffer = buffer))
+      .catch(error => {
+        console.warn('Could not load the alert sound:', error)
+        bufferLoading = null
+
+        return null
+      })
+  }
+
+  return bufferLoading
+}
+
+// resume() waits indefinitely when the browser will not allow it, so cap the wait
+const tryResume = async (context: AudioContext): Promise<void> => {
+  if (context.state === 'running') return
+
+  await Promise.race([context.resume().catch(() => undefined), new Promise(resolve => setTimeout(resolve, 400))])
+}
+
+/** Whether the chime can play right now without anyone tapping first. */
+export const isAlertSoundReady = (): boolean => {
+  if (audioContext) return audioContext.state === 'running'
+
+  return htmlAudioUnlocked
+}
+
+/** Hear about the chime becoming allowed, or being blocked again (iOS does that). */
+export const onAlertSoundChange = (listener: (ready: boolean) => void): (() => void) => {
+  soundListeners.add(listener)
+
+  return () => {
+    soundListeners.delete(listener)
+  }
+}
+
 /**
- * Browsers refuse to play sound on a page nobody has touched. Call this on the
- * first tap so the chime is allowed to play later, when an alert arrives with
- * the page sitting untouched in the background.
+ * Call from any tap, click or key press. Lets the chime play later, when an alert
+ * arrives with the page sitting untouched. Safe to call as often as you like.
  */
 export const unlockAlertSound = (): void => {
+  const context = getContext()
+
+  if (context) {
+    // resume() has to be called inside the tap itself, so no await before it
+    if (context.state !== 'running') {
+      context
+        .resume()
+        .then(() => soundListeners.forEach(listener => listener(isAlertSoundReady())))
+        .catch(() => undefined)
+
+      // iOS also wants a sound started inside the tap: one silent sample
+      try {
+        const source = context.createBufferSource()
+
+        source.buffer = context.createBuffer(1, 1, 22050)
+        source.connect(context.destination)
+        source.start(0)
+      } catch {
+        // Not needed elsewhere
+      }
+    }
+
+    loadBuffer(context)
+
+    return
+  }
+
   const audio = getAudio()
 
-  if (!audio) return
+  if (!audio || htmlAudioUnlocked) return
 
   audio.muted = true
   audio
@@ -290,6 +405,8 @@ export const unlockAlertSound = (): void => {
     .then(() => {
       audio.pause()
       audio.currentTime = 0
+      htmlAudioUnlocked = true
+      soundListeners.forEach(listener => listener(true))
     })
     .catch(() => undefined)
     .finally(() => {
@@ -298,6 +415,16 @@ export const unlockAlertSound = (): void => {
 }
 
 export const stopAlert = (): void => {
+  if (currentSource) {
+    try {
+      currentSource.stop()
+    } catch {
+      // Already finished
+    }
+
+    currentSource = null
+  }
+
   if (alertAudio) {
     alertAudio.pause()
     alertAudio.currentTime = 0
@@ -316,9 +443,37 @@ export const ALERT_DURATION_MS = 2800
  * Resolves false when the browser blocked the sound (page never interacted with).
  */
 export const playAlert = async (): Promise<boolean> => {
-  const audio = getAudio()
-
   if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(VIBRATION)
+
+  const context = getContext()
+
+  if (context) {
+    await tryResume(context)
+
+    if (context.state === 'running') {
+      const buffer = await loadBuffer(context)
+
+      if (buffer) {
+        // Not stopAlert(): that would also cancel the vibration just started
+        try {
+          currentSource?.stop()
+        } catch {
+          // Already finished
+        }
+
+        const source = context.createBufferSource()
+
+        source.buffer = buffer
+        source.connect(context.destination)
+        source.start(0)
+        currentSource = source
+
+        return true
+      }
+    }
+  }
+
+  const audio = getAudio()
 
   if (!audio) return false
 
@@ -329,6 +484,7 @@ export const playAlert = async (): Promise<boolean> => {
 
   try {
     await audio.play()
+    htmlAudioUnlocked = true
 
     return true
   } catch {

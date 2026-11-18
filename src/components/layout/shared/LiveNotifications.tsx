@@ -20,6 +20,7 @@ import Button from '@mui/material/Button'
 import Alert from '@mui/material/Alert'
 import Snackbar from '@mui/material/Snackbar'
 import CircularProgress from '@mui/material/CircularProgress'
+import Tooltip from '@mui/material/Tooltip'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import type { Theme } from '@mui/material/styles'
 
@@ -47,7 +48,9 @@ import {
   ALERT_DURATION_MS,
   enablePush,
   getPushStatus,
+  isAlertSoundReady,
   needsInstallForPush,
+  onAlertSoundChange,
   playAlert,
   sendTestAlert,
   stopAlert,
@@ -55,6 +58,12 @@ import {
   unlockAlertSound
 } from '@/libs/notifications/client'
 import type { PushStatus } from '@/libs/notifications/client'
+import {
+  NOTIFICATION_DONE,
+  notificationIdFor,
+  recordIdFor,
+  resolveNotification
+} from '@/libs/notifications/resolve'
 
 interface NotificationItem {
   id: string
@@ -66,6 +75,74 @@ interface NotificationItem {
 }
 
 const PROMPT_SNOOZE_MS = 3 * 24 * 60 * 60 * 1000
+
+// Any of these counts as a tap that lets the page make sound. A touch `pointerdown`
+// does not, which is why listening for that alone left phones silent.
+const GESTURE_EVENTS = ['pointerdown', 'pointerup', 'click', 'touchend', 'keydown'] as const
+
+// Links to a review queue mean the upload still has to be checked; anything else
+// is just news, done with once someone has opened it.
+const needsReview = (item: Pick<NotificationItem, 'url'>) => Boolean(item.url?.includes('/review'))
+
+// Take a dealt-with alert off this device's notification bar too.
+const closeSystemNotification = (tag: string) => {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
+
+  navigator.serviceWorker
+    .getRegistration('/')
+    .then(registration => registration?.getNotifications({ tag }))
+    .then(list => list?.forEach(notification => notification.close()))
+    .catch(() => undefined)
+}
+
+/**
+ * Of the uploads in the bell that link to a review queue, those already checked
+ * (or since deleted). Covers anything verified before notifications were cleared
+ * automatically, and any route to verifying that does not clear them itself.
+ */
+const findAlreadyReviewed = async (items: NotificationItem[]): Promise<string[]> => {
+  const idsOf = (kind: string) =>
+    items
+      .filter(item => item.kind === kind && needsReview(item))
+      .map(item => recordIdFor(item.id))
+      .filter((id): id is string => Boolean(id))
+
+  const check = async (
+    collectionId: string,
+    ids: string[],
+    fields: string[],
+    awaiting: (record: any) => boolean
+  ): Promise<string[]> => {
+    if (ids.length === 0) return []
+
+    const response = await databases.listDocuments(appwriteConfig.database, collectionId, [
+      Query.equal('$id', ids),
+      Query.select(['$id', ...fields]),
+      Query.limit(ids.length)
+    ])
+
+    const pending = new Set(response.documents.filter(awaiting).map(record => record.$id))
+
+    return ids.filter(id => !pending.has(id)).map(notificationIdFor)
+  }
+
+  const [manifests, returns] = await Promise.all([
+    check(
+      appwriteConfig.manifests,
+      idsOf('manifest_delivered'),
+      ['detailsVerified', 'packageSize', 'packageCount'],
+      record => record.detailsVerified !== true && (!record.packageSize || !record.packageCount)
+    ),
+    check(
+      appwriteConfig.returnwaybills,
+      idsOf('return_logged'),
+      ['detailsVerified', 'packageCount'],
+      record => record.detailsVerified !== true && !record.packageCount
+    )
+  ])
+
+  return [...manifests, ...returns]
+}
 
 const iconFor = (kind: string): { icon: string; color: 'success' | 'warning' | 'info' } => {
   if (kind === 'manifest_delivered') return { icon: 'ri-truck-line', color: 'success' }
@@ -140,6 +217,7 @@ const LiveNotifications = () => {
   const [promptOpen, setPromptOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [ringing, setRinging] = useState(false)
+  const [soundReady, setSoundReady] = useState(true)
 
   const anchorRef = useRef<HTMLButtonElement>(null)
   const handledIds = useRef(new Set<string>())
@@ -149,14 +227,37 @@ const LiveNotifications = () => {
 
   const unreadCount = items.filter(item => item.createdAt > lastSeen).length
 
+  // Take items out of the list here, and out of the notification bar.
+  const dropItems = useCallback((ids: string[]) => {
+    if (ids.length === 0) return
+
+    const gone = new Set(ids)
+
+    setItems(prev => prev.filter(item => !gone.has(item.id)))
+    ids.forEach(closeSystemNotification)
+  }, [])
+
+  // Done with: gone from every office device's bell, over Realtime.
+  const markDone = useCallback(
+    (ids: string[]) => {
+      dropItems(ids)
+      ids.forEach(id => resolveNotification(id))
+    },
+    [dropItems]
+  )
+
   const openItem = useCallback(
-    (item: Pick<NotificationItem, 'url'>) => {
+    (item: Pick<NotificationItem, 'id' | 'url'>) => {
       stopAlert()
       setRinging(false)
       setOpen(false)
+
+      // Uploads waiting on a review stay until they are checked; the rest are read
+      if (item.id && !needsReview(item)) markDone([item.id])
+
       if (item.url) router.push(item.url)
     },
-    [router]
+    [router, markDone]
   )
 
   // A new upload has arrived, by whichever road got here first.
@@ -204,7 +305,11 @@ const LiveNotifications = () => {
               icon: '/icons/icon-192.png',
               badge: '/icons/badge-96.png',
               tag: item.id,
+              renotify: true,
               requireInteraction: true,
+              // Make the phone's own notification sound and buzz, like a push does
+              silent: false,
+              vibrate: [600, 200, 600, 200, 600, 400, 600, 200, 600, 200, 600],
               data: { url: item.url || '/', id: item.id }
             } as NotificationOptions)
           )
@@ -225,6 +330,7 @@ const LiveNotifications = () => {
     databases
       .listDocuments(appwriteConfig.database, appwriteConfig.notifications, [
         Query.equal('recipient', OFFICE_RECIPIENT),
+        Query.notEqual('status', NOTIFICATION_DONE),
         Query.orderDesc('$createdAt'),
         Query.limit(30)
       ])
@@ -239,17 +345,32 @@ const LiveNotifications = () => {
 
           return [...fresh, ...loaded]
         })
+
+        return findAlreadyReviewed(loaded).then(reviewed => {
+          if (!cancelled) markDone(reviewed)
+        })
       })
       .catch(error => console.warn('Could not load notifications:', error))
 
     const unsubscribe = client.subscribe(
       `databases.${appwriteConfig.database}.collections.${appwriteConfig.notifications}.documents`,
       (event: any) => {
-        const created = (event.events || []).some((name: string) => name.endsWith('.create'))
+        const names: string[] = event.events || []
+        const payload = event.payload
 
-        if (!created || event.payload?.recipient !== OFFICE_RECIPIENT) return
+        if (payload?.recipient !== OFFICE_RECIPIENT) return
 
-        handleIncoming(fromDocument(event.payload), true)
+        // Dealt with on this or another device: clear it here too
+        if (
+          names.some(name => name.endsWith('.delete')) ||
+          (names.some(name => name.endsWith('.update')) && payload.status === NOTIFICATION_DONE)
+        ) {
+          dropItems([payload.$id])
+
+          return
+        }
+
+        if (names.some(name => name.endsWith('.create'))) handleIncoming(fromDocument(payload), true)
       }
     )
 
@@ -257,7 +378,7 @@ const LiveNotifications = () => {
       cancelled = true
       unsubscribe()
     }
-  }, [isOffice, userId, seenKey, handleIncoming])
+  }, [isOffice, userId, seenKey, handleIncoming, dropItems, markDone])
 
   // Push messages relayed by the service worker while a window is open.
   useEffect(() => {
@@ -290,9 +411,21 @@ const LiveNotifications = () => {
   useEffect(() => {
     if (!isOffice || !userId) return
 
-    const unlock = () => unlockAlertSound()
+    // Every tap tries again until the browser lets the chime play. Cheap once it has.
+    const unlock = () => {
+      if (!isAlertSoundReady()) unlockAlertSound()
+    }
 
-    window.addEventListener('pointerdown', unlock, { once: true })
+    GESTURE_EVENTS.forEach(name => window.addEventListener(name, unlock, { capture: true, passive: true }))
+
+    const stopWatching = onAlertSoundChange(setSoundReady)
+
+    // Some browsers allow sound straight away on a site used often; give them a
+    // moment to say so before asking for a tap.
+    const firstCheck = window.setTimeout(() => {
+      unlockAlertSound()
+      setSoundReady(isAlertSoundReady())
+    }, 1500)
 
     getPushStatus(userId).then(status => {
       setPushStatus(status)
@@ -302,7 +435,11 @@ const LiveNotifications = () => {
       if (status === 'off' && Date.now() - readStored(snoozeKey) > PROMPT_SNOOZE_MS) setPromptOpen(true)
     })
 
-    return () => window.removeEventListener('pointerdown', unlock)
+    return () => {
+      GESTURE_EVENTS.forEach(name => window.removeEventListener(name, unlock, { capture: true }))
+      stopWatching()
+      window.clearTimeout(firstCheck)
+    }
   }, [isOffice, userId, snoozeKey])
 
   const markAllSeen = useCallback(() => {
@@ -457,6 +594,13 @@ const LiveNotifications = () => {
                     {unreadCount > 0 && (
                       <Chip variant='tonal' size='small' color='primary' label={`${unreadCount} New`} />
                     )}
+                    {isOffice && items.length > 0 && (
+                      <Tooltip title='Mark all as done'>
+                        <IconButton size='small' onClick={() => markDone(items.map(item => item.id))}>
+                          <i className='ri-check-double-line text-xl' />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </div>
                   <Divider />
 
@@ -468,7 +612,9 @@ const LiveNotifications = () => {
                       <div className='flex flex-col items-center gap-2 plb-10 pli-4 text-center'>
                         <i className='ri-notification-off-line text-4xl text-textDisabled' />
                         <Typography color='text.secondary'>
-                          {isOffice ? 'No uploads yet. Driver deliveries and returns will show here.' : 'No notifications'}
+                          {isOffice
+                            ? 'Nothing waiting. New driver deliveries and returns will show here.'
+                            : 'No notifications'}
                         </Typography>
                       </div>
                     ) : (
@@ -503,7 +649,23 @@ const LiveNotifications = () => {
                                 {timeAgo(item.createdAt)}
                               </Typography>
                             </div>
-                            {unread && <Badge variant='dot' color='primary' className='mbs-2 mie-1' />}
+                            <div className='flex flex-col items-center gap-2'>
+                              {unread && <Badge variant='dot' color='primary' className='mbs-2 mie-1' />}
+                              {isOffice && (
+                                <Tooltip title='Mark as done'>
+                                  <IconButton
+                                    size='small'
+                                    aria-label='Mark as done'
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      markDone([item.id])
+                                    }}
+                                  >
+                                    <i className='ri-check-line text-base' />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </div>
                           </div>
                         )
                       })
@@ -553,6 +715,30 @@ const LiveNotifications = () => {
           }
         >
           Get a loud alert on this device when a driver uploads a delivery.
+        </Alert>
+      </Snackbar>
+
+      {/* Browsers keep a page silent until it is tapped. Ask for that tap up front,
+          instead of the chime staying silent until someone happens to press the bell. */}
+      <Snackbar open={isOffice && !soundReady && !promptOpen} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert
+          severity='warning'
+          variant='filled'
+          icon={<i className='ri-volume-mute-line' />}
+          action={
+            <Button
+              color='inherit'
+              size='small'
+              onClick={() => {
+                unlockAlertSound()
+                playAlert()
+              }}
+            >
+              Turn on sound
+            </Button>
+          }
+        >
+          The alert sound is off until you tap this screen.
         </Alert>
       </Snackbar>
     </>

@@ -4,6 +4,7 @@ import type { ManifestType, ManifestFilters, ManifestStats } from '@/types/apps/
 import { listAllDocuments } from './paginate'
 import { companyIdForName, companyIdForTrip, getCompanies } from './company.actions'
 import { syncManifestLosses } from './driverloss.actions'
+import { resolveNotificationFor } from '@/libs/notifications/resolve'
 
 // Database and Collection IDs
 const DATABASE_ID = appwriteConfig.database
@@ -1235,6 +1236,9 @@ export const verifyManifestDetails = async (
     } catch (error) {
       console.warn('Could not update the loss sheet after verification:', error)
     }
+
+    // Checked: the upload's alert has done its job, so it leaves the office bell
+    await resolveNotificationFor(manifestId)
 
     return manifest as unknown as ManifestType
   } catch (error) {

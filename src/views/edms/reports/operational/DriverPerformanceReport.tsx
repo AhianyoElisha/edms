@@ -391,6 +391,7 @@ const DriverPerformanceReport = () => {
                   <TableCell>Driver</TableCell>
                   <TableCell align='center'>Total Trips</TableCell>
                   <TableCell align='center'>Completed</TableCell>
+                  <TableCell align='center'>Stops Delivered</TableCell>
                   <TableCell align='center'>Cancelled</TableCell>
                   <TableCell align='center'>Completion Rate</TableCell>
                   <TableCell align='right'>Revenue</TableCell>
@@ -401,7 +402,7 @@ const DriverPerformanceReport = () => {
               <TableBody>
                 {reportData.drivers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align='center' className='py-8'>
+                    <TableCell colSpan={9} align='center' className='py-8'>
                       <Typography variant='body2' color='text.secondary'>
                         No driver activity recorded for this period
                       </Typography>
@@ -430,6 +431,9 @@ const DriverPerformanceReport = () => {
                       </TableCell>
                       <TableCell align='center'>
                         <Chip size='small' label={driver.completedTrips} color='success' variant='tonal' />
+                      </TableCell>
+                      <TableCell align='center'>
+                        <Typography variant='body2' fontWeight={500}>{driver.manifestsDelivered ?? 0}</Typography>
                       </TableCell>
                       <TableCell align='center'>
                         <Chip size='small' label={driver.cancelledTrips} color='error' variant='tonal' />
