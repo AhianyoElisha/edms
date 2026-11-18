@@ -226,7 +226,9 @@ export async function getDriverPerformance(month?: number, year?: number) {
 
     // Get trips with driver info for the selected month (by trip date, as above)
     const trips = {
-      documents: await listTripsForInvoiceMonth<any>(currentMonth, currentYear)
+      documents: await listTripsForInvoiceMonth<any>(currentMonth, currentYear, 'documents', [
+        Query.select(['*', 'driver.$id', 'driver.name', 'driver.avatar', 'manifests.$id', 'manifests.status'])
+      ])
     }
 
     // Calculate driver performance
@@ -235,7 +237,7 @@ export async function getDriverPerformance(month?: number, year?: number) {
     trips.documents.forEach((trip: any) => {
       // Handle driver as either ID string or object with $id
       const driverId = typeof trip.driver === 'object' ? trip.driver?.$id : trip.driver
-      if (!driverId) return
+      if (!driverId || trip.status === 'cancelled') return
 
       // Get driver info from lookup
       const driverInfo = driverLookup.get(driverId) || { name: 'Unknown Driver', avatar: '/images/avatars/1.png' }
@@ -252,8 +254,15 @@ export async function getDriverPerformance(month?: number, year?: number) {
       }
 
       const driverData = driverMap.get(driverId)
+      const manifests: any[] = Array.isArray(trip.manifests) ? trip.manifests : []
+      const deliveredStops = manifests.filter(m => m?.status === 'delivered' || m?.status === 'completed').length
+
       driverData.totalTrips++
-      if (trip.status === 'completed') {
+      driverData.deliveredPackages += deliveredStops
+
+      // Same rule as the Driver Performance report: every manifest delivered counts as
+      // a finished trip, whether or not the office has closed the trip yet
+      if (trip.status === 'completed' || (manifests.length > 0 && deliveredStops === manifests.length)) {
         driverData.completedTrips++
       }
     })

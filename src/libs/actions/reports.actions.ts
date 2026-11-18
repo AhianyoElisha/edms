@@ -18,12 +18,15 @@ export const tripEarnsRevenue = (trip: any) => trip.status !== 'cancelled' && tr
 
 export const tripRevenue = (trip: any) => Number(trip.tripCost) || Number(trip.clientRate) || 0
 
+// A relationship comes back as an id or as the related row, depending on the query
+const relationId = (value: any): string | null => (value && typeof value === 'object' ? value.$id : value) || null
+
 /**
  * A month's trips, in the shape the old one-page queries returned. Trips are counted
  * in their invoice month: one moved to a later month's invoice leaves this month.
  */
-const monthTrips = async (month: number, year: number, api: 'rows' | 'documents') => {
-  const rows = await listTripsForInvoiceMonth<any>(month, year, api)
+const monthTrips = async (month: number, year: number, api: 'rows' | 'documents', extraQueries: string[] = []) => {
+  const rows = await listTripsForInvoiceMonth<any>(month, year, api, extraQueries)
 
   return { rows, documents: rows, total: rows.length }
 }
@@ -259,8 +262,11 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
       [Query.limit(500)]
     )
 
-    // Get all trips for the month
-    const trips = await monthTrips(currentMonth, currentYear, 'rows')
+    // Get all trips for the month. The driver and the manifests' statuses are asked for
+    // by name: the tables API leaves relationships out unless they are selected.
+    const trips = await monthTrips(currentMonth, currentYear, 'rows', [
+      Query.select(['*', 'driver.$id', 'driver.name', 'driver.email', 'driver.avatar', 'manifests.$id', 'manifests.status'])
+    ])
 
     // The month's expenses, each with the driver it was for where that is known
     // (saved on the expense, or whoever had the vehicle on the expense date)
@@ -269,41 +275,66 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
     // Build driver map
     const driverMap = new Map<string, any>()
     
+    const emptyDriver = () => ({
+      totalTrips: 0,
+      completedTrips: 0,
+      cancelledTrips: 0,
+      manifestsDelivered: 0,
+      totalExpenses: 0,
+      totalRevenue: 0,
+      totalDistance: 0,
+      onTimeDeliveries: 0,
+      lateDeliveries: 0
+    })
+
     // Initialize with all users
     users.rows.forEach((user: any) => {
       driverMap.set(user.$id, {
+        ...emptyDriver(),
         driverId: user.$id,
         driverName: user.name || user.email || 'Unknown',
         email: user.email,
-        avatar: user.avatar || '/images/avatars/1.png',
-        totalTrips: 0,
-        completedTrips: 0,
-        cancelledTrips: 0,
-        totalExpenses: 0,
-        totalRevenue: 0,
-        totalDistance: 0,
-        onTimeDeliveries: 0,
-        lateDeliveries: 0
+        avatar: user.avatar || '/images/avatars/1.png'
       })
     })
 
     // Aggregate trip data by driver
     trips.rows.forEach((trip: any) => {
-      const driverId = trip.driver
-      if (driverId && driverMap.has(driverId)) {
-        const driver = driverMap.get(driverId)
-        driver.totalTrips++
-        if (trip.status === 'completed') {
-          driver.completedTrips++
-        }
-        if (tripEarnsRevenue(trip)) {
-          driver.totalRevenue += tripRevenue(trip)
-        }
-        if (trip.status === 'cancelled') {
-          driver.cancelledTrips++
-        }
-        driver.totalDistance += trip.distanceTraveled || 0
+      const driverId = relationId(trip.driver)
+
+      if (!driverId) return
+
+      // A driver missing from the users list (left, or never synced) still gets a row
+      if (!driverMap.has(driverId)) {
+        driverMap.set(driverId, {
+          ...emptyDriver(),
+          driverId,
+          driverName: trip.driver?.name || 'Unknown Driver',
+          email: trip.driver?.email,
+          avatar: trip.driver?.avatar || '/images/avatars/1.png'
+        })
       }
+
+      const driver = driverMap.get(driverId)
+      const manifests: any[] = Array.isArray(trip.manifests) ? trip.manifests : []
+      const deliveredStops = manifests.filter(m => m?.status === 'delivered' || m?.status === 'completed').length
+
+      driver.totalTrips++
+      driver.manifestsDelivered += deliveredStops
+
+      if (trip.status === 'cancelled') {
+        driver.cancelledTrips++
+      } else if (trip.status === 'completed' || (manifests.length > 0 && deliveredStops === manifests.length)) {
+        // Judged on the driver's own work: every manifest delivered and uploaded counts,
+        // even while the office has not yet closed the trip (most trips never are).
+        driver.completedTrips++
+      }
+
+      if (tripEarnsRevenue(trip)) {
+        driver.totalRevenue += tripRevenue(trip)
+      }
+
+      driver.totalDistance += trip.distanceTraveled || 0
     })
 
     // Put each expense against its driver. Most expenses are not linked to a vehicle
@@ -350,12 +381,16 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
       .filter(d => d.totalTrips > 0 || d.totalExpenses > 0) // Drivers with trips, or with expenses against them
       .map(driver => ({
         ...driver,
-        completionRate: driver.totalTrips > 0 ? ((driver.completedTrips / driver.totalTrips) * 100).toFixed(1) : '0',
+        // Cancelled trips are not the driver's to finish, so they do not drag the rate down
+        completionRate:
+          driver.totalTrips - driver.cancelledTrips > 0
+            ? ((driver.completedTrips / (driver.totalTrips - driver.cancelledTrips)) * 100).toFixed(1)
+            : '0',
         profit: driver.totalRevenue - driver.totalExpenses,
         avgRevenuePerTrip: driver.totalTrips - driver.cancelledTrips > 0 ? (driver.totalRevenue / (driver.totalTrips - driver.cancelledTrips)).toFixed(2) : '0',
         avgExpensePerTrip: driver.totalTrips > 0 ? (driver.totalExpenses / driver.totalTrips).toFixed(2) : '0'
       }))
-      .sort((a, b) => b.completedTrips - a.completedTrips)
+      .sort((a, b) => b.completedTrips - a.completedTrips || b.manifestsDelivered - a.manifestsDelivered)
 
     return {
       period: {
@@ -368,7 +403,7 @@ export async function getDriverPerformanceReport(month?: number, year?: number) 
       topPerformers: driverPerformance.slice(0, 5),
       summary: {
         totalTrips: trips.total,
-        completedTrips: trips.rows.filter((t: any) => t.status === 'completed').length,
+        completedTrips: driverPerformance.reduce((sum, d) => sum + d.completedTrips, 0),
         totalRevenue: driverPerformance.reduce((sum, d) => sum + d.totalRevenue, 0),
         totalExpenses: driverPerformance.reduce((sum, d) => sum + d.totalExpenses, 0),
 

@@ -1,6 +1,7 @@
 // Appwrite Imports
 import { databases, storage, appwriteConfig, tablesDB } from '@/libs/appwrite.config'
 import { ID, Query } from 'appwrite'
+import { resolveNotificationFor } from '@/libs/notifications/resolve'
 
 // Type Imports
 import type { 
@@ -302,6 +303,9 @@ export async function verifyReturnWaybillDetails(
       waybillId,
       updateData
     )
+
+    // Checked: the upload's alert has done its job, so it leaves the office bell
+    await resolveNotificationFor(waybillId)
 
     return waybill as unknown as ReturnWaybillType
   } catch (error) {
