@@ -36,6 +36,7 @@ import { AppwriteProvider } from '@/contexts/AppwriteProvider'
 import MaintenanceBanner from './MaintenanceBanner'
 import PwaRegister from '@components/PwaRegister'
 import NewVersionBanner from '@components/NewVersionBanner'
+import InstallAppPrompt from '@components/InstallAppPrompt'
 
 // Configure Inter font
 const inter = Inter({
@@ -78,6 +79,13 @@ const Layout = ({ children }: ChildrenType) => {
     <html id='__next'>
       <head>
         <link rel="icon" href="/favicon.ico" />
+        {/* Hold on to the browser's install offer if it comes before the app has loaded */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__edmsInstallPrompt=e})"
+          }}
+        />
       </head>
       <body className={`flex is-full min-bs-full flex-auto flex-col ${inter.className}`} style={{ fontFamily: 'var(--font-inter)' }}>
         <PwaRegister />
@@ -100,6 +108,7 @@ const Layout = ({ children }: ChildrenType) => {
                   {/* </AuthWrapper> */}
                       <DynamicAttentionBanner />
                       <NewVersionBanner />
+                      <InstallAppPrompt />
                     </FrontLayout>
                   </IntersectionProvider>
               </BlankLayout>
