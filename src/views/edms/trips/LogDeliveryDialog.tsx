@@ -35,6 +35,7 @@ import { getManifestClientOptions, logManifestDelivery } from '@/libs/actions/ma
 
 // Lib Imports
 import { notifyOffice } from '@/libs/notifications/client'
+import { readManifestPhoto } from '@/libs/ocr/client'
 
 interface LogDeliveryDialogProps {
   open: boolean
@@ -53,6 +54,11 @@ interface LogDeliveryDialogProps {
  *
  * The company, package count and shortages can be added when the driver has
  * them to hand, but every one of them is optional and none blocks Submit.
+ *
+ * When the driver leaves the package count blank, the photo is read on the
+ * server as part of the submit and the total printed on the manifest is saved
+ * as the package count (and, short of any shortage the driver entered, as the
+ * delivered count). The office checks it against the photo on review.
  */
 const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDialogProps) => {
   const fullScreen = useMediaQuery((theme: Theme) => theme.breakpoints.down('sm'))
@@ -63,6 +69,7 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [submitStage, setSubmitStage] = useState<'uploading' | 'reading' | 'saving'>('uploading')
 
   // Optional extras
   const [clientOptions, setClientOptions] = useState<string[]>([])
@@ -182,6 +189,7 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
 
     try {
       setSubmitting(true)
+      setSubmitStage('uploading')
 
       const { storage, appwriteConfig } = await import('@/libs/appwrite.config')
       const { ID } = await import('appwrite')
@@ -207,6 +215,17 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
 
       const photoUrl = `${appwriteConfig.endpoint}/storage/buckets/${bucketId}/files/${uploaded.$id}/view?project=${appwriteConfig.project}`
 
+      // Read the total off the manifest unless the driver already typed one. A photo
+      // that cannot be read just leaves the count for the office, as before.
+      let photoCount: number | null = null
+
+      if (!parsedPackageCount) {
+        setSubmitStage('reading')
+        photoCount = (await readManifestPhoto({ fileId: uploaded.$id }, { timeoutMs: 30_000 }))?.totalPackages ?? null
+      }
+
+      setSubmitStage('saving')
+
       const manifest = await logManifestDelivery({
         tripId: tripData.$id,
         dropoffLocationId: selectedStop.locationId,
@@ -214,7 +233,7 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
         dropoffSequence: selectedStop.sequence,
         photoUrl,
         clientName: clientName.trim() || undefined,
-        packageCount: parsedPackageCount || undefined,
+        packageCount: parsedPackageCount || photoCount || undefined,
         shortageCount: parsedShortage || undefined,
         surplusCount: parsedSurplus || undefined
       })
@@ -223,7 +242,10 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
       // driver should not wait on it.
       notifyOffice({ kind: 'manifest_delivered', manifestId: manifest.$id })
 
-      toast.success(`Delivery logged for ${selectedStop.locationName || 'this stop'}`)
+      toast.success(
+        `Delivery logged for ${selectedStop.locationName || 'this stop'}` +
+          (photoCount ? ` - ${photoCount} package${photoCount === 1 ? '' : 's'} read from the manifest` : '')
+      )
       onLogged?.()
       onClose()
     } catch (error: any) {
@@ -246,8 +268,8 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
       <DialogContent dividers>
         <Alert severity='info' icon={<i className='ri-information-line' />} className='mb-5'>
           <Typography variant='body2'>
-            Pick the stop and take a photo of the manifest. That&apos;s all &mdash; the office fills in the manifest
-            number and package figures later. The details at the bottom are optional.
+            Pick the stop and take a photo of the manifest. That&apos;s all &mdash; the package total is read from the
+            photo and the office checks it later. The details at the bottom are optional.
           </Typography>
         </Alert>
 
@@ -371,7 +393,8 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
           3. Details <span className='font-normal text-textSecondary'>(optional)</span>
         </Typography>
         <Typography variant='caption' color='text.secondary' className='block mb-3'>
-          Skip these if you don&apos;t have them. Only enter shortages if packages were missing.
+          Skip these if you don&apos;t have them &mdash; a blank package count is read from the photo. Only enter
+          shortages if packages were missing.
         </Typography>
 
         <Grid container spacing={3}>
@@ -442,7 +465,13 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
           disabled={!selectedStop || !photoFile || submitting || Boolean(figuresError)}
           startIcon={submitting ? <CircularProgress size={18} color='inherit' /> : <i className='ri-check-double-line' />}
         >
-          {submitting ? 'Submitting…' : 'Submit Delivery'}
+          {!submitting
+            ? 'Submit Delivery'
+            : submitStage === 'reading'
+              ? 'Reading manifest…'
+              : submitStage === 'saving'
+                ? 'Saving…'
+                : 'Uploading…'}
         </Button>
       </DialogActions>
     </Dialog>
