@@ -215,13 +215,18 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
 
       const photoUrl = `${appwriteConfig.endpoint}/storage/buckets/${bucketId}/files/${uploaded.$id}/view?project=${appwriteConfig.project}`
 
-      // Read the total off the manifest unless the driver already typed one. A photo
-      // that cannot be read just leaves the count for the office, as before.
+      // Read the total off the manifest unless the driver already typed one. Only a
+      // reading the parser is sure of is saved: on the stored photos, the unsure ones
+      // were wrong more often than right (usually short, from rows it missed). A
+      // photo that cannot be read leaves the count for the office, as before; the
+      // admin can still ask for an unsure reading from the review screen.
       let photoCount: number | null = null
 
       if (!parsedPackageCount) {
         setSubmitStage('reading')
-        photoCount = (await readManifestPhoto({ fileId: uploaded.$id }, { timeoutMs: 30_000 }))?.totalPackages ?? null
+        const reading = await readManifestPhoto({ fileId: uploaded.$id }, { timeoutMs: 30_000 })
+
+        photoCount = reading?.confidence === 'high' ? reading.totalPackages : null
       }
 
       setSubmitStage('saving')

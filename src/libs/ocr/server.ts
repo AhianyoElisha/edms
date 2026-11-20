@@ -3,7 +3,7 @@ import 'server-only'
 import { Client, Databases, Query, Storage } from 'node-appwrite'
 
 import { EMPTY_READING, readManifestText } from './manifestText'
-import type { ManifestReading } from './manifestText'
+import type { ManifestReading, OcrWord } from './manifestText'
 
 /**
  * Server side of manifest OCR. Runs only inside /api/manifest-ocr.
@@ -121,8 +121,8 @@ export const readManifestPhoto = async (request: {
     throw new OcrError(502, 'The photo could not be read')
   }
 
-  const result = (await response.json()) as { lines?: Array<{ text: string }>; ms?: number }
+  const result = (await response.json()) as { lines?: Array<{ text: string }>; words?: OcrWord[]; ms?: number }
   const lines = (result.lines || []).map(line => line.text)
 
-  return { ...(lines.length ? readManifestText(lines) : EMPTY_READING), ms: result.ms }
+  return { ...(lines.length ? readManifestText(lines, result.words || []) : EMPTY_READING), ms: result.ms }
 }
