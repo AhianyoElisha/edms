@@ -4,8 +4,8 @@
 #   https://api.edsghana.com/ocr/health   -> GET  /health
 #   https://api.edsghana.com/ocr/ocr      -> POST /ocr   (Bearer OCR_SERVICE_TOKEN)
 #
-# Traefik picks the longest rule first, so this Host + /ocr rule wins over
-# Appwrite's catch-all PathPrefix(`/`). Appwrite has no /ocr path of its own.
+# Traefik ranks routers by rule length, and Appwrite's console rule is longer
+# than this one, so the priority is set outright. Appwrite has no /ocr path.
 
 services:
   manifest-ocr:
@@ -24,16 +24,17 @@ services:
     labels:
       - traefik.enable=true
       - traefik.constraint-label-stack=appwrite
-      - traefik.docker.network=appwrite_gateway
+      - traefik.docker.network=appwrite
       - traefik.http.services.manifest_ocr.loadbalancer.server.port=8000
       - traefik.http.middlewares.manifest_ocr_strip.stripprefix.prefixes=/ocr
       - traefik.http.routers.manifest_ocr.entrypoints=appwrite_websecure
       - traefik.http.routers.manifest_ocr.rule=Host(`api.edsghana.com`) && PathPrefix(`/ocr`)
       - traefik.http.routers.manifest_ocr.tls=true
+      - traefik.http.routers.manifest_ocr.priority=1000
       - traefik.http.routers.manifest_ocr.middlewares=manifest_ocr_strip
       - traefik.http.routers.manifest_ocr.service=manifest_ocr
 
 networks:
   gateway:
-    name: appwrite_gateway
+    name: appwrite
     external: true
