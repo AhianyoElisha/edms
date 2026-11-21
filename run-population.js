@@ -39,7 +39,7 @@ const loadEnvLocal = () => {
 loadEnvLocal();
 
 const CONFIG = {
-  APPWRITE_ENDPOINT: process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1',
+  APPWRITE_ENDPOINT: process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://api.edsghana.com/v1',
   PROJECT_ID: process.env.NEXT_PUBLIC_APPWRITE_PROJECT,
   DATABASE_ID: process.env.NEXT_PUBLIC_DATABASE_ID,
   API_KEY: process.env.APPWRITE_API_KEY
