@@ -49,6 +49,9 @@ import {
 } from '@/libs/actions/manifest.actions'
 import { getAllRateCards } from '@/libs/actions/ratecard.actions'
 
+// Lib Imports
+import { readManifestPhoto } from '@/libs/ocr/client'
+
 const PACKAGE_SIZES = [
   { value: 'small', label: 'Small' },
   { value: 'medium', label: 'Medium' },
@@ -238,6 +241,7 @@ const ManifestReviewQueue = () => {
   const [loading, setLoading] = useState(true)
   const [drafts, setDrafts] = useState<Record<string, DraftDetails>>({})
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [readingId, setReadingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [lightbox, setLightbox] = useState<string | null>(null)
   const [page, setPage] = useState(0)
@@ -386,6 +390,33 @@ const ManifestReviewQueue = () => {
     setDrafts(prev => ({ ...prev, [manifest.$id]: { ...(prev[manifest.$id] || initialDraft(manifest)), [field]: value } }))
   }
 
+  // Read the total off the photo again - for a manifest logged before OCR, one the
+  // service could not read at upload, or a count the admin wants to re-check.
+  const handleReadPhoto = async (manifest: any) => {
+    try {
+      setReadingId(manifest.$id)
+
+      const reading = await readManifestPhoto({ manifestId: manifest.$id }, { throwOnError: true })
+
+      if (!reading?.totalPackages) {
+        toast.info('No package total found on this photo - enter it by hand')
+
+        return
+      }
+
+      updateDraft(manifest, 'packageCount', String(reading.totalPackages))
+      toast.success(
+        `Read ${reading.totalPackages} package${reading.totalPackages === 1 ? '' : 's'}` +
+          (reading.evidence ? ` from "${reading.evidence}"` : '') +
+          (reading.confidence === 'low' ? ' - check it carefully' : '')
+      )
+    } catch (error: any) {
+      toast.error(error?.message || 'Could not read the photo')
+    } finally {
+      setReadingId(null)
+    }
+  }
+
   const handleVerify = async (manifest: any) => {
     const draft = draftFor(manifest)
 
@@ -480,7 +511,8 @@ const ManifestReviewQueue = () => {
           <div className='flex-1'>
             <Typography variant='h5'>Manifests Awaiting Review</Typography>
             <Typography variant='body2' color='text.secondary'>
-              Deliveries drivers logged in the field. Read the figures off each photo and complete the record.
+              Deliveries drivers logged in the field. Package totals are read from each photo &mdash; check them, add
+              any shortages written on the manifest, and save.
             </Typography>
           </div>
           <Chip
@@ -592,6 +624,19 @@ const ManifestReviewQueue = () => {
             const draft = draftFor(manifest)
             const photo = manifest.manifestImage || manifest.proofOfDeliveryImage
             const isSaving = savingId === manifest.$id
+            const isReading = readingId === manifest.$id
+
+            // A count already on the record came from the photo or the driver; flag it for checking
+            const prefilledCount = manifest.packageCount > 0 && draft.packageCount === String(manifest.packageCount)
+
+            // What arrived: the total less any shortage, the same rule the save applies
+            const draftTotal = parseOptionalCount(draft.packageCount)
+            const draftShort = parseOptionalCount(draft.shortageCount)
+
+            const deliveredPreview =
+              typeof draftTotal === 'number' && draftTotal > 0 && draftShort !== 'invalid'
+                ? Math.max(0, draftTotal - (draftShort ?? 0))
+                : null
 
             return (
               <Card key={manifest.$id}>
@@ -718,8 +763,26 @@ const ManifestReviewQueue = () => {
                             value={draft.packageCount}
                             onChange={e => updateDraft(manifest, 'packageCount', e.target.value)}
                             inputProps={{ min: 0 }}
-                            disabled={!canVerify || isSaving}
-                            helperText='Optional'
+                            disabled={!canVerify || isSaving || isReading}
+                            color={prefilledCount ? 'warning' : undefined}
+                            focused={prefilledCount ? true : undefined}
+                            helperText={prefilledCount ? 'Prefilled - check against the photo' : 'Optional'}
+                            InputProps={{
+                              endAdornment: photo && canVerify && (
+                                <InputAdornment position='end'>
+                                  <IconButton
+                                    size='small'
+                                    edge='end'
+                                    title='Read from photo'
+                                    aria-label='Read the package total from the photo'
+                                    onClick={() => handleReadPhoto(manifest)}
+                                    disabled={isSaving || isReading}
+                                  >
+                                    {isReading ? <CircularProgress size={16} /> : <i className='ri-scan-2-line text-lg' />}
+                                  </IconButton>
+                                </InputAdornment>
+                              )
+                            }}
                           />
                         </Grid>
                         <Grid item xs={6} sm={4}>
@@ -746,6 +809,19 @@ const ManifestReviewQueue = () => {
                             inputProps={{ min: 0 }}
                             disabled={!canVerify || isSaving}
                             helperText='Optional – extra packages carried'
+                          />
+                        </Grid>
+                        <Grid item xs={6} sm={4}>
+                          <TextField
+                            fullWidth
+                            size='small'
+                            label='Delivered'
+                            value={deliveredPreview ?? ''}
+                            placeholder='—'
+                            InputProps={{ readOnly: true }}
+                            InputLabelProps={{ shrink: true }}
+                            disabled={!canVerify || isSaving}
+                            helperText='Total less shortages'
                           />
                         </Grid>
                       </Grid>
