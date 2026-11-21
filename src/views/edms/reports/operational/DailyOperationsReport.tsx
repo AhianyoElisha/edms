@@ -63,8 +63,8 @@ const StatCard = ({ title, value, subtitle, icon, color = 'primary' }: {
         >
           <i className={`${icon} text-2xl`}></i>
         </Avatar>
-        <Box>
-          <Typography variant='h5' fontWeight={600}>{value}</Typography>
+        <Box className='min-is-0'>
+          <Typography variant='h5' fontWeight={600} className='break-words'>{value}</Typography>
           <Typography variant='body2' color='text.secondary'>{title}</Typography>
           {subtitle && (
             <Typography variant='caption' color='text.disabled'>{subtitle}</Typography>
@@ -155,7 +155,7 @@ const DailyOperationsReport = () => {
                 Overview of operations for {dayjs(reportData.date).format('MMMM D, YYYY')}
               </Typography>
             </Box>
-            <Box className='flex items-center gap-4'>
+            <Box className='flex flex-wrap items-center gap-3 is-full sm:is-auto'>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DatePicker
                   label='Select Date'
@@ -309,7 +309,7 @@ const DailyOperationsReport = () => {
             subheader={`${reportData.trips.list.length} trips scheduled for today`}
           />
           <TableContainer component={Paper}>
-            <Table>
+            <Table sx={{ minWidth: 720, '& th, & td': { whiteSpace: 'nowrap' } }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Trip ID</TableCell>
@@ -365,7 +365,7 @@ const DailyOperationsReport = () => {
             subheader={`${reportData.expenses.list.length} expense records`}
           />
           <TableContainer component={Paper}>
-            <Table>
+            <Table sx={{ minWidth: 720, '& th, & td': { whiteSpace: 'nowrap' } }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Description</TableCell>

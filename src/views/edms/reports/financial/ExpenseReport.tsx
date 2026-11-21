@@ -68,9 +68,9 @@ const StatCard = ({ title, value, subtitle, icon, color = 'primary', trend, tren
         >
           <i className={`${icon} text-2xl`}></i>
         </Avatar>
-        <Box className='flex-grow'>
+        <Box className='flex-grow min-is-0'>
           <Box className='flex items-center gap-2'>
-            <Typography variant='h5' fontWeight={600}>{value}</Typography>
+            <Typography variant='h5' fontWeight={600} className='break-words'>{value}</Typography>
             {trend && trendValue && (
               <Chip 
                 size='small' 
@@ -290,8 +290,8 @@ const ExpenseReport = () => {
                 Expense analysis for {reportData.period.monthName} {reportData.period.year}
               </Typography>
             </Box>
-            <Box className='flex items-center gap-4'>
-              <FormControl size='small' sx={{ minWidth: 140 }}>
+            <Box className='flex flex-wrap items-center gap-3 is-full sm:is-auto'>
+              <FormControl size='small' sx={{ minWidth: 140, flex: { xs: 1, sm: 'none' } }}>
                 <InputLabel>Month</InputLabel>
                 <Select
                   value={selectedMonth}
@@ -305,7 +305,7 @@ const ExpenseReport = () => {
                   ))}
                 </Select>
               </FormControl>
-              <FormControl size='small' sx={{ minWidth: 100 }}>
+              <FormControl size='small' sx={{ minWidth: 100, flex: { xs: 1, sm: 'none' } }}>
                 <InputLabel>Year</InputLabel>
                 <Select
                   value={selectedYear}
@@ -533,7 +533,7 @@ const ExpenseReport = () => {
         <Card>
           <CardHeader title='Recent Expenses' subheader='Latest expense transactions' />
           <TableContainer component={Paper}>
-            <Table>
+            <Table sx={{ minWidth: 720, '& th, & td': { whiteSpace: 'nowrap' } }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Description</TableCell>

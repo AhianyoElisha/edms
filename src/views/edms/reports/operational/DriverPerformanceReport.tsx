@@ -66,8 +66,8 @@ const StatCard = ({ title, value, subtitle, icon, color = 'primary' }: {
         >
           <i className={`${icon} text-2xl`}></i>
         </Avatar>
-        <Box>
-          <Typography variant='h5' fontWeight={600}>{value}</Typography>
+        <Box className='min-is-0'>
+          <Typography variant='h5' fontWeight={600} className='break-words'>{value}</Typography>
           <Typography variant='body2' color='text.secondary'>{title}</Typography>
           {subtitle && (
             <Typography variant='caption' color='text.disabled'>{subtitle}</Typography>
@@ -217,8 +217,8 @@ const DriverPerformanceReport = () => {
                 Driver metrics for {reportData.period.monthName} {reportData.period.year}
               </Typography>
             </Box>
-            <Box className='flex items-center gap-4'>
-              <FormControl size='small' sx={{ minWidth: 140 }}>
+            <Box className='flex flex-wrap items-center gap-3 is-full sm:is-auto'>
+              <FormControl size='small' sx={{ minWidth: 140, flex: { xs: 1, sm: 'none' } }}>
                 <InputLabel>Month</InputLabel>
                 <Select
                   value={selectedMonth}
@@ -232,7 +232,7 @@ const DriverPerformanceReport = () => {
                   ))}
                 </Select>
               </FormControl>
-              <FormControl size='small' sx={{ minWidth: 100 }}>
+              <FormControl size='small' sx={{ minWidth: 100, flex: { xs: 1, sm: 'none' } }}>
                 <InputLabel>Year</InputLabel>
                 <Select
                   value={selectedYear}
@@ -330,7 +330,7 @@ const DriverPerformanceReport = () => {
               {reportData.topPerformers.slice(0, 5).map((driver: any, index: number) => (
                 <Box 
                   key={driver.driverId} 
-                  className='flex items-center gap-4 p-3 rounded-lg'
+                  className='flex items-center gap-3 sm:gap-4 p-3 rounded-lg'
                   sx={{ bgcolor: index === 0 ? 'primary.lightOpacity' : 'action.hover' }}
                 >
                   <Box className='flex items-center justify-center w-8'>
@@ -344,16 +344,16 @@ const DriverPerformanceReport = () => {
                       <Typography variant='body2' fontWeight={600}>{index + 1}</Typography>
                     )}
                   </Box>
-                  <Avatar src={driver.avatar} alt={driver.driverName}>
+                  <Avatar src={driver.avatar} alt={driver.driverName} className='shrink-0 max-sm:hidden'>
                     {driver.driverName?.charAt(0) || 'D'}
                   </Avatar>
-                  <Box className='flex-grow'>
-                    <Typography variant='body1' fontWeight={500}>{driver.driverName || 'Unknown Driver'}</Typography>
-                    <Typography variant='caption' color='text.secondary'>{driver.email}</Typography>
+                  <Box className='flex-grow min-is-0'>
+                    <Typography variant='body1' fontWeight={500} noWrap>{driver.driverName || 'Unknown Driver'}</Typography>
+                    <Typography variant='caption' color='text.secondary' noWrap className='block'>{driver.email}</Typography>
                   </Box>
-                  <Box className='text-right'>
-                    <Typography variant='body2' fontWeight={600}>{driver.completedTrips} trips</Typography>
-                    <Typography variant='caption' color='success.main'>
+                  <Box className='text-right shrink-0'>
+                    <Typography variant='body2' fontWeight={600} noWrap>{driver.completedTrips} trips</Typography>
+                    <Typography variant='caption' color='success.main' noWrap className='block'>
                       GH₵ {Number(driver.totalRevenue).toLocaleString()}
                     </Typography>
                   </Box>
@@ -362,6 +362,7 @@ const DriverPerformanceReport = () => {
                     label={`${driver.completionRate}%`}
                     color={parseFloat(driver.completionRate) >= 80 ? 'success' : parseFloat(driver.completionRate) >= 50 ? 'warning' : 'error'}
                     variant='tonal'
+                    className='shrink-0 max-sm:hidden'
                   />
                 </Box>
               ))}
@@ -385,7 +386,7 @@ const DriverPerformanceReport = () => {
             subheader={`${reportData.drivers.length} drivers with activity this month`}
           />
           <TableContainer component={Paper}>
-            <Table>
+            <Table sx={{ minWidth: 720, '& th, & td': { whiteSpace: 'nowrap' } }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Driver</TableCell>

@@ -61,9 +61,9 @@ const StatCard = ({ title, value, subtitle, icon, color = 'primary', trend, tren
         >
           <i className={`${icon} text-2xl`}></i>
         </Avatar>
-        <Box className='flex-grow'>
+        <Box className='flex-grow min-is-0'>
           <Box className='flex items-center gap-2'>
-            <Typography variant='h5' fontWeight={600}>{value}</Typography>
+            <Typography variant='h5' fontWeight={600} className='break-words'>{value}</Typography>
             {trend && trendValue && (
               <Chip 
                 size='small' 
@@ -292,8 +292,8 @@ const RevenueReport = () => {
                 Financial performance for {reportData.period.monthName} {reportData.period.year}
               </Typography>
             </Box>
-            <Box className='flex items-center gap-4'>
-              <FormControl size='small' sx={{ minWidth: 140 }}>
+            <Box className='flex flex-wrap items-center gap-3 is-full sm:is-auto'>
+              <FormControl size='small' sx={{ minWidth: 140, flex: { xs: 1, sm: 'none' } }}>
                 <InputLabel>Month</InputLabel>
                 <Select
                   value={selectedMonth}
@@ -307,7 +307,7 @@ const RevenueReport = () => {
                   ))}
                 </Select>
               </FormControl>
-              <FormControl size='small' sx={{ minWidth: 100 }}>
+              <FormControl size='small' sx={{ minWidth: 100, flex: { xs: 1, sm: 'none' } }}>
                 <InputLabel>Year</InputLabel>
                 <Select
                   value={selectedYear}

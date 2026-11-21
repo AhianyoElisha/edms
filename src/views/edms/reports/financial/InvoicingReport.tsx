@@ -67,8 +67,8 @@ const StatCard = ({ title, value, subtitle, icon, color = 'primary' }: {
         >
           <i className={`${icon} text-2xl`}></i>
         </Avatar>
-        <Box>
-          <Typography variant='h5' fontWeight={600}>{value}</Typography>
+        <Box className='min-is-0'>
+          <Typography variant='h5' fontWeight={600} className='break-words'>{value}</Typography>
           <Typography variant='body2' color='text.secondary'>{title}</Typography>
           {subtitle && (
             <Typography variant='caption' color='text.disabled'>{subtitle}</Typography>
@@ -274,8 +274,8 @@ const InvoicingReport = () => {
                 Invoice and payment tracking for {reportData.period.monthName} {reportData.period.year}
               </Typography>
             </Box>
-            <Box className='flex items-center gap-4'>
-              <FormControl size='small' sx={{ minWidth: 140 }}>
+            <Box className='flex flex-wrap items-center gap-3 is-full sm:is-auto'>
+              <FormControl size='small' sx={{ minWidth: 140, flex: { xs: 1, sm: 'none' } }}>
                 <InputLabel>Month</InputLabel>
                 <Select
                   value={selectedMonth}
@@ -289,7 +289,7 @@ const InvoicingReport = () => {
                   ))}
                 </Select>
               </FormControl>
-              <FormControl size='small' sx={{ minWidth: 100 }}>
+              <FormControl size='small' sx={{ minWidth: 100, flex: { xs: 1, sm: 'none' } }}>
                 <InputLabel>Year</InputLabel>
                 <Select
                   value={selectedYear}
@@ -475,7 +475,7 @@ const InvoicingReport = () => {
             subheader={`${reportData.trips.length} trips. Mark trips invoiced or paid on Trips > Monthly Breakdown.`}
           />
           <TableContainer component={Paper}>
-            <Table>
+            <Table sx={{ minWidth: 720, '& th, & td': { whiteSpace: 'nowrap' } }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Trip</TableCell>
