@@ -38,6 +38,30 @@ export interface ManifestReading {
 
 export const EMPTY_READING: ManifestReading = { totalPackages: null, source: null, confidence: null, evidence: null }
 
+/**
+ * A figure far larger than the rest of its column is almost always a misread: a
+ * handwritten tick or note run into the printed count ("3" + "Box" read as 3130,
+ * a tick before "31" read as 814). The total is still offered, but not as sure.
+ */
+// Tested on the stored photos: 6 caught the misreads without losing a correct total.
+const STRAY_FACTOR = 6
+
+// No movable unit on the verified manifests held more than about 220 packages, so
+// a figure past this is a tick read as an extra digit ("58" and a tick as 581).
+const MAX_PER_UNIT = 400
+
+const hasStrayFigure = (values: number[]): boolean => {
+  if (values.some(value => value > MAX_PER_UNIT)) return true
+  if (values.length < 2) return false
+
+  return values.some((value, index) => {
+    const others = values.filter((_, i) => i !== index).sort((a, b) => a - b)
+    const median = others[others.length >> 1]
+
+    return value >= 100 && value > STRAY_FACTOR * Math.max(median, 1)
+  })
+}
+
 const MAX_PACKAGES = 10000
 
 const UNIT = '(?:packages?|packs?|pkgs?|pkg|parcels?|pieces?|pcs|items?|boxes?|bx|cartons?|ctns?|bags?|qty|quantity|units?|cases?)'
@@ -246,7 +270,7 @@ const fromPackageColumn = (words: OcrWord[], lines: string[]): ManifestReading |
       totalPackages: total,
       source: 'column',
       // Every row the header promises was found, and nothing more.
-      confidence: units === figures.length ? 'high' : 'low',
+      confidence: units === figures.length && !hasStrayFigure(figures.map(f => f.value)) ? 'high' : 'low',
       evidence: `Package count column: ${figures.map(f => f.value).join(' + ')}` + (units ? ` (${units} unit${units === 1 ? '' : 's'})` : '')
     }
 
@@ -370,7 +394,8 @@ const fromUnitRows = (words: OcrWord[], lines: string[]): ManifestReading | null
     totalPackages: figures.reduce((sum, value) => sum + value, 0),
     source: 'column',
     // Every unit the sheet declares has a row, and every row has its figure.
-    confidence: expected === rows.length && figures.length === rows.length ? 'high' : 'low',
+    confidence:
+      expected === rows.length && figures.length === rows.length && !hasStrayFigure(figures) ? 'high' : 'low',
     evidence:
       `Package figures: ${figures.join(' + ')}` +
       (expected ? ` (${figures.length} of ${expected} unit${expected === 1 ? '' : 's'})` : '')
