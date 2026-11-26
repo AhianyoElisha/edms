@@ -49,12 +49,13 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { listTripsAroundMonth, setTripsBilling, setTripsInvoiceMonth } from '@/libs/actions/tripMonth.actions'
 import { getCompanies } from '@/libs/actions/company.actions'
 import { getLossesForTrips, owedValue } from '@/libs/actions/driverloss.actions'
+import { getAllExpenses } from '@/libs/actions/expense.actions'
 
 // Util Imports
 import { monthKey, monthLabel, parseMonthKey, periodLabel, shiftMonthKey } from '@/utils/invoiceMonth'
 import type { InvoicePeriod } from '@/utils/invoiceMonth'
-import { byDriver, sumPrice, toBreakdownTrip } from './breakdown'
-import type { BreakdownTrip } from './breakdown'
+import { byDriver, splitExpenses, sumPrice, toBreakdownExpense, toBreakdownTrip } from './breakdown'
+import type { BreakdownExpense, BreakdownTrip, DriverBreakdown, ExpenseGroup } from './breakdown'
 
 // Only what the page shows; the relationship fields keep each page of results small
 const TRIP_FIELDS = [
@@ -72,6 +73,12 @@ const money = (value: number) =>
 
 const day = (value?: string) => (value ? dayjs(value).format('D MMM YYYY') : '')
 const statusLabel = (status: string) => status.replace(/_/g, ' ')
+const typeLabel = (type: string) => type.replace(/_/g, ' ').replace(/^./, letter => letter.toUpperCase())
+
+// A driver row on the By driver tab: their trips on the invoice and their expenses
+type DriverRow = DriverBreakdown & { expenses: ExpenseGroup | null }
+
+const expensesOf = (row: { expenses: ExpenseGroup | null }) => row.expenses?.total || 0
 
 const MonthlyBreakdown = () => {
   const { searchParams, setParam, setParams } = useUrlFilters()
@@ -181,7 +188,107 @@ const MonthlyBreakdown = () => {
       : base
   }, [show, totals, ofCompany, search])
 
-  const drivers = useMemo(() => byDriver(totals.invoice), [totals.invoice])
+  // ---- Expenses, to set beside the revenue ----
+  // The ones dated in the invoice's window (the month, or its half for a twice-monthly
+  // client), plus any linked to a trip listed here whatever their date
+  const [expenses, setExpenses] = useState<BreakdownExpense[]>([])
+  const [expensesLoading, setExpensesLoading] = useState(false)
+  const [expensesError, setExpensesError] = useState('')
+  const companyTripKey = ofCompany.map(trip => trip.$id).join(',')
+
+  const expenseWindow = useMemo(() => {
+    const start = dayjs(`${month}-01`).startOf('month')
+    const end = start.endOf('month')
+
+    if (period === 1 && cutoffDay) return { start, end: start.date(cutoffDay).endOf('day') }
+    if (period === 2 && cutoffDay) return { start: start.date(cutoffDay + 1), end }
+
+    return { start, end }
+  }, [month, period, cutoffDay])
+
+  useEffect(() => {
+    if (!canViewFinancials || loading) return
+
+    let cancelled = false
+    const tripIds = companyTripKey ? companyTripKey.split(',') : []
+
+    const chunks: string[][] = []
+
+    for (let i = 0; i < tripIds.length; i += 100) chunks.push(tripIds.slice(i, i + 100))
+
+    setExpensesLoading(true)
+    setExpensesError('')
+
+    Promise.all([
+      getAllExpenses({ dateRange: { start: expenseWindow.start.toISOString(), end: expenseWindow.end.toISOString() } }),
+      ...chunks.map(chunk => getAllExpenses({ tripIds: chunk }))
+    ])
+      .then(results => {
+        if (!cancelled) setExpenses(results.flat().map(toBreakdownExpense))
+      })
+      .catch(loadError => {
+        console.error('Error loading expenses for the breakdown:', loadError)
+        if (!cancelled) {
+          setExpenses([])
+          setExpensesError('Could not load the expenses for this period.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setExpensesLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [canViewFinancials, loading, companyTripKey, expenseWindow])
+
+  // What each listed trip spent (only expenses recorded against the trip itself)
+  const tripExpenses = useMemo(() => splitExpenses(expenses, ofCompany).byTrip, [expenses, ofCompany])
+
+  // The invoice's expenses: on its trips, on its drivers, and the rest
+  const invoiceExpenses = useMemo(() => splitExpenses(expenses, totals.invoice), [expenses, totals.invoice])
+
+  // Expenses are not kept per company, so with a company picked only the drivers on
+  // its trips are shown, and costs not tied to a driver are left out
+  const showAllExpenses = !companyId
+
+  const drivers: DriverRow[] = useMemo(() => {
+    const rows: DriverRow[] = byDriver(totals.invoice).map(driver => ({
+      ...driver,
+      expenses: invoiceExpenses.byDriver.get(driver.driverId || 'none') || null
+    }))
+
+    if (showAllExpenses) {
+      const listedIds = new Set(rows.map(row => row.driverId || 'none'))
+
+      // Drivers with expenses in the period but no trips on this invoice
+      invoiceExpenses.byDriver.forEach((group, driverId) => {
+        if (listedIds.has(driverId)) return
+
+        rows.push({
+          driverId: driverId === 'none' ? '' : driverId,
+          driverName: group.driverName,
+          trips: 0,
+          cancelled: 0,
+          amount: 0,
+          lines: [],
+          packagesSent: 0,
+          packagesDelivered: 0,
+          packagesShort: 0,
+          packagesExtra: 0,
+          tripsWithShortage: [],
+          expenses: group
+        })
+      })
+    }
+
+    return rows
+  }, [totals.invoice, invoiceExpenses, showAllExpenses])
+
+  const revenueTotal = sumPrice(totals.invoice)
+  const unassignedExpenses = showAllExpenses ? invoiceExpenses.unassigned.total : 0
+  const driverExpensesTotal = drivers.reduce((sum, driver) => sum + expensesOf(driver), 0)
+  const expensesTotal = driverExpensesTotal + unassignedExpenses
 
   // What the loss sheet charges each driver for this invoice's trips (priced items still owed)
   const [lossValues, setLossValues] = useState<Record<string, number>>({})
@@ -280,7 +387,11 @@ const MonthlyBreakdown = () => {
     { header: 'Vehicle', accessor: (trip: BreakdownTrip) => trip.vehicleNumber, width: 16, excelWidth: 14 },
     { header: 'Route', accessor: (trip: BreakdownTrip) => trip.routeName, width: 28, excelWidth: 32 },
     ...(canViewFinancials
-      ? [{ header: 'Price (GH₵)', accessor: (trip: BreakdownTrip) => (trip.earns ? trip.price.toFixed(2) : '0.00'), align: 'right' as const, width: 16, excelWidth: 14 }]
+      ? [
+          { header: 'Price (GH₵)', accessor: (trip: BreakdownTrip) => (trip.earns ? trip.price.toFixed(2) : '0.00'), align: 'right' as const, width: 16, excelWidth: 14 },
+          { header: 'Expenses (GH₵)', accessor: (trip: BreakdownTrip) => (tripExpenses.get(trip.$id)?.total || 0).toFixed(2), align: 'right' as const, width: 16, excelWidth: 14 },
+          { header: 'Net (GH₵)', accessor: (trip: BreakdownTrip) => ((trip.earns ? trip.price : 0) - (tripExpenses.get(trip.$id)?.total || 0)).toFixed(2), align: 'right' as const, width: 16, excelWidth: 14 }
+        ]
       : []),
     { header: 'Status', accessor: (trip: BreakdownTrip) => statusLabel(trip.status), width: 15, excelWidth: 18 },
     { header: 'Closed', accessor: (trip: BreakdownTrip) => day(trip.closedAt), width: 16, excelWidth: 14 },
@@ -288,9 +399,31 @@ const MonthlyBreakdown = () => {
     { header: 'Invoice', accessor: (trip: BreakdownTrip) => (trip.paid ? 'Paid' : trip.invoiced ? 'Invoiced' : 'Not invoiced'), width: 13, excelWidth: 14 }
   ]
 
-  const driverExportRows = drivers.flatMap(driver =>
-    driver.lines.map(line => ({ driverName: driver.driverName, ...line }))
-  )
+  // Each driver's routes, then a line with their revenue beside their expenses
+  const driverExportRows = [
+    ...drivers.flatMap(driver => [
+      ...driver.lines.map(line => ({ driverName: driver.driverName, ...line, expenses: null, net: null })),
+      ...(canViewFinancials
+        ? [
+            {
+              driverName: driver.driverName,
+              routeName: `Total for ${driver.driverName}`,
+              tonnage: '',
+              trips: driver.trips,
+              price: null,
+              amount: driver.amount,
+              expenses: expensesOf(driver),
+              net: driver.amount - expensesOf(driver)
+            }
+          ]
+        : [])
+    ]),
+    ...(canViewFinancials && unassignedExpenses > 0
+      ? [{ driverName: 'Not tied to a driver', routeName: '', tonnage: '', trips: 0, price: null, amount: 0, expenses: unassignedExpenses, net: -unassignedExpenses }]
+      : [])
+  ]
+
+  const optionalMoney = (value: number | null) => (value === null ? '' : value.toFixed(2))
 
   const driverColumns: ExportColumn[] = [
     { header: 'Driver', accessor: (row: any) => row.driverName, width: 34, excelWidth: 24 },
@@ -299,13 +432,15 @@ const MonthlyBreakdown = () => {
     { header: 'Trips', accessor: (row: any) => row.trips, align: 'right', width: 16, excelWidth: 8 },
     ...(canViewFinancials
       ? [
-          { header: 'Price (GH₵)', accessor: (row: any) => row.price.toFixed(2), align: 'right' as const, width: 24, excelWidth: 14 },
-          { header: 'Amount (GH₵)', accessor: (row: any) => row.amount.toFixed(2), align: 'right' as const, width: 28, excelWidth: 16 }
+          { header: 'Price (GH₵)', accessor: (row: any) => optionalMoney(row.price), align: 'right' as const, width: 24, excelWidth: 14 },
+          { header: 'Revenue (GH₵)', accessor: (row: any) => row.amount.toFixed(2), align: 'right' as const, width: 28, excelWidth: 16 },
+          { header: 'Expenses (GH₵)', accessor: (row: any) => optionalMoney(row.expenses), align: 'right' as const, width: 28, excelWidth: 16 },
+          { header: 'Net (GH₵)', accessor: (row: any) => optionalMoney(row.net), align: 'right' as const, width: 28, excelWidth: 16 }
         ]
       : [])
   ]
 
-  const lossRows = drivers.filter(driver => driver.packagesSent > 0 || driver.packagesShort > 0 || lossValue(driver.driverId) > 0)
+  const lossRows = drivers.filter(driver => driver.trips + driver.cancelled > 0).filter(driver => driver.packagesSent > 0 || driver.packagesShort > 0 || lossValue(driver.driverId) > 0)
 
   const lossColumns: ExportColumn[] = [
     { header: 'Driver', accessor: (row: any) => row.driverName, width: 52, excelWidth: 24 },
@@ -320,7 +455,13 @@ const MonthlyBreakdown = () => {
   const exportSummary: ExportSummary[] = [
     { label: 'Invoice', value: slotLabel() },
     { label: 'Trips on the invoice', value: String(totals.invoice.length) },
-    ...(canViewFinancials ? [{ label: 'Invoice total', value: money(sumPrice(totals.invoice)) }] : [])
+    ...(canViewFinancials
+      ? [
+          { label: 'Invoice total', value: money(revenueTotal) },
+          { label: 'Expenses', value: money(expensesTotal) },
+          { label: 'Net', value: money(revenueTotal - expensesTotal) }
+        ]
+      : [])
   ]
 
   const totalShort = drivers.reduce((sum, driver) => sum + driver.packagesShort, 0)
@@ -423,6 +564,51 @@ const MonthlyBreakdown = () => {
         ))}
       </Grid>
 
+      {canViewFinancials && (
+        <Card>
+          <CardContent className='flex flex-col gap-4'>
+            <div>
+              <Typography variant='h6'>Revenue and expenses</Typography>
+              <Typography variant='body2' color='text.secondary'>
+                The {invoiceName} beside the expenses dated{' '}
+                {expenseWindow.start.format('D MMM')} to {expenseWindow.end.format('D MMM YYYY')}
+                {showAllExpenses
+                  ? '.'
+                  : '. Expenses are not recorded per company, so this counts the expenses of the drivers on its trips, and leaves out costs not tied to a driver.'}
+              </Typography>
+            </div>
+            {expensesError && <Alert severity='warning'>{expensesError}</Alert>}
+            <Grid container spacing={4}>
+              <Grid item xs={12} sm={4}>
+                <Typography variant='body2' color='text.secondary'>
+                  Revenue
+                </Typography>
+                <Typography variant='h5'>{money(revenueTotal)}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography variant='body2' color='text.secondary'>
+                  Expenses
+                </Typography>
+                <Typography variant='h5'>{expensesLoading ? <CircularProgress size={20} /> : money(expensesTotal)}</Typography>
+                {!expensesLoading && showAllExpenses && expensesTotal > 0 && (
+                  <Typography variant='caption' color='text.secondary'>
+                    {money(driverExpensesTotal)} on drivers and trips · {money(unassignedExpenses)} not tied to a driver
+                  </Typography>
+                )}
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <Typography variant='body2' color='text.secondary'>
+                  Net
+                </Typography>
+                <Typography variant='h5' color={revenueTotal - expensesTotal < 0 ? 'error.main' : 'success.main'}>
+                  {expensesLoading ? <CircularProgress size={20} /> : money(revenueTotal - expensesTotal)}
+                </Typography>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <Tabs value={view} onChange={(_, value) => setParam('view', value === 'trips' ? '' : value)} className='border-be'>
           <Tab value='trips' label='Trips' />
@@ -443,6 +629,12 @@ const MonthlyBreakdown = () => {
         ) : view === 'trips' ? (
           <>
             <CardContent className='flex flex-col gap-4'>
+              {canViewFinancials && (
+                <Typography variant='body2' color='text.secondary'>
+                  A trip&apos;s expenses are the ones recorded against that trip. Fuel and allowances recorded against a
+                  driver are on the By driver tab.
+                </Typography>
+              )}
               <div className='flex flex-wrap items-center gap-2'>
                 <TextField
                   select
@@ -556,6 +748,8 @@ const MonthlyBreakdown = () => {
                     <TableCell>Vehicle</TableCell>
                     <TableCell>Route</TableCell>
                     {canViewFinancials && <TableCell align='right'>Price</TableCell>}
+                    {canViewFinancials && <TableCell align='right'>Expenses</TableCell>}
+                    {canViewFinancials && <TableCell align='right'>Net</TableCell>}
                     <TableCell>Status</TableCell>
                     <TableCell>Closed</TableCell>
                     <TableCell>Invoice month</TableCell>
@@ -565,7 +759,7 @@ const MonthlyBreakdown = () => {
                 <TableBody>
                   {listed.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={11} align='center'>
+                      <TableCell colSpan={13} align='center'>
                         <Typography color='text.secondary' className='p-4'>
                           No trips here for {slotLabel()}
                         </Typography>
@@ -589,6 +783,16 @@ const MonthlyBreakdown = () => {
                       <TableCell>{trip.vehicleNumber}</TableCell>
                       <TableCell>{trip.routeName}</TableCell>
                       {canViewFinancials && <TableCell align='right'>{trip.earns ? money(trip.price) : '-'}</TableCell>}
+                      {canViewFinancials && (
+                        <TableCell align='right'>
+                          {tripExpenses.get(trip.$id) ? money(tripExpenses.get(trip.$id)!.total) : '-'}
+                        </TableCell>
+                      )}
+                      {canViewFinancials && (
+                        <TableCell align='right'>
+                          {money((trip.earns ? trip.price : 0) - (tripExpenses.get(trip.$id)?.total || 0))}
+                        </TableCell>
+                      )}
                       <TableCell className='capitalize'>{statusLabel(trip.status)}</TableCell>
                       <TableCell>
                         {trip.closedAt ? (
@@ -646,7 +850,11 @@ const MonthlyBreakdown = () => {
           <>
             <CardContent>
               <Typography variant='body2' color='text.secondary'>
-                Trips on the {invoiceName}, by driver. Open a driver to see their trips by route and price.
+                Trips on the {invoiceName}, by driver
+                {canViewFinancials
+                  ? `, beside each driver's expenses dated ${expenseWindow.start.format('D MMM')} to ${expenseWindow.end.format('D MMM')} (and any recorded against their trips here)`
+                  : ''}
+                . Open a driver to see their trips by route and price{canViewFinancials ? ', and what they spent' : ''}.
               </Typography>
             </CardContent>
             <TableContainer>
@@ -657,13 +865,15 @@ const MonthlyBreakdown = () => {
                     <TableCell>Driver</TableCell>
                     <TableCell align='right'>Trips</TableCell>
                     <TableCell align='right'>Cancelled</TableCell>
-                    {canViewFinancials && <TableCell align='right'>Amount</TableCell>}
+                    {canViewFinancials && <TableCell align='right'>Revenue</TableCell>}
+                    {canViewFinancials && <TableCell align='right'>Expenses</TableCell>}
+                    {canViewFinancials && <TableCell align='right'>Net</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {drivers.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} align='center'>
+                      <TableCell colSpan={7} align='center'>
                         <Typography color='text.secondary' className='p-4'>
                           No trips on the {invoiceName}
                         </Typography>
@@ -673,6 +883,7 @@ const MonthlyBreakdown = () => {
                   {drivers.map(driver => {
                     const key = driver.driverId || 'none'
                     const open = openDriver === key
+                    const spent = expensesOf(driver)
 
                     return (
                       <Fragment key={key}>
@@ -681,41 +892,135 @@ const MonthlyBreakdown = () => {
                             <i className={open ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line'} />
                           </TableCell>
                           <TableCell className='font-medium'>{driver.driverName}</TableCell>
-                          <TableCell align='right'>{driver.trips}</TableCell>
+                          <TableCell align='right'>{driver.trips || '-'}</TableCell>
                           <TableCell align='right'>{driver.cancelled || '-'}</TableCell>
                           {canViewFinancials && <TableCell align='right'>{money(driver.amount)}</TableCell>}
+                          {canViewFinancials && (
+                            <TableCell align='right'>{expensesLoading ? '…' : spent > 0 ? money(spent) : '-'}</TableCell>
+                          )}
+                          {canViewFinancials && (
+                            <TableCell align='right'>
+                              <Typography variant='body2' color={driver.amount - spent < 0 ? 'error.main' : 'text.primary'}>
+                                {money(driver.amount - spent)}
+                              </Typography>
+                            </TableCell>
+                          )}
                         </TableRow>
                         <TableRow>
-                          <TableCell colSpan={5} className='p-0 border-0'>
+                          <TableCell colSpan={7} className='p-0 border-0'>
                             <Collapse in={open} unmountOnExit>
-                              <Table size='small' className='bg-actionHover'>
-                                <TableHead>
-                                  <TableRow>
-                                    <TableCell>Route</TableCell>
-                                    <TableCell align='right'>Tonnage</TableCell>
-                                    <TableCell align='right'>Trips</TableCell>
-                                    {canViewFinancials && <TableCell align='right'>Price</TableCell>}
-                                    {canViewFinancials && <TableCell align='right'>Amount</TableCell>}
-                                  </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                  {driver.lines.map(line => (
-                                    <TableRow key={`${line.routeName}|${line.tonnage}|${line.price}`}>
-                                      <TableCell>{line.routeName}</TableCell>
-                                      <TableCell align='right'>{line.tonnage || '-'}</TableCell>
-                                      <TableCell align='right'>{line.trips}</TableCell>
-                                      {canViewFinancials && <TableCell align='right'>{money(line.price)}</TableCell>}
-                                      {canViewFinancials && <TableCell align='right'>{money(line.amount)}</TableCell>}
+                              {driver.lines.length > 0 && (
+                                <Table size='small' className='bg-actionHover'>
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell>Route</TableCell>
+                                      <TableCell align='right'>Tonnage</TableCell>
+                                      <TableCell align='right'>Trips</TableCell>
+                                      {canViewFinancials && <TableCell align='right'>Price</TableCell>}
+                                      {canViewFinancials && <TableCell align='right'>Amount</TableCell>}
                                     </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
+                                  </TableHead>
+                                  <TableBody>
+                                    {driver.lines.map(line => (
+                                      <TableRow key={`${line.routeName}|${line.tonnage}|${line.price}`}>
+                                        <TableCell>{line.routeName}</TableCell>
+                                        <TableCell align='right'>{line.tonnage || '-'}</TableCell>
+                                        <TableCell align='right'>{line.trips}</TableCell>
+                                        {canViewFinancials && <TableCell align='right'>{money(line.price)}</TableCell>}
+                                        {canViewFinancials && <TableCell align='right'>{money(line.amount)}</TableCell>}
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              )}
+                              {canViewFinancials && driver.expenses && driver.expenses.items.length > 0 && (
+                                <Table size='small' className='bg-actionHover'>
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell>Expense date</TableCell>
+                                      <TableCell>Type</TableCell>
+                                      <TableCell>Description</TableCell>
+                                      <TableCell align='right'>Amount</TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {[...driver.expenses.items]
+                                      .sort((a, b) => a.expenseDate.localeCompare(b.expenseDate))
+                                      .map(expense => (
+                                        <TableRow key={expense.$id}>
+                                          <TableCell>{day(expense.expenseDate)}</TableCell>
+                                          <TableCell>{typeLabel(expense.expenseType)}</TableCell>
+                                          <TableCell>
+                                            <Typography component={Link} href={`/edms/expenses/${expense.$id}`} variant='body2' color='primary'>
+                                              {expense.description || 'View expense'}
+                                            </Typography>
+                                          </TableCell>
+                                          <TableCell align='right'>{money(expense.amount)}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                  </TableBody>
+                                </Table>
+                              )}
                             </Collapse>
                           </TableCell>
                         </TableRow>
                       </Fragment>
                     )
                   })}
+                  {canViewFinancials && unassignedExpenses > 0 && (
+                    <>
+                      <TableRow hover className='cursor-pointer' onClick={() => setOpenDriver(openDriver === 'unassigned' ? '' : 'unassigned')}>
+                        <TableCell padding='checkbox'>
+                          <i className={openDriver === 'unassigned' ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line'} />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant='body2' color='text.secondary'>
+                            Not tied to a driver
+                          </Typography>
+                        </TableCell>
+                        <TableCell align='right'>-</TableCell>
+                        <TableCell align='right'>-</TableCell>
+                        <TableCell align='right'>-</TableCell>
+                        <TableCell align='right'>{money(unassignedExpenses)}</TableCell>
+                        <TableCell align='right'>
+                          <Typography variant='body2' color='error.main'>
+                            {money(-unassignedExpenses)}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell colSpan={7} className='p-0 border-0'>
+                          <Collapse in={openDriver === 'unassigned'} unmountOnExit>
+                            <Table size='small' className='bg-actionHover'>
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>Expense type</TableCell>
+                                  <TableCell align='right'>Expenses</TableCell>
+                                  <TableCell align='right'>Amount</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {Object.entries(invoiceExpenses.unassigned.byType)
+                                  .sort((a, b) => b[1] - a[1])
+                                  .map(([type, amount]) => (
+                                    <TableRow key={type}>
+                                      <TableCell>{typeLabel(type)}</TableCell>
+                                      <TableCell align='right'>
+                                        {invoiceExpenses.unassigned.items.filter(expense => expense.expenseType === type).length}
+                                      </TableCell>
+                                      <TableCell align='right'>{money(amount)}</TableCell>
+                                    </TableRow>
+                                  ))}
+                              </TableBody>
+                            </Table>
+                            <Typography variant='caption' color='text.secondary' className='block p-3'>
+                              Expenses with no driver or vehicle on them. Recording the driver (or the trip) on an expense moves it to that driver.
+                            </Typography>
+                          </Collapse>
+                        </TableCell>
+                      </TableRow>
+                    </>
+                  )}
                   {drivers.length > 0 && (
                     <TableRow>
                       <TableCell />
@@ -726,7 +1031,17 @@ const MonthlyBreakdown = () => {
                       <TableCell align='right'>{drivers.reduce((sum, driver) => sum + driver.cancelled, 0) || '-'}</TableCell>
                       {canViewFinancials && (
                         <TableCell align='right' className='font-medium'>
-                          {money(drivers.reduce((sum, driver) => sum + driver.amount, 0))}
+                          {money(revenueTotal)}
+                        </TableCell>
+                      )}
+                      {canViewFinancials && (
+                        <TableCell align='right' className='font-medium'>
+                          {money(expensesTotal)}
+                        </TableCell>
+                      )}
+                      {canViewFinancials && (
+                        <TableCell align='right' className='font-medium'>
+                          {money(revenueTotal - expensesTotal)}
                         </TableCell>
                       )}
                     </TableRow>

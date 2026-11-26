@@ -221,3 +221,95 @@ export const byDriver = (trips: BreakdownTrip[]): DriverBreakdown[] => {
     }))
     .sort((a, b) => b.amount - a.amount || a.driverName.localeCompare(b.driverName))
 }
+
+// ==================== EXPENSES ====================
+
+/** The parts of an expense the breakdown needs */
+export type BreakdownExpense = {
+  $id: string
+  amount: number
+  expenseDate: string
+  expenseType: string
+  description: string
+  tripId: string
+  driverId: string
+  driverName: string
+}
+
+export const toBreakdownExpense = (expense: any): BreakdownExpense => ({
+  $id: expense.$id,
+  amount: number(expense.amount) || number(expense.totalAmount),
+  expenseDate: expense.expenseDate || '',
+  expenseType: expense.expenseType || 'other',
+  description: expense.description || '',
+  tripId: (expense.tripId && typeof expense.tripId === 'object' ? expense.tripId.$id : expense.tripId) || '',
+  driverId: expense.driverId || '',
+  driverName: expense.driverName || ''
+})
+
+export type ExpenseGroup = { total: number; byType: Record<string, number>; items: BreakdownExpense[] }
+
+export type ExpenseSplit = {
+  /** trip id -> the expenses linked to that trip */
+  byTrip: Map<string, ExpenseGroup>
+
+  /** driver id -> the expenses on their trips here, and the ones recorded against them */
+  byDriver: Map<string, ExpenseGroup & { driverName: string }>
+
+  /** Neither on a trip here nor tied to a driver: office costs, unlinked fuel, and so on */
+  unassigned: ExpenseGroup
+
+  total: number
+}
+
+const emptyGroup = (): ExpenseGroup => ({ total: 0, byType: {}, items: [] })
+
+const addTo = (group: ExpenseGroup, expense: BreakdownExpense) => {
+  group.total += expense.amount
+  group.byType[expense.expenseType] = (group.byType[expense.expenseType] || 0) + expense.amount
+  group.items.push(expense)
+}
+
+/**
+ * Puts each expense in one place, so the expenses add up to the total once:
+ *  - linked to one of `trips`: on that trip, and on that trip's driver
+ *  - linked to some other trip: left out - it counts wherever that trip is invoiced
+ *  - otherwise on the driver it was for (recorded on it, or who had the vehicle that day)
+ *  - otherwise not tied to a driver
+ *
+ * `expenses` should be the ones dated in the period plus the ones linked to `trips`.
+ */
+export const splitExpenses = (expenses: BreakdownExpense[], trips: BreakdownTrip[]): ExpenseSplit => {
+  const tripsById = new Map(trips.map(trip => [trip.$id, trip]))
+  const split: ExpenseSplit = { byTrip: new Map(), byDriver: new Map(), unassigned: emptyGroup(), total: 0 }
+  const seen = new Set<string>()
+
+  const driverGroup = (driverId: string, driverName: string) => {
+    if (!split.byDriver.has(driverId)) split.byDriver.set(driverId, { ...emptyGroup(), driverName })
+
+    return split.byDriver.get(driverId)!
+  }
+
+  expenses.forEach(expense => {
+    if (seen.has(expense.$id) || expense.amount <= 0) return
+    seen.add(expense.$id)
+
+    if (expense.tripId) {
+      const trip = tripsById.get(expense.tripId)
+
+      if (!trip) return
+
+      if (!split.byTrip.has(trip.$id)) split.byTrip.set(trip.$id, emptyGroup())
+      addTo(split.byTrip.get(trip.$id)!, expense)
+      addTo(driverGroup(trip.driverId || 'none', trip.driverName), expense)
+    } else if (expense.driverId) {
+      addTo(driverGroup(expense.driverId, expense.driverName || 'Unknown driver'), expense)
+    } else {
+      addTo(split.unassigned, expense)
+    }
+
+    split.total += expense.amount
+  })
+
+  return split
+}

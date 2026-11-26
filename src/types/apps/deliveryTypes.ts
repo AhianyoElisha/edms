@@ -753,6 +753,8 @@ export interface ExpenseFilters {
   paymentStatus?: PaymentStatusType
   vehicleId?: string
   tripId?: string
+  /** Expenses linked to any of these trips */
+  tripIds?: string[]
   dateRange?: {
     start: string
     end: string
