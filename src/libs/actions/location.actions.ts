@@ -26,6 +26,9 @@ export interface CreatePickupLocationData {
   contactPerson?: string
   contactPhone?: string
   isActive: boolean
+
+  /** The company whose goods are collected here */
+  companyId?: string | null
 }
 
 export interface CreateDropoffLocationData {

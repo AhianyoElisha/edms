@@ -68,13 +68,14 @@ interface DraftDetails {
 }
 
 // Start each form from whatever is already known: figures the driver typed at
-// the stop, and the company the trip was priced for.
+// the stop, the company of the pickup location the trip set out from, or else the
+// company the trip was priced for.
 const initialDraft = (manifest: any): DraftDetails => {
   const trip = typeof manifest.trip === 'object' ? manifest.trip : null
 
   return {
     manifestNumber: '',
-    clientName: manifest.clientName || trip?.rateCard?.clientName || '',
+    clientName: manifest.clientName || manifest.pickupCompanyName || trip?.rateCard?.clientName || '',
     packageSize: manifest.packageSize || '',
     packageCount: manifest.packageCount > 0 ? String(manifest.packageCount) : '',
     shortageCount: manifest.shortageCount > 0 ? String(manifest.shortageCount) : '',
@@ -119,13 +120,15 @@ const tripOf = (manifest: any) => (typeof manifest.trip === 'object' ? manifest.
 type RouteCompanies = Record<string, string>
 
 // A manifest in this queue rarely has its company filled in yet (that is part of the
-// review), so fall back to the company whose rate card covers the trip's route.
+// review), so fall back to the company of the pickup location, then to the company
+// whose rate card covers the trip's route.
 const companyOf = (manifest: any, routeCompanies: RouteCompanies = {}) => {
   const trip = tripOf(manifest)
   const route = trip?.route
 
   return (
     manifest.clientName ||
+    manifest.pickupCompanyName ||
     trip?.rateCard?.clientName ||
     (route && typeof route === 'object' ? routeCompanies[route.$id] || routeCompanies[route.routeCode] : '') ||
     ''

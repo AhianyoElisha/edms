@@ -24,6 +24,9 @@ import { createPickupLocation, CreatePickupLocationData } from '@/libs/actions/l
 import { WEST_AFRICAN_COUNTRIES } from '@/data/countries'
 import MenuItem from '@mui/material/MenuItem'
 import { GHANA_REGIONS, toGhanaRegion } from '@/utils/ghanaRegions'
+import CompanyField from '@/components/edms/CompanyField'
+import { getCompanies } from '@/libs/actions/company.actions'
+import type { CompanyType } from '@/libs/actions/company.actions'
 
 interface AddPickupLocationDrawerProps {
   open: boolean
@@ -52,11 +55,25 @@ const AddPickupLocationDrawer: React.FC<AddPickupLocationDrawerProps> = ({
   })
   const [suggestedName, setSuggestedName] = useState('')
 
+  // The company whose goods are collected here, picked by name and saved by id
+  const [companies, setCompanies] = useState<CompanyType[]>([])
+  const [companyName, setCompanyName] = useState('')
+
+  const loadCompanies = () =>
+    getCompanies()
+      .then(setCompanies)
+      .catch(error => console.error('Error loading companies:', error))
+
+  useEffect(() => {
+    if (open) loadCompanies()
+  }, [open])
+
   // Reset form when drawer opens
   useEffect(() => {
     if (open) {
       setSelectedCoordinates(null)
       setSuggestedName('')
+      setCompanyName('')
       setFormData({
         locationName: '',
         locationCode: '',
@@ -130,6 +147,7 @@ const AddPickupLocationDrawer: React.FC<AddPickupLocationDrawerProps> = ({
 
   const validateForm = (): string | null => {
     if (!formData.locationName?.trim()) return 'Location name is required'
+    if (!companyName) return 'Company is required'
     if (!formData.locationCode?.trim()) return 'Location code is required'
     if (!formData.address?.trim()) return 'Address is required'
     if (!formData.city?.trim()) return 'City is required'
@@ -146,7 +164,15 @@ const AddPickupLocationDrawer: React.FC<AddPickupLocationDrawerProps> = ({
 
     setLoading(true)
     try {
-      await createPickupLocation(formData)
+      const companyId = companies.find(company => company.name === companyName)?.$id
+
+      if (!companyId) {
+        toast.error('Pick the company from the list')
+
+        return
+      }
+
+      await createPickupLocation({ ...formData, companyId })
       toast.success('Warehouse created successfully!')
       onSuccess()
       onClose()
@@ -211,6 +237,18 @@ const AddPickupLocationDrawer: React.FC<AddPickupLocationDrawerProps> = ({
                 onChange={(e) => handleInputChange('locationCode', e.target.value)}
                 required
                 placeholder='Auto-generated from coordinates'
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <CompanyField
+                size='medium'
+                required
+                allowAdd
+                options={companies.filter(company => company.isActive !== false).map(company => company.name)}
+                value={companyName}
+                onChange={setCompanyName}
+                onCompanyAdded={loadCompanies}
+                helperText="The company whose goods are collected here. Manifests from this location are filled in with it."
               />
             </Grid>
           </Grid>

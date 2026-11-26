@@ -24,6 +24,9 @@ import { updatePickupLocation } from '@/libs/actions/location.actions'
 import { WEST_AFRICAN_COUNTRIES } from '@/data/countries'
 import MenuItem from '@mui/material/MenuItem'
 import { GHANA_REGIONS, toGhanaRegion } from '@/utils/ghanaRegions'
+import CompanyField from '@/components/edms/CompanyField'
+import { getCompanies } from '@/libs/actions/company.actions'
+import type { CompanyType } from '@/libs/actions/company.actions'
 
 interface EditPickupLocationDrawerProps {
   open: boolean
@@ -54,6 +57,19 @@ const EditPickupLocationDrawer: React.FC<EditPickupLocationDrawerProps> = ({
   })
   const [suggestedName, setSuggestedName] = useState('')
 
+  // The company whose goods are collected here, picked by name and saved by id
+  const [companies, setCompanies] = useState<CompanyType[]>([])
+  const [companyName, setCompanyName] = useState('')
+
+  const loadCompanies = () =>
+    getCompanies()
+      .then(setCompanies)
+      .catch(error => console.error('Error loading companies:', error))
+
+  useEffect(() => {
+    if (open) loadCompanies()
+  }, [open])
+
   // Populate form when location changes
   useEffect(() => {
     if (open && location) {
@@ -79,6 +95,13 @@ const EditPickupLocationDrawer: React.FC<EditPickupLocationDrawerProps> = ({
       }
     }
   }, [open, location])
+
+  // Show the location's current company once the company list has loaded
+  useEffect(() => {
+    if (open && location) {
+      setCompanyName(companies.find(company => company.$id === location.companyId)?.name || '')
+    }
+  }, [open, location, companies])
 
   const handleInputChange = (field: string, value: any) => {
     if (field.includes('.')) {
@@ -138,6 +161,7 @@ const EditPickupLocationDrawer: React.FC<EditPickupLocationDrawerProps> = ({
 
   const validateForm = (): string | null => {
     if (!formData.locationName?.trim()) return 'Location name is required'
+    if (!companyName) return 'Company is required'
     if (!formData.locationCode?.trim()) return 'Location code is required'
     if (!formData.address?.trim()) return 'Address is required'
     if (!formData.city?.trim()) return 'City is required'
@@ -156,9 +180,18 @@ const EditPickupLocationDrawer: React.FC<EditPickupLocationDrawerProps> = ({
 
     setLoading(true)
     try {
+      const companyId = companies.find(company => company.name === companyName)?.$id
+
+      if (!companyId) {
+        toast.error('Pick the company from the list')
+
+        return
+      }
+
       await updatePickupLocation({
         $id: location.$id,
-        ...formData
+        ...formData,
+        companyId
       })
       toast.success('Warehouse updated successfully!')
       onSuccess()
@@ -224,6 +257,18 @@ const EditPickupLocationDrawer: React.FC<EditPickupLocationDrawerProps> = ({
                 onChange={(e) => handleInputChange('locationCode', e.target.value)}
                 required
                 placeholder='Auto-generated from coordinates'
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <CompanyField
+                size='medium'
+                required
+                allowAdd
+                options={companies.filter(company => company.isActive !== false).map(company => company.name)}
+                value={companyName}
+                onChange={setCompanyName}
+                onCompanyAdded={loadCompanies}
+                helperText="The company whose goods are collected here. Manifests from this location are filled in with it."
               />
             </Grid>
           </Grid>

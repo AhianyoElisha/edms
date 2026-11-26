@@ -42,6 +42,7 @@ import {
 import LocationTableFilters from '../LocationTableFilters'
 import AddPickupLocationDrawer from './AddPickupLocationDrawer'
 import EditPickupLocationDrawer from './EditPickupLocationDrawer'
+import { getCompanies } from '@/libs/actions/company.actions'
 
 // Component Imports
 import CustomAvatar from '@core/components/mui/Avatar'
@@ -86,14 +87,20 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
   const [locationToEdit, setLocationToEdit] = useState<PickupLocationType | null>(null)
 
+  // company id -> name, for the Company column
+  const [companyNames, setCompanyNames] = useState<Record<string, string>>({})
+  const companyOf = (location: PickupLocationType) => (location.companyId && companyNames[location.companyId]) || ''
+
   // Fetch locations
   const fetchLocations = async () => {
     try {
       setLoading(true)
-      const [locationsData, statsData] = await Promise.all([
+      const [locationsData, statsData, companies] = await Promise.all([
         getAllPickupLocations(),
-        getLocationStatistics()
+        getLocationStatistics(),
+        getCompanies().catch(() => [])
       ])
+      setCompanyNames(Object.fromEntries(companies.map(company => [company.$id, company.name])))
       setLocations(locationsData)
       setStatistics(statsData.pickup)
     } catch (error) {
@@ -119,7 +126,8 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
         location.address.toLowerCase().includes(filters.search.toLowerCase()) ||
         location.city.toLowerCase().includes(filters.search.toLowerCase()) ||
         location.locationCode.toLowerCase().includes(filters.search.toLowerCase()) ||
-        (location.contactPerson && location.contactPerson.toLowerCase().includes(filters.search.toLowerCase()))
+        (location.contactPerson && location.contactPerson.toLowerCase().includes(filters.search.toLowerCase())) ||
+        companyOf(location).toLowerCase().includes(filters.search.toLowerCase())
       )
     }
 
@@ -134,7 +142,7 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
     }
 
     return filtered
-  }, [locations, filters])
+  }, [locations, filters, companyNames])
 
   useEffect(() => {
     setFilteredLocations(applyFilters)
@@ -298,6 +306,7 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
               <TableHead>
                 <TableRow>
                   <TableCell>Location Details</TableCell>
+                  <TableCell>Company</TableCell>
                   <TableCell>Address</TableCell>
                   <TableCell>Contact</TableCell>
                   <TableCell>Status</TableCell>
@@ -316,6 +325,13 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
                           Code: {location.locationCode}
                         </Typography>
                       </Box>
+                    </TableCell>
+                    <TableCell>
+                      {companyOf(location) ? (
+                        <Typography variant="body2">{companyOf(location)}</Typography>
+                      ) : (
+                        <Chip label="Not set" size="small" color="warning" variant="outlined" />
+                      )}
                     </TableCell>
                     <TableCell>
                       <Box>
@@ -444,6 +460,10 @@ const PickupLocationOverviewTable: React.FC<PickupLocationOverviewTableProps> = 
                 <Box mb={2}>
                   <Typography variant="body2" color="text.secondary">Location Code</Typography>
                   <Typography variant="body1">{selectedLocation.locationCode}</Typography>
+                </Box>
+                <Box mb={2}>
+                  <Typography variant="body2" color="text.secondary">Company</Typography>
+                  <Typography variant="body1">{companyOf(selectedLocation) || 'Not set'}</Typography>
                 </Box>
                 <Box mb={2}>
                   <Typography variant="body2" color="text.secondary">Status</Typography>
