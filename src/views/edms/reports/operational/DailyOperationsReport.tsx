@@ -32,6 +32,7 @@ import dayjs, { Dayjs } from 'dayjs'
 
 // Action Imports
 import { getDailyOperationsReport } from '@/libs/actions/reports.actions'
+import TripTitle from '@/components/edms/TripTitle'
 
 // Stat Card Component
 const StatCard = ({ title, value, subtitle, icon, color = 'primary' }: {
@@ -312,7 +313,7 @@ const DailyOperationsReport = () => {
             <Table sx={{ minWidth: 720, '& th, & td': { whiteSpace: 'nowrap' } }}>
               <TableHead>
                 <TableRow>
-                  <TableCell>Trip ID</TableCell>
+                  <TableCell>Trip</TableCell>
                   <TableCell>Driver</TableCell>
                   <TableCell>Vehicle</TableCell>
                   <TableCell>Route</TableCell>
@@ -333,9 +334,7 @@ const DailyOperationsReport = () => {
                   reportData.trips.list.map((trip: any) => (
                     <TableRow key={trip.tripNumber} hover>
                       <TableCell>
-                        <Typography variant='body2' fontWeight={500}>
-                          {trip.tripNumber}
-                        </Typography>
+                        <TripTitle trip={trip} link />
                       </TableCell>
                       <TableCell>{trip.driver?.name || 'N/A'}</TableCell>
                       <TableCell>{trip.vehicle?.vehicleNumber || 'N/A'}</TableCell>

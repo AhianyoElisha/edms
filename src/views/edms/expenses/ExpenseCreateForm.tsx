@@ -1,6 +1,7 @@
 'use client'
 
 // React Imports
+import { tripLabel, tripSubtitle } from '@/utils/tripLabel'
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -295,7 +296,7 @@ const ExpenseCreateForm = () => {
             <Alert severity="info" icon={<i className="ri-information-line" />}>
               {tripIdFromUrl && selectedTrip && (
                 <span>
-                  Creating expense for trip <strong>{selectedTrip.tripNumber}</strong>
+                  Creating expense for trip <strong>{tripLabel(selectedTrip)}</strong>
                 </span>
               )}
               {!tripIdFromUrl && vehicleIdFromUrl && selectedVehicle && (
@@ -450,7 +451,7 @@ const ExpenseCreateForm = () => {
                         fullWidth
                         disabled={dataLoading}
                         options={trips}
-                        getOptionLabel={t => t.tripNumber || ''}
+                        getOptionLabel={t => tripLabel(t, '')}
                         value={trips.find(t => t.$id === tripId) || null}
                         onChange={(_, selected) => {
                           setTripId(selected?.$id || '')
@@ -478,6 +479,11 @@ const ExpenseCreateForm = () => {
                                   }
                                 />
                               </Box>
+                              {tripSubtitle(trip) && (
+                                <Typography variant='caption' color='text.secondary'>
+                                  {tripSubtitle(trip)}
+                                </Typography>
+                              )}
                               <Typography variant='caption' color='text.secondary'>
                                 {trip.tripDate ? new Date(trip.tripDate).toLocaleDateString() : 'No date'}
                                 {trip.driver && typeof trip.driver === 'object' && ` • ${(trip.driver as any).name || 'Unknown driver'}`}
@@ -486,7 +492,7 @@ const ExpenseCreateForm = () => {
                           </li>
                         )}
                         renderInput={params => (
-                          <TextField {...params} label='Trip' placeholder='Search by trip number...' />
+                          <TextField {...params} label='Trip' placeholder='Search by trip number, route or vehicle...' />
                         )}
                         noOptionsText='No trips available'
                         isOptionEqualToValue={(option, value) => option.$id === value.$id}

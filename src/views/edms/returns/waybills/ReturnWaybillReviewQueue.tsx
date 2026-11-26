@@ -1,6 +1,7 @@
 'use client'
 
 // React Imports
+import { tripLabel } from '@/utils/tripLabel'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 // Next Imports
@@ -86,7 +87,7 @@ const BASE_FILTERS: QueueFilterDef<any>[] = [
       const trip = tripOf(w)
       const id = trip?.$id || (typeof w.trip === 'string' ? w.trip : '')
 
-      return id ? { id, label: trip?.tripNumber || id } : null
+      return id ? { id, label: trip ? tripLabel(trip, id) : id } : null
     }
   },
   {
@@ -384,8 +385,9 @@ const ReturnWaybillReviewQueue = () => {
                             <Link href={`/edms/trips/${trip.$id}`} className='text-primary'>
                               {trip.tripNumber}
                             </Link>
-                            {trip.driver?.name ? ` • ${trip.driver.name}` : ''}
+                            {trip.route?.routeName ? ` • ${trip.route.routeName}` : ''}
                             {trip.vehicle?.vehicleNumber ? ` • ${trip.vehicle.vehicleNumber}` : ''}
+                            {trip.driver?.name ? ` • ${trip.driver.name}` : ''}
                           </>
                         ) : (
                           'Trip unavailable'

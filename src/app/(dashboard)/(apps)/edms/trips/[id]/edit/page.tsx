@@ -18,6 +18,7 @@ import PermissionGuard from '@/components/PermissionGuard'
 
 // Action Imports
 import { getTripById } from '@/libs/actions/trip.actions'
+import { tripSubtitle } from '@/utils/tripLabel'
 
 const EditTripPage = () => {
   const params = useParams()
@@ -79,6 +80,7 @@ const EditTripPage = () => {
         <div className='flex flex-col gap-6'>
           <div>
             <h4 className='text-2xl font-semibold'>Edit Trip - {tripData.tripNumber}</h4>
+            {tripSubtitle(tripData) && <p className='text-textSecondary font-medium'>{tripSubtitle(tripData)}</p>}
             <p className='text-textSecondary'>
               Update trip details, adjust manifests and package counts, or remove manifests that are no longer needed
             </p>

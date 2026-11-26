@@ -33,6 +33,8 @@ import TablePagination from '@mui/material/TablePagination'
 import PortalShell from './PortalShell'
 
 // Hook Imports
+import TripTitle from '@/components/edms/TripTitle'
+import { tripLabel } from '@/utils/tripLabel'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useUrlFilters } from '@/hooks/useUrlFilters'
 
@@ -87,7 +89,7 @@ const ManifestsTable = () => {
         // "Delivered" covers both of our finished states
         (!status || manifest.status === status || (status === 'delivered' && manifest.status === 'completed')) &&
         (!term ||
-          [manifest.manifestNumber, manifest.tripNumber, manifest.dropoff].some(value =>
+          [manifest.manifestNumber, manifest.tripNumber, manifest.tripRoute, manifest.tripVehicle, manifest.dropoff].some(value =>
             (value || '').toLowerCase().includes(term)
           ))
     )
@@ -98,7 +100,10 @@ const ManifestsTable = () => {
   }, [search, status, tripFilter])
 
   const paged = visible.slice(page * rowsPerPage, (page + 1) * rowsPerPage)
-  const tripNumber = tripFilter ? manifests.find(m => m.tripId === tripFilter)?.tripNumber : ''
+  const filteredTrip = tripFilter ? manifests.find(m => m.tripId === tripFilter) : undefined
+  const tripNumber = filteredTrip
+    ? tripLabel({ tripNumber: filteredTrip.tripNumber, routeName: filteredTrip.tripRoute, vehicleNumber: filteredTrip.tripVehicle })
+    : ''
 
   // Photos are fetched one at a time, on request, through the server
   const showPhoto = async (manifest: PortalManifest, kind: 'manifest' | 'delivery') => {
@@ -211,7 +216,13 @@ const ManifestsTable = () => {
                           {manifest.manifestNumber}
                         </Typography>
                       </TableCell>
-                      <TableCell>{manifest.tripNumber || '—'}</TableCell>
+                      <TableCell>
+                        {manifest.tripNumber ? (
+                          <TripTitle trip={{ tripNumber: manifest.tripNumber, routeName: manifest.tripRoute, vehicleNumber: manifest.tripVehicle }} />
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
                       <TableCell>{manifest.dropoff || '—'}</TableCell>
                       <TableCell>{formatDate(manifest.manifestDate)}</TableCell>
                       <TableCell align='right'>{manifest.packageCount || '—'}</TableCell>

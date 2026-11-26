@@ -128,7 +128,8 @@ const buildContent = async (request: NotifyRequest): Promise<AlertContent> => {
       '*',
       'trip.tripNumber',
       'trip.driver.name',
-      'trip.vehicle.vehicleNumber'
+      'trip.vehicle.vehicleNumber',
+      'trip.route.routeName'
     ])
 
     if (!isFresh(waybill.$createdAt)) throw new HttpError(409, 'This return is not a new upload')
@@ -138,7 +139,8 @@ const buildContent = async (request: NotifyRequest): Promise<AlertContent> => {
 
     const details = [
       trip?.tripNumber ? `Trip ${trip.tripNumber}` : null,
-      trip?.vehicle?.vehicleNumber || null
+      trip?.vehicle?.vehicleNumber || null,
+      trip?.route?.routeName || null
     ].filter(Boolean)
 
     return {

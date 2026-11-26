@@ -1,6 +1,7 @@
 'use client'
 
 // React Imports
+import TripTitle from '@/components/edms/TripTitle'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -536,12 +537,7 @@ const ExpenseDetailsView = ({ expenseId }: ExpenseDetailsViewProps) => {
                       <i className="ri-truck-line" style={{ fontSize: 24 }} />
                     </Box>
                     <Box>
-                      <Typography variant="subtitle1" fontWeight={600}>
-                        {trip.tripNumber}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {typeof trip.route === 'object' ? trip.route?.routeName : trip.route || 'No route'}
-                      </Typography>
+                      <TripTitle trip={trip} link variant="subtitle1" />
                     </Box>
                   </Box>
                 </CardContent>

@@ -51,6 +51,9 @@ export type PortalManifest = {
   status: string
   tripId: string | null
   tripNumber: string
+  /** What identifies the trip: its route and vehicle (the same the trips list shows) */
+  tripRoute: string
+  tripVehicle: string
   dropoff: string
   packageSize: string | null
   packageCount: number
@@ -175,7 +178,7 @@ export async function portalListManifests(jwt: string): Promise<PortalManifest[]
     Query.select([
       '$id', 'manifestNumber', 'manifestDate', 'status', 'packageSize', 'packageCount', 'deliveredCount',
       'shortageCount', 'surplusCount', 'deliveryTime', 'manifestImage', 'proofOfDeliveryImage',
-      'trip.$id', 'trip.tripNumber', 'trip.status',
+      'trip.$id', 'trip.tripNumber', 'trip.status', 'trip.route.routeName', 'trip.vehicle.vehicleNumber',
       'dropofflocation.locationName', 'dropofflocation.city', 'dropofflocation.address'
     ])
   ])
@@ -189,6 +192,8 @@ export async function portalListManifests(jwt: string): Promise<PortalManifest[]
       status: manifest.status,
       tripId: manifest.trip?.$id || null,
       tripNumber: manifest.trip?.tripNumber || '',
+      tripRoute: manifest.trip?.route?.routeName || '',
+      tripVehicle: manifest.trip?.vehicle?.vehicleNumber || '',
       dropoff: locationLabel(manifest.dropofflocation),
       packageSize: manifest.packageSize || null,
       packageCount: manifest.packageCount || 0,

@@ -27,6 +27,7 @@ import OptionMenu from '@core/components/option-menu'
 
 // Type Imports
 import type { TripType } from '@/types/apps/deliveryTypes'
+import TripTitle from '@/components/edms/TripTitle'
 
 type TripStatusType = 'planned' | 'in_progress' | 'at_pickup' | 'on_route' | 'completed' | 'cancelled' | 'awaiting_manifests' | 'deleted'
 
@@ -196,9 +197,7 @@ const TripSummary = ({
                 <div className='flex flex-col gap-2 flex-1'>
                   <div className='flex items-center justify-between'>
                     <div>
-                      <Typography variant='body1' className='font-medium'>
-                        Trip #{trip.tripNumber}
-                      </Typography>
+                      <TripTitle trip={trip} variant='body1' />
                       <Typography variant='body2' color='text.secondary'>
                         Driver ID: {trip.driver} • Vehicle ID: {trip.vehicle}
                       </Typography>

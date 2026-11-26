@@ -57,6 +57,7 @@ import TimelineConnector from '@mui/lab/TimelineConnector'
 import MuiTimeline from '@mui/lab/Timeline'
 import type { TimelineProps } from '@mui/lab/Timeline'
 import { styled } from '@mui/material/styles'
+import { tripLabel, tripSubtitle } from '@/utils/tripLabel'
 
 // Styled Timeline component
 const Timeline = styled(MuiTimeline)<TimelineProps>({
@@ -252,6 +253,11 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
   return (
     <>
       <Typography className='mt-4' variant='h4'>Trip Details - {tripData.tripNumber}</Typography>
+      {tripSubtitle(tripData) && (
+        <Typography variant='body1' color='text.secondary'>
+          {tripSubtitle(tripData)}
+        </Typography>
+      )}
       <Divider className='my-8' />
       <Breadcrumbs aria-label="breadcrumb" className='mt-10 ml-5 mb-5'>
         <StyledBreadcrumb 
@@ -1203,7 +1209,7 @@ const TripView = ({ tripData, onRefresh }: { tripData: any; onRefresh?: () => vo
       <DeleteConfirmationDialog
         open={deleteDialogOpen}
         setOpen={setDeleteDialogOpen}
-        title={`Delete trip ${tripData.tripNumber}?`}
+        title={`Delete trip ${tripLabel(tripData)}?`}
         description='This action cannot be undone.'
         confirmButtonText='Yes, Delete Trip'
         isDeleting={isDeleting}

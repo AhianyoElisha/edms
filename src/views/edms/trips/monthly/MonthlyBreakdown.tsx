@@ -37,6 +37,7 @@ import { toast } from 'react-toastify'
 
 // Component Imports
 import CompanyFilterSelect from '@/components/edms/CompanyFilterSelect'
+import TripTitle from '@/components/edms/TripTitle'
 import OpenDialogOnElementClick from '@/components/dialogs/OpenDialogOnElementClick'
 import GenericTableExportDialog from '@/components/dialogs/generic-table-export-dialog'
 import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-table-export-dialog'
@@ -56,6 +57,7 @@ import { monthKey, monthLabel, parseMonthKey, periodLabel, shiftMonthKey } from 
 import type { InvoicePeriod } from '@/utils/invoiceMonth'
 import { byDriver, splitExpenses, sumPrice, toBreakdownExpense, toBreakdownTrip } from './breakdown'
 import type { BreakdownExpense, BreakdownTrip, DriverBreakdown, ExpenseGroup } from './breakdown'
+import { tripLabel } from '@/utils/tripLabel'
 
 // Only what the page shows; the relationship fields keep each page of results small
 const TRIP_FIELDS = [
@@ -79,6 +81,9 @@ const typeLabel = (type: string) => type.replace(/_/g, ' ').replace(/^./, letter
 type DriverRow = DriverBreakdown & { expenses: ExpenseGroup | null }
 
 const expensesOf = (row: { expenses: ExpenseGroup | null }) => row.expenses?.total || 0
+
+// The trip as the shared trip label reads it ("No route" is a placeholder, not a route)
+const labelTrip = (trip: BreakdownTrip) => ({ ...trip, routeName: trip.routeName === 'No route' ? '' : trip.routeName })
 
 const MonthlyBreakdown = () => {
   const { searchParams, setParam, setParams } = useUrlFilters()
@@ -381,7 +386,7 @@ const MonthlyBreakdown = () => {
   }
 
   const tripColumns: ExportColumn[] = [
-    { header: 'Trip', accessor: (trip: BreakdownTrip) => trip.tripNumber, width: 20, excelWidth: 16 },
+    { header: 'Trip', accessor: (trip: BreakdownTrip) => tripLabel(labelTrip(trip)), width: 40, excelWidth: 44 },
     { header: 'Trip date', accessor: (trip: BreakdownTrip) => day(trip.tripDate), width: 16, excelWidth: 14 },
     { header: 'Driver', accessor: (trip: BreakdownTrip) => trip.driverName, width: 22, excelWidth: 22 },
     { header: 'Vehicle', accessor: (trip: BreakdownTrip) => trip.vehicleNumber, width: 16, excelWidth: 14 },
@@ -774,9 +779,7 @@ const MonthlyBreakdown = () => {
                         </TableCell>
                       )}
                       <TableCell>
-                        <Typography component={Link} href={`/edms/trips/${trip.$id}`} color='primary' className='font-medium'>
-                          {trip.tripNumber}
-                        </Typography>
+                        <TripTitle trip={labelTrip(trip)} link />
                       </TableCell>
                       <TableCell>{day(trip.tripDate)}</TableCell>
                       <TableCell>{trip.driverName}</TableCell>
@@ -1136,9 +1139,7 @@ const MonthlyBreakdown = () => {
                                     {driver.tripsWithShortage.map(trip => (
                                       <TableRow key={trip.$id}>
                                         <TableCell>
-                                          <Typography component={Link} href={`/edms/trips/${trip.$id}`} color='primary'>
-                                            {trip.tripNumber}
-                                          </Typography>
+                                          <TripTitle trip={labelTrip(trip)} link />
                                         </TableCell>
                                         <TableCell>{day(trip.tripDate)}</TableCell>
                                         <TableCell>{trip.routeName}</TableCell>

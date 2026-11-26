@@ -1,6 +1,7 @@
 'use client'
 
 // React Imports
+import { tripLabel as tripLabelText } from '@/utils/tripLabel'
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 
 // Next Imports
@@ -144,7 +145,7 @@ const DriverLedger = ({ driverId }: { driverId: string }) => {
         .map(loss => ({
           date: loss.lossDate || loss.$createdAt,
           entry: loss.description || 'Missing package',
-          trip: trips[loss.tripId]?.tripNumber || 'Trip',
+          trip: tripLabelText(trips[loss.tripId]),
           charge: owedValue(loss),
           payment: 0
         })),
@@ -182,7 +183,7 @@ const DriverLedger = ({ driverId }: { driverId: string }) => {
   const exportColumns: ExportColumn[] = [
     { header: 'Date', accessor: row => day(row.date), width: 28, excelWidth: 14 },
     { header: 'Entry', accessor: row => row.entry, width: 70, excelWidth: 36 },
-    { header: 'Trip', accessor: row => row.trip, width: 32, excelWidth: 16 },
+    { header: 'Trip', accessor: row => row.trip, width: 60, excelWidth: 44 },
     { header: 'Charged (GH₵)', accessor: row => (row.charge ? row.charge.toFixed(2) : ''), align: 'right', width: 28, excelWidth: 14 },
     { header: 'Paid (GH₵)', accessor: row => (row.payment ? row.payment.toFixed(2) : ''), align: 'right', width: 28, excelWidth: 14 },
     { header: 'Balance (GH₵)', accessor: row => row.balance.toFixed(2), align: 'right', width: 28, excelWidth: 14 }

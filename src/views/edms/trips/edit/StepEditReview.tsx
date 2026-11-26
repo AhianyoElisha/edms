@@ -28,6 +28,7 @@ import { updateTripWithManifests } from '@/libs/actions/trip.actions'
 
 // Third-party Imports
 import { toast } from 'react-toastify'
+import { tripLabel } from '@/utils/tripLabel'
 
 const StepEditReview = ({ handlePrev, wizardData, tripData }: WizardStepProps & { tripData: any }) => {
   const router = useRouter()
@@ -52,7 +53,7 @@ const StepEditReview = ({ handlePrev, wizardData, tripData }: WizardStepProps & 
       const result = await updateTripWithManifests(tripData.$id, wizardData)
 
       if (result.success) {
-        toast.success(`Trip ${tripData.tripNumber} updated successfully`, {
+        toast.success(`Trip ${tripLabel(tripData)} updated successfully`, {
           position: 'top-right',
           autoClose: 5000
         })
@@ -74,7 +75,7 @@ const StepEditReview = ({ handlePrev, wizardData, tripData }: WizardStepProps & 
         <Typography variant='h5' className='mb-1'>
           Review Changes
         </Typography>
-        <Typography variant='body2'>Confirm the updated details before saving trip {tripData.tripNumber}</Typography>
+        <Typography variant='body2'>Confirm the updated details before saving trip {tripLabel(tripData)}</Typography>
       </Grid>
 
       {error && (

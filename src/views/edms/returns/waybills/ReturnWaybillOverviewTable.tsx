@@ -1,6 +1,7 @@
 'use client'
 
 // React Imports
+import TripTitle from '@/components/edms/TripTitle'
 import { useState, useMemo, useEffect } from 'react'
 
 // Next Imports
@@ -250,11 +251,10 @@ const ReturnWaybillOverviewTable = () => {
         header: 'Trip',
         cell: ({ row }) => {
           const trip = row.original.trip
-          return (
-            <Typography color='text.primary'>
-              {typeof trip === 'object' && trip?.tripNumber ? trip.tripNumber : trip || 'N/A'}
-            </Typography>
-          )
+
+          if (typeof trip === 'object' && trip) return <TripTitle trip={trip} link />
+
+          return <Typography color='text.primary'>{trip || 'N/A'}</Typography>
         }
       }),
       columnHelper.accessor('dropofflocation', {

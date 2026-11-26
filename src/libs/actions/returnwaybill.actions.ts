@@ -60,7 +60,7 @@ export async function getAllReturnWaybills(filters?: ReturnWaybillFilters): Prom
     queries.push(Query.limit(500))
 
     // Include relationships
-    queries.push(Query.select(['*', 'trip.*', 'dropofflocation.*', 'pickuplocation.*']))
+    queries.push(Query.select(['*', 'trip.*', 'trip.route.routeName', 'trip.vehicle.vehicleNumber', 'dropofflocation.*', 'pickuplocation.*']))
 
     const response = await tablesDB.listRows(
       appwriteConfig.database,
@@ -93,7 +93,7 @@ export async function getReturnWaybillById(waybillId: string): Promise<ReturnWay
       appwriteConfig.database,
       appwriteConfig.returnwaybills,
       waybillId,
-      [Query.select(['*', 'trip.*', 'dropofflocation.*', 'pickuplocation.*'])]
+      [Query.select(['*', 'trip.*', 'trip.route.routeName', 'trip.vehicle.vehicleNumber', 'dropofflocation.*', 'pickuplocation.*'])]
     )
 
     // Parse packageDetails if stored as JSON string
@@ -119,7 +119,7 @@ export async function getReturnWaybillsByTrip(tripId: string): Promise<ReturnWay
     const queries = [
       Query.equal('trip', tripId),
       Query.orderDesc('$createdAt'),
-      Query.select(['*', 'trip.*', 'dropofflocation.*', 'pickuplocation.*'])
+      Query.select(['*', 'trip.*', 'trip.route.routeName', 'trip.vehicle.vehicleNumber', 'dropofflocation.*', 'pickuplocation.*'])
     ]
 
     const response = await tablesDB.listRows(
@@ -150,7 +150,7 @@ export async function getReturnWaybillsByDropoff(dropoffLocationId: string): Pro
     const queries = [
       Query.equal('dropofflocation', dropoffLocationId),
       Query.orderDesc('$createdAt'),
-      Query.select(['*', 'trip.*', 'dropofflocation.*', 'pickuplocation.*'])
+      Query.select(['*', 'trip.*', 'trip.route.routeName', 'trip.vehicle.vehicleNumber', 'dropofflocation.*', 'pickuplocation.*'])
     ]
 
     const response = await tablesDB.listRows(
@@ -182,7 +182,7 @@ export async function getPendingReturnWaybills(): Promise<ReturnWaybillType[]> {
       Query.notEqual('status', 'delivered'),
       Query.notEqual('status', 'processed'),
       Query.orderAsc('returnDate'), // Oldest first
-      Query.select(['*', 'trip.*', 'dropofflocation.*', 'pickuplocation.*'])
+      Query.select(['*', 'trip.*', 'trip.route.routeName', 'trip.vehicle.vehicleNumber', 'dropofflocation.*', 'pickuplocation.*'])
     ]
 
     const response = await tablesDB.listRows(

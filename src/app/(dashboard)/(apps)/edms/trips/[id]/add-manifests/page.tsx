@@ -21,6 +21,7 @@ import { getTripById } from '@/libs/actions/trip.actions'
 
 // Third-party Imports
 import { toast } from 'react-toastify'
+import { tripLabel } from '@/utils/tripLabel'
 
 export default function AddManifestsPage() {
   const params = useParams()
@@ -85,7 +86,7 @@ export default function AddManifestsPage() {
       <div className='flex flex-col gap-6'>
         <div>
           <h4 className='text-2xl font-semibold'>Add Manifests to Trip</h4>
-          <p className='text-textSecondary'>Add manifest details to trip {tripData.tripNumber}</p>
+          <p className='text-textSecondary'>Add manifest details to trip {tripLabel(tripData)}</p>
         </div>
 
         <Grid container spacing={6}>

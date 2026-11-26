@@ -29,6 +29,7 @@ import { createTripWithManifests } from '@/libs/actions/trip.actions'
 
 // Third-party Imports
 import { toast } from 'react-toastify'
+import { tripLabel } from '@/utils/tripLabel'
 
 const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
   const router = useRouter()
@@ -63,7 +64,13 @@ const StepReview = ({ handlePrev, wizardData }: WizardStepProps) => {
       const result = await createTripWithManifests(wizardData)
 
       if (result.success) {
-        toast.success(`Trip created successfully! Trip Number: ${result.tripNumber}`, {
+        toast.success(
+          `Trip created successfully! Trip Number: ${tripLabel({
+            tripNumber: result.tripNumber,
+            routeName: tripDetails.routeName,
+            vehicleNumber: tripDetails.vehicleNumber
+          })}`,
+          {
           position: 'top-right',
           autoClose: 5000,
         })
