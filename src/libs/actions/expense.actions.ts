@@ -47,6 +47,9 @@ export async function getAllExpenses(filters?: ExpenseFilters): Promise<ExpenseT
       if (filters.tripId) {
         queries.push(Query.equal('tripId', filters.tripId))
       }
+      if (filters.tripIds?.length) {
+        queries.push(Query.equal('tripId', filters.tripIds))
+      }
       if (filters.dateRange) {
         if (filters.dateRange.start) {
           queries.push(Query.greaterThanEqual('expenseDate', filters.dateRange.start))
