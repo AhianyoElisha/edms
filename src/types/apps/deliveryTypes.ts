@@ -24,7 +24,8 @@ export interface BaseLocationType {
 }
 
 export interface PickupLocationType extends BaseLocationType {
-  // Additional fields can be added later if needed
+  // The company whose goods are collected here (id from the Companies page)
+  companyId?: string | null
 }
 
 export interface DropoffLocationType extends BaseLocationType {

@@ -2,7 +2,7 @@ import { ID, Query } from 'appwrite'
 import { databases, appwriteConfig, tablesDB } from '@/libs/appwrite.config'
 import type { ManifestType, ManifestFilters, ManifestStats } from '@/types/apps/deliveryTypes'
 import { listAllDocuments } from './paginate'
-import { companyIdForName, companyIdForTrip, getCompanies } from './company.actions'
+import { companyIdForName, companyIdForTrip, getCompanies, pickupCompanyIdsForRoutes } from './company.actions'
 import { syncManifestLosses } from './driverloss.actions'
 import { resolveNotificationFor } from '@/libs/notifications/resolve'
 
@@ -1324,6 +1324,7 @@ export const getManifestsAwaitingVerification = async (): Promise<any[]> => {
         'trip.*',
         'trip.driver.*',
         'trip.vehicle.*',
+        'trip.route.$id',
         'trip.route.routeName',
         'trip.rateCard.clientName',
         'dropofflocation.*'
@@ -1331,7 +1332,28 @@ export const getManifestsAwaitingVerification = async (): Promise<any[]> => {
       Query.limit(500)
     ])
 
-    return (response.rows as any[]).filter(isManifestAwaitingVerification)
+    const rows = (response.rows as any[]).filter(isManifestAwaitingVerification)
+
+    // The company of the pickup location each trip set out from, so the review form
+    // can start with it filled in. Optional: the queue still loads without it.
+    try {
+      const routeIdOf = (row: any) => (typeof row.trip?.route === 'object' ? row.trip.route?.$id : row.trip?.route)
+      const [routeCompanies, companies] = await Promise.all([
+        pickupCompanyIdsForRoutes(rows.map(routeIdOf)),
+        getCompanies()
+      ])
+      const names = Object.fromEntries(companies.map(company => [company.$id, company.name]))
+
+      rows.forEach(row => {
+        const companyId = routeCompanies[routeIdOf(row)]
+
+        if (companyId && names[companyId]) row.pickupCompanyName = names[companyId]
+      })
+    } catch (error) {
+      console.warn('Could not work out the pickup companies for the review queue:', error)
+    }
+
+    return rows
   } catch (error) {
     console.error('Error fetching manifests awaiting verification:', error)
     throw new Error('Failed to fetch manifests awaiting verification')

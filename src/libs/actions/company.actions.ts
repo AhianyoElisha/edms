@@ -14,7 +14,9 @@ import { toNameCase } from '@/utils/textCase'
  * own login be limited to its own trips and manifests.
  *
  *  - a rate card belongs to the company picked on it
- *  - a trip belongs to the company whose rate card covers its route
+ *  - a pickup location belongs to the company whose goods are collected there
+ *  - a trip belongs to the company whose rate card covers its route, or else
+ *    the company of the route's pickup location
  *  - a manifest belongs to the company entered on it, or else its trip's company
  *
  * `clientName` is still stored beside `companyId` on rate cards and manifests so
@@ -81,7 +83,34 @@ export async function companyIdForName(name?: string | null): Promise<string | n
   return (await findCompanyByName(name))?.$id || null
 }
 
-/** The company a route is carried for: the one whose rate card covers it. */
+/**
+ * route id -> the company id of the route's pickup location, for the routes that
+ * start at a location with a company set.
+ */
+export async function pickupCompanyIdsForRoutes(routeIds: (string | null | undefined)[]): Promise<Record<string, string>> {
+  const ids = Array.from(new Set(routeIds.filter((id): id is string => !!id)))
+  const result: Record<string, string> = {}
+
+  // Appwrite caps the values of one equal() query, so look the routes up in batches
+  for (let i = 0; i < ids.length; i += 100) {
+    const routes = await databases.listDocuments(appwriteConfig.database, appwriteConfig.routes, [
+      Query.equal('$id', ids.slice(i, i + 100)),
+      Query.select(['$id', 'startLocation.$id', 'startLocation.companyId']),
+      Query.limit(100)
+    ])
+
+    routes.documents.forEach((route: any) => {
+      if (route.startLocation?.companyId) result[route.$id] = route.startLocation.companyId
+    })
+  }
+
+  return result
+}
+
+/**
+ * The company a route is carried for: the one whose rate card covers it, or else
+ * the company of the pickup location the route starts from.
+ */
 export async function companyIdForRoute(routeId?: string | null): Promise<string | null> {
   if (!routeId) return null
 
@@ -93,8 +122,9 @@ export async function companyIdForRoute(routeId?: string | null): Promise<string
     ])
 
     const linked = cards.documents.filter((card: any) => card.companyId)
+    const fromRateCard = ((linked.find((card: any) => card.isActive !== false) || linked[0]) as any)?.companyId
 
-    return ((linked.find((card: any) => card.isActive !== false) || linked[0]) as any)?.companyId || null
+    return fromRateCard || (await pickupCompanyIdsForRoutes([routeId]))[routeId] || null
   } catch (error) {
     console.warn('Could not work out the company for route', routeId, error)
 
