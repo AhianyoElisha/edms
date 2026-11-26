@@ -61,6 +61,8 @@ import type { ExportColumn, ExportSummary } from '@/components/dialogs/generic-t
 import CompanyFilterSelect from '@/components/edms/CompanyFilterSelect'
 import { FilterDropdowns, useDropdownFilters } from '@/components/edms/QueueFilters'
 import type { QueueFilterDef } from '@/components/edms/QueueFilters'
+import TripTitle from '@/components/edms/TripTitle'
+import { tripLabel, tripSubtitle } from '@/utils/tripLabel'
 
 LicenseInfo.setLicenseKey('e0d9bb8070ce0054c9d9ecb6e82cb58fTz03MTc0MCxFPTE3MjI1MzA1NTIwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxLVj0y')
 
@@ -75,7 +77,11 @@ const refOption = (ref: any, labelKey: string, fallback: string) =>
 const tripOf = (manifest: any) => (manifest.trip && typeof manifest.trip === 'object' ? manifest.trip : null)
 
 const MANIFEST_FILTERS: QueueFilterDef<any>[] = [
-  { param: 'tripId', label: 'Trip', pick: m => refOption(tripOf(m), 'tripNumber', 'Trip') },
+  {
+    param: 'tripId',
+    label: 'Trip',
+    pick: m => (tripOf(m)?.$id ? { id: tripOf(m).$id as string, label: tripLabel(tripOf(m)) } : null)
+  },
   { param: 'driverId', label: 'Driver', pick: m => refOption(tripOf(m)?.driver, 'name', 'Unnamed driver') },
   { param: 'vehicleId', label: 'Vehicle', kind: 'vehicle', pick: m => refOption(tripOf(m)?.vehicle, 'vehicleNumber', 'Unnamed vehicle') },
   { param: 'routeId', label: 'Route', pick: m => refOption(tripOf(m)?.route, 'routeName', 'Unnamed route') },
@@ -181,7 +187,8 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
     if (query) {
       filtered = filtered.filter(manifest =>
         (manifest.manifestNumber || '').toLowerCase().includes(query) ||
-        (((manifest as any).trip?.tripNumber as string | undefined) || '').toLowerCase().includes(query)
+        (((manifest as any).trip?.tripNumber as string | undefined) || '').toLowerCase().includes(query) ||
+        tripSubtitle(tripOf(manifest)).toLowerCase().includes(query)
       )
     }
 
@@ -212,7 +219,7 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
   // Export configuration
   const exportColumns: ExportColumn[] = useMemo(() => [
     { header: 'Manifest Number', accessor: (row: ManifestType) => row.manifestNumber, width: 28, excelWidth: 18 },
-    { header: 'Trip', accessor: (row: ManifestType) => typeof row.trip === 'object' && row.trip !== null ? (row.trip as any).tripNumber || (row.trip as any).$id : row.trip || 'N/A', width: 22, excelWidth: 15 },
+    { header: 'Trip', accessor: (row: ManifestType) => typeof row.trip === 'object' && row.trip !== null ? tripLabel(row.trip as any, (row.trip as any).$id) : row.trip || 'N/A', width: 34, excelWidth: 40 },
     { header: 'Sequence', accessor: (row: ManifestType) => row.dropoffSequence, align: 'center', width: 18, excelWidth: 10 },
     { header: 'Package Size', accessor: (row: ManifestType) => row.packageSize || 'small', width: 20, excelWidth: 14 },
     { header: 'Package Count', accessor: (row: ManifestType) => row.packageCount || 0, align: 'right', width: 20, excelWidth: 14 },
@@ -625,11 +632,13 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
                     <Typography variant="subtitle2" fontWeight="bold">
                       {manifest.manifestNumber}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Trip: {typeof manifest.trip === 'object' && manifest.trip !== null
-                        ? (manifest.trip as any).tripNumber || (manifest.trip as any).$id
-                        : manifest.trip || 'N/A'}
-                    </Typography>
+                    {tripOf(manifest) ? (
+                      <TripTitle trip={tripOf(manifest)} fallback={tripOf(manifest).$id} />
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        Trip: {(manifest.trip as any) || 'N/A'}
+                      </Typography>
+                    )}
                   </Box>
                 </TableCell>
                 <TableCell>
@@ -747,11 +756,11 @@ const ManifestOverviewTable = ({ onEditManifest }: ManifestOverviewTableProps) =
                 </Typography>
                 <Box mb={2}>
                   <Typography variant="body2" color="text.secondary">Trip Number</Typography>
-                  <Typography variant="body1">
-                    {typeof selectedManifest.trip === 'object' && selectedManifest.trip !== null
-                      ? (selectedManifest.trip as any).tripNumber || (selectedManifest.trip as any).$id
-                      : selectedManifest.trip || 'Not assigned'}
-                  </Typography>
+                  {tripOf(selectedManifest) ? (
+                    <TripTitle trip={tripOf(selectedManifest)} fallback={tripOf(selectedManifest).$id} variant="body1" link />
+                  ) : (
+                    <Typography variant="body1">{(selectedManifest.trip as any) || 'Not assigned'}</Typography>
+                  )}
                 </Box>
                 <Box mb={2}>
                   <Typography variant="body2" color="text.secondary">Dropoff Sequence</Typography>

@@ -51,6 +51,7 @@ import tableStyles from '@core/styles/table.module.css'
 
 // Actions Imports
 import { getAllTrips, updateTripStatus, deleteTrip } from '@/libs/actions/trip.actions'
+import TripTitle from '@/components/edms/TripTitle'
 
 // Hook Imports
 import { usePermissions } from '@/hooks/usePermissions'
@@ -253,11 +254,7 @@ const TripsOverviewTable = () => {
       } as ColumnDef<TripType, any>] : []),
       columnHelper.accessor('tripNumber', {
         header: 'Trip Number',
-        cell: ({ row }) => (
-          <Typography className='font-medium' color='text.primary'>
-            {row.original.tripNumber}
-          </Typography>
-        )
+        cell: ({ row }) => <TripTitle trip={row.original} />
       }),
       columnHelper.accessor('tripDate', {
         header: 'Trip Date',

@@ -28,6 +28,7 @@ import Box from '@mui/material/Box'
 import LinearProgress from '@mui/material/LinearProgress'
 
 // Component Imports
+import TripTitle from '@/components/edms/TripTitle'
 import StyledBreadcrumb from '@/components/layout/shared/Breadcrumbs'
 import EditShortageDialog from '@/views/edms/losses/EditShortageDialog'
 
@@ -861,7 +862,7 @@ const ManifestView = ({ manifestData, onRefresh }: { manifestData: any; onRefres
                   <Grid container spacing={4}>
                     <Grid item xs={12} md={6} lg={3}>
                       <Typography color='text.secondary'>Trip Number</Typography>
-                      <Typography className='font-medium'>{trip.tripNumber}</Typography>
+                      <TripTitle trip={trip} variant='body1' link />
                     </Grid>
                     <Grid item xs={12} md={6} lg={3}>
                       <Typography color='text.secondary'>Trip Status</Typography>

@@ -45,6 +45,7 @@ import type { RouteStopType } from '@/types/apps/deliveryTypes'
 // Actions
 import { getRouteDropoffLocations } from '@/libs/actions/route.actions'
 import { addManifestsToTrip } from '@/libs/actions/trip.actions'
+import { tripLabel, tripSubtitle } from '@/utils/tripLabel'
 
 interface ManifestEntry {
   id: string
@@ -163,7 +164,7 @@ const AddManifestsView = ({ tripData }: AddManifestsViewProps) => {
       const result = await addManifestsToTrip(tripData.$id, manifestData)
 
       if (result.success) {
-        toast.success(`${manifests.length} manifest(s) added to trip ${tripData.tripNumber}!`)
+        toast.success(`${manifests.length} manifest(s) added to trip ${tripLabel(tripData)}!`)
         router.push(`/edms/trips/${tripData.$id}`)
       } else {
         throw new Error(result.error || 'Failed to add manifests')
@@ -190,6 +191,11 @@ const AddManifestsView = ({ tripData }: AddManifestsViewProps) => {
           <Typography variant='h5' className='mb-1'>
             Add Manifests to Trip {tripData.tripNumber}
           </Typography>
+          {tripSubtitle(tripData) && (
+            <Typography variant='body2' color='text.secondary' className='font-medium'>
+              {tripSubtitle(tripData)}
+            </Typography>
+          )}
           <Typography variant='body2' color='text.secondary'>
             Route: <strong>{typeof tripData.route === 'object' ? tripData.route.routeName : 'N/A'}</strong>
             {' | '}Driver: <strong>{typeof tripData.driver === 'object' ? tripData.driver.name : 'N/A'}</strong>

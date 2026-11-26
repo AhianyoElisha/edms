@@ -1,6 +1,8 @@
 'use client'
 
 // React Imports
+import TripTitle from '@/components/edms/TripTitle'
+import { tripLabel } from '@/utils/tripLabel'
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -251,7 +253,7 @@ const ReturnWaybillCreateForm = ({ tripId: initialTripId }: ReturnWaybillCreateF
             {hasTripContext ? (
               <Alert severity='info' icon={<i className='ri-truck-line' />}>
                 <Typography variant='subtitle2'>
-                  Creating return waybill for Trip: {tripDetails?.tripNumber || tripId}
+                  Creating return waybill for Trip: {tripDetails ? tripLabel(tripDetails, tripId) : tripId}
                 </Typography>
                 <Typography variant='body2'>
                   Returns from a dropoff location will be tracked until delivered back to the origin.
@@ -286,8 +288,7 @@ const ReturnWaybillCreateForm = ({ tripId: initialTripId }: ReturnWaybillCreateF
                         <MenuItem value=''>Select a trip</MenuItem>
                         {trips.map(trip => (
                           <MenuItem key={trip.$id} value={trip.$id}>
-                            {/* @ts-ignore */}
-                            {trip.tripNumber} - {trip.route?.routeName || 'Unknown Route'}
+                            {tripLabel(trip)}
                           </MenuItem>
                         ))}
                       </TextField>
@@ -307,12 +308,7 @@ const ReturnWaybillCreateForm = ({ tripId: initialTripId }: ReturnWaybillCreateF
                       color='primary' 
                       size='small' 
                     />
-                    <Typography variant='h6'>
-                      {tripDetails?.tripNumber}
-                    </Typography>
-                    <Typography variant='body2' color='text.secondary'>
-                      {tripDetails?.route?.routeName || 'Route not specified'}
-                    </Typography>
+                    <TripTitle trip={tripDetails} variant='h6' />
                   </Box>
                 </CardContent>
               </Card>

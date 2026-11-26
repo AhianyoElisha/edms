@@ -35,6 +35,7 @@ import dayjs from 'dayjs'
 
 // Component Imports
 import CompanyField from '@/components/edms/CompanyField'
+import { tripLabel } from '@/utils/tripLabel'
 import { useFilterOptionDisplay } from '@/components/edms/QueueFilters'
 
 // Hook Imports
@@ -152,7 +153,7 @@ const FILTERS: Array<{
       const trip = tripOf(m)
       const id = trip?.$id || (typeof m.trip === 'string' ? m.trip : '')
 
-      return id ? { id, label: trip?.tripNumber || id } : null
+      return id ? { id, label: trip ? tripLabel(trip, id) : id } : null
     }
   },
   {

@@ -36,6 +36,7 @@ const ApexChart = dynamic(() => import('react-apexcharts'), { ssr: false })
 
 // Action Imports
 import { getInvoicingReport } from '@/libs/actions/reports.actions'
+import TripTitle from '@/components/edms/TripTitle'
 
 // Stat Card Component
 const StatCard = ({ title, value, subtitle, icon, color = 'primary' }: {
@@ -500,9 +501,7 @@ const InvoicingReport = () => {
                   reportData.trips.slice(tripPage * 25, tripPage * 25 + 25).map((trip: any) => (
                     <TableRow key={trip.$id} hover>
                       <TableCell>
-                        <Typography variant='body2' fontWeight={500}>
-                          {trip.tripNumber || trip.$id.slice(0, 8)}
-                        </Typography>
+                        <TripTitle trip={trip} link fallback={trip.$id.slice(0, 8)} />
                       </TableCell>
                       <TableCell>
                         <Typography variant='body2' color='text.secondary'>

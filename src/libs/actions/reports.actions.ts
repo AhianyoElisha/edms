@@ -844,7 +844,7 @@ export async function getInvoicingReport(month?: number, year?: number) {
     // The trips on the month's invoice. Every trip that earns its price is billable -
     // not only those marked completed, which most trips never are.
     const allTrips = await listTripsForInvoiceMonth<any>(currentMonth, currentYear, 'rows', [
-      Query.select(['$id', 'tripNumber', 'tripDate', 'status', 'tripCost', 'clientRate', 'invoiceGenerated', 'paymentStatus', 'billingMonth', 'driver.name', 'route.routeName'])
+      Query.select(['$id', 'tripNumber', 'tripDate', 'status', 'tripCost', 'clientRate', 'invoiceGenerated', 'paymentStatus', 'billingMonth', 'driver.name', 'route.routeName', 'vehicle.vehicleNumber'])
     ])
 
     const billable = allTrips

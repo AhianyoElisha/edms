@@ -1,6 +1,7 @@
 'use client'
 
 // React Imports
+import TripTitle from '@/components/edms/TripTitle'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -533,10 +534,7 @@ const ExpenseEditForm = ({ expenseId }: ExpenseEditFormProps) => {
                           {trips.map((trip) => (
                             <MenuItem key={trip.$id} value={trip.$id}>
                               <Box>
-                                <Typography variant="body2">{trip.tripNumber}</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {trip.route || 'No route'}
-                                </Typography>
+                                <TripTitle trip={trip} />
                               </Box>
                             </MenuItem>
                           ))}

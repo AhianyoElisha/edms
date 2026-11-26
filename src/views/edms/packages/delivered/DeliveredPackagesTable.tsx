@@ -41,6 +41,7 @@ import { toast } from 'react-toastify'
 
 // Component Imports
 import LoaderDark from '@/components/layout/shared/LoaderDark'
+import TripTitle from '@/components/edms/TripTitle'
 
 // Action Imports
 import { getDeliveredManifests, isManifestAwaitingVerification } from '@/libs/actions/manifest.actions'
@@ -444,16 +445,18 @@ const DeliveredPackagesTable = () => {
                         </td>
                         <td>
                           {row.tripId ? (
-                            <Link href={`/edms/trips/${row.tripId}`} className='text-primary'>
-                              {row.tripNumber || 'View trip'}
-                            </Link>
+                            <TripTitle
+                              link
+                              fallback='View trip'
+                              trip={{
+                                $id: row.tripId,
+                                tripNumber: row.tripNumber,
+                                routeName: row.route === UNASSIGNED_ROUTE ? '' : row.route,
+                                vehicleNumber: row.vehicle
+                              }}
+                            />
                           ) : (
                             <Typography color='text.secondary'>—</Typography>
-                          )}
-                          {row.vehicle && (
-                            <Typography variant='body2' color='text.secondary'>
-                              {row.vehicle}
-                            </Typography>
                           )}
                         </td>
                         <td>

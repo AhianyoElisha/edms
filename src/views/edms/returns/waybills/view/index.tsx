@@ -1,6 +1,7 @@
 'use client'
 
 // React Imports
+import TripTitle from '@/components/edms/TripTitle'
 import { useState, useEffect } from 'react'
 
 // Next Imports
@@ -445,9 +446,11 @@ const ReturnWaybillView = ({ waybillData, onRefetch }: ReturnWaybillViewProps) =
                 <Grid container spacing={4}>
                   <Grid item xs={12} md={6}>
                     <Typography color='text.secondary'>Trip Number</Typography>
-                    <Typography className='font-medium'>
-                      {typeof trip === 'object' ? trip.tripNumber : trip}
-                    </Typography>
+                    {typeof trip === 'object' ? (
+                      <TripTitle trip={trip} link variant='body1' />
+                    ) : (
+                      <Typography className='font-medium'>{trip}</Typography>
+                    )}
                   </Grid>
                   {typeof trip === 'object' && (
                     <>

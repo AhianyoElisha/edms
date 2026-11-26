@@ -19,6 +19,7 @@ import Box from '@mui/material/Box'
 
 // Actions
 import { getAllTrips } from '@/libs/actions/trip.actions'
+import TripTitle from '@/components/edms/TripTitle'
 
 const VehicleTripHistory = ({ vehicleId }: { vehicleId: string }) => {
   const [trips, setTrips] = useState<any[]>([])
@@ -110,9 +111,7 @@ const VehicleTripHistory = ({ vehicleId }: { vehicleId: string }) => {
                 return (
                   <TableRow key={trip.$id} hover>
                     <TableCell>
-                      <Typography variant='body2' className='font-medium'>
-                        {trip.tripNumber || trip.$id?.slice(0, 8)}
-                      </Typography>
+                      <TripTitle trip={trip} link fallback={trip.$id?.slice(0, 8)} />
                     </TableCell>
                     <TableCell>
                       <Typography variant='body2'>{routeName}</Typography>
