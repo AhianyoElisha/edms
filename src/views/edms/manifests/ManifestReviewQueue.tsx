@@ -78,7 +78,13 @@ const initialDraft = (manifest: any): DraftDetails => {
     manifestNumber: '',
     clientName: manifest.clientName || manifest.pickupCompanyName || trip?.rateCard?.clientName || '',
     packageSize: manifest.packageSize || '',
-    packageCount: manifest.packageCount > 0 ? String(manifest.packageCount) : '',
+    // The count on the record, or else what the photo was read as (unsure) for the admin to check
+    packageCount:
+      manifest.packageCount > 0
+        ? String(manifest.packageCount)
+        : manifest.ocrPackageCount > 0
+          ? String(manifest.ocrPackageCount)
+          : '',
     shortageCount: manifest.shortageCount > 0 ? String(manifest.shortageCount) : '',
     surplusCount: manifest.surplusCount > 0 ? String(manifest.surplusCount) : ''
   }
@@ -633,6 +639,12 @@ const ManifestReviewQueue = () => {
             // A count already on the record came from the photo or the driver; flag it for checking
             const prefilledCount = manifest.packageCount > 0 && draft.packageCount === String(manifest.packageCount)
 
+            // An unsure reading of the photo, offered for the admin to confirm or correct
+            const suggestedCount =
+              !(manifest.packageCount > 0) &&
+              manifest.ocrPackageCount > 0 &&
+              draft.packageCount === String(manifest.ocrPackageCount)
+
             // What arrived: the total less any shortage, the same rule the save applies
             const draftTotal = parseOptionalCount(draft.packageCount)
             const draftShort = parseOptionalCount(draft.shortageCount)
@@ -768,9 +780,15 @@ const ManifestReviewQueue = () => {
                             onChange={e => updateDraft(manifest, 'packageCount', e.target.value)}
                             inputProps={{ min: 0 }}
                             disabled={!canVerify || isSaving || isReading}
-                            color={prefilledCount ? 'warning' : undefined}
-                            focused={prefilledCount ? true : undefined}
-                            helperText={prefilledCount ? 'Prefilled - check against the photo' : 'Optional'}
+                            color={prefilledCount || suggestedCount ? 'warning' : undefined}
+                            focused={prefilledCount || suggestedCount ? true : undefined}
+                            helperText={
+                              suggestedCount
+                                ? `Unsure reading of the photo${manifest.ocrEvidence ? ` (${manifest.ocrEvidence})` : ''} - check every row`
+                                : prefilledCount
+                                  ? 'Prefilled - check against the photo'
+                                  : 'Optional'
+                            }
                             InputProps={{
                               endAdornment: photo && canVerify && (
                                 <InputAdornment position='end'>

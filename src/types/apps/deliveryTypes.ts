@@ -360,6 +360,12 @@ export interface ManifestType {
   shortageCount?: number | null
   // Packages delivered over and above what the manifest lists (carried by mistake)
   surplusCount?: number | null
+
+  // What the photo was read as when the reading was not sure enough to use as the
+  // count. A suggestion for the review screen only; the admin decides the figure.
+  ocrPackageCount?: number | null
+  ocrConfidence?: 'high' | 'low' | null
+  ocrEvidence?: string | null
   // The company the goods belong to (JUMIA, CENTRAL POINT, ...). Manifests are no
   // longer assumed to be Jumia's.
   clientName?: string | null
