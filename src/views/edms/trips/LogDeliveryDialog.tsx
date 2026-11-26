@@ -31,7 +31,8 @@ import type { RouteStopType } from '@/types/apps/deliveryTypes'
 
 // Action Imports
 import { getRouteDropoffLocations } from '@/libs/actions/route.actions'
-import { getManifestClientOptions, logManifestDelivery } from '@/libs/actions/manifest.actions'
+import { getManifestClientOptions, logManifestDelivery, saveManifestPhotoReading } from '@/libs/actions/manifest.actions'
+import type { ManifestReading } from '@/libs/ocr/client'
 
 // Lib Imports
 import { notifyOffice } from '@/libs/notifications/client'
@@ -216,17 +217,21 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
       const photoUrl = `${appwriteConfig.endpoint}/storage/buckets/${bucketId}/files/${uploaded.$id}/view?project=${appwriteConfig.project}`
 
       // Read the total off the manifest unless the driver already typed one. Only a
-      // reading the parser is sure of is saved: on the stored photos, the unsure ones
+      // reading the parser is sure of is saved as the count: on the stored photos, the
+      // unsure ones were wrong more often than right. An unsure reading is kept beside
+      // the manifest as a suggestion for the office to accept or correct on review.
       // were wrong more often than right (usually short, from rows it missed). A
       // photo that cannot be read leaves the count for the office, as before; the
       // admin can still ask for an unsure reading from the review screen.
       let photoCount: number | null = null
+      let unsureReading: ManifestReading | null = null
 
       if (!parsedPackageCount) {
         setSubmitStage('reading')
         const reading = await readManifestPhoto({ fileId: uploaded.$id }, { timeoutMs: 30_000 })
 
         photoCount = reading?.confidence === 'high' ? reading.totalPackages : null
+        unsureReading = reading?.totalPackages && reading.confidence !== 'high' ? reading : null
       }
 
       setSubmitStage('saving')
@@ -242,6 +247,9 @@ const LogDeliveryDialog = ({ open, onClose, tripData, onLogged }: LogDeliveryDia
         shortageCount: parsedShortage || undefined,
         surplusCount: parsedSurplus || undefined
       })
+
+      // The driver is not shown an unsure figure; the office decides it on review
+      if (unsureReading) await saveManifestPhotoReading(manifest.$id, unsureReading)
 
       // Ring the office. Not awaited: the delivery is saved either way and the
       // driver should not wait on it.

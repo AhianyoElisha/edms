@@ -954,6 +954,31 @@ const generateFieldManifestNumber = (): string => {
  * A manifest still waiting on the back office is one the driver captured in the
  * field: it was never verified and carries no package figures.
  */
+/**
+ * Keep what the photo was read as, for the review screen, when the reading was not
+ * sure enough to save as the manifest's count. It is only a suggestion: it does not
+ * touch the count, the trip's totals or the review queue; the admin decides.
+ *
+ * Never throws - the delivery is already saved, and a missing suggestion only means
+ * the admin reads the photo themselves.
+ */
+export const saveManifestPhotoReading = async (
+  manifestId: string,
+  reading: { totalPackages: number | null; confidence: 'high' | 'low' | null; evidence: string | null }
+): Promise<void> => {
+  if (!reading.totalPackages) return
+
+  try {
+    await databases.updateDocument(DATABASE_ID, MANIFESTS_COLLECTION_ID, manifestId, {
+      ocrPackageCount: reading.totalPackages,
+      ocrConfidence: reading.confidence,
+      ocrEvidence: reading.evidence ? reading.evidence.slice(0, 500) : null
+    })
+  } catch (error) {
+    console.warn('Could not keep the photo reading for review:', error)
+  }
+}
+
 export const isManifestAwaitingVerification = (manifest: any): boolean =>
   manifest?.detailsVerified !== true && (!manifest?.packageSize || !manifest?.packageCount)
 

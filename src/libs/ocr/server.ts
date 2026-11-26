@@ -2,7 +2,7 @@ import 'server-only'
 
 import { Client, Databases, Query, Storage } from 'node-appwrite'
 
-import { EMPTY_READING, readManifestText } from './manifestText'
+import { EMPTY_READING, cellsToReread, readManifestText, wordsFromCells } from './manifestText'
 import type { ManifestReading, OcrWord } from './manifestText'
 
 /**
@@ -106,12 +106,14 @@ export const readManifestPhoto = async (request: {
 
   if (!fileId) throw new OcrError(400, 'fileId or manifestId is required')
 
-  const image = await new Storage(adminClient()).getFileView(BUCKET, fileId)
+  const image = Buffer.from(await new Storage(adminClient()).getFileView(BUCKET, fileId))
+  const deadline = Date.now() + OCR_TIMEOUT_MS
+  const base = OCR_URL!.replace(/\/$/, '')
 
-  const response = await fetch(`${OCR_URL!.replace(/\/$/, '')}/ocr`, {
+  const response = await fetch(`${base}/ocr`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${OCR_TOKEN}`, 'Content-Type': 'application/octet-stream' },
-    body: Buffer.from(image),
+    body: image,
     signal: AbortSignal.timeout(OCR_TIMEOUT_MS),
     cache: 'no-store'
   })
@@ -121,8 +123,56 @@ export const readManifestPhoto = async (request: {
     throw new OcrError(502, 'The photo could not be read')
   }
 
-  const result = (await response.json()) as { lines?: Array<{ text: string }>; words?: OcrWord[]; ms?: number }
-  const lines = (result.lines || []).map(line => line.text)
+  const result = (await response.json()) as {
+    lines?: Array<{ text: string }>
+    words?: OcrWord[]
+    frame?: { turns: number; tilt: number }
+    ms?: number
+  }
 
-  return { ...(lines.length ? readManifestText(lines, result.words || []) : EMPTY_READING), ms: result.ms }
+  const lines = (result.lines || []).map(line => line.text)
+  const words = result.words || []
+
+  if (!lines.length) return { ...EMPTY_READING, ms: result.ms }
+
+  const reading = readManifestText(lines, words)
+
+  if (reading.confidence === 'high' || !result.frame) return { ...reading, ms: result.ms }
+
+  // Not sure: read again the cells where a figure should be but none was found -
+  // usually a printed figure with a tick or a note written across it
+  const cells = cellsToReread(words, lines)
+  const timeLeft = deadline - Date.now()
+
+  if (cells.length === 0 || timeLeft < 4000) return { ...reading, ms: result.ms }
+
+  try {
+    const second = await fetch(`${base}/cells`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OCR_TOKEN}`,
+        'Content-Type': 'application/octet-stream',
+        'X-Cells': JSON.stringify({ frame: result.frame, cells })
+      },
+      body: image,
+      signal: AbortSignal.timeout(timeLeft),
+      cache: 'no-store'
+    })
+
+    if (!second.ok) throw new Error(`cells: ${second.status}`)
+
+    const reread = (await second.json()) as { cells?: Array<{ text: string; score: number }>; ms?: number }
+    const found = wordsFromCells(cells, reread.cells || [])
+
+    if (found.length === 0) return { ...reading, ms: result.ms }
+
+    const improved = readManifestText(lines, [...words, ...found])
+
+    return { ...(improved.totalPackages ? improved : reading), ms: (result.ms || 0) + (reread.ms || 0) }
+  } catch (error) {
+    // The first reading stands; an older service without /cells lands here too
+    console.warn('OCR cell re-read skipped:', error)
+
+    return { ...reading, ms: result.ms }
+  }
 }

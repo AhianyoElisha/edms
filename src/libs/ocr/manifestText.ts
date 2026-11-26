@@ -290,13 +290,15 @@ const WHOLE_COUNT = /^\s*([0-9oOlIsSB]*[0-9][0-9oOlIsSB]*)\s*(?:[/\\|.,;:'"`)\]~
  * The number of units the sheet says it carries: "3 UNIT(S)" on a transport
  * manifest, or the large figure over "NUMBER OF MOVABLE UNITS" on a handover sheet.
  */
+const UNITS_LABEL = /number\s*of\s*movable|movable\s*units/i
+
 const declaredUnitCount = (words: OcrWord[], lines: string[]): number | null => {
   const fromLine = declaredUnits(lines)
 
   if (fromLine !== null) return fromLine
 
   for (const label of words) {
-    if (!/number\s*of\s*movable|movable\s*units/i.test(label.text)) continue
+    if (!UNITS_LABEL.test(label.text)) continue
 
     const figure = words
       .filter(word => WHOLE_COUNT.test(word.text) && word !== label)
@@ -309,12 +311,62 @@ const declaredUnitCount = (words: OcrWord[], lines: string[]): number | null => 
   return null
 }
 
+// The row numbers printed at the left of the unit rows ("2 mu_GH-All-Network ..."):
+// the highest one reached, read from the lines the unit ids are on.
+const highestUnitRowNumber = (lines: string[]): number | null => {
+  let highest: number | null = null
+
+  lines.forEach(line => {
+    if (!UNIT_ROW.test(line)) return
+
+    const match = /^\s*(\d{1,3})(?=\s)/.exec(line)
+
+    if (match) highest = Math.max(highest ?? 0, parseInt(match[1], 10))
+  })
+
+  return highest
+}
+
+/**
+ * The same, read by position: the number printed level with each unit row, to the
+ * left of its id. On a tilted photo the rows can run together into one line of
+ * text, but each row number is still a word of its own beside its row. Counts only
+ * when the rows are numbered 1, 2, 3 ... with none missing.
+ */
+const numberedUnitRows = (words: OcrWord[], rows: OcrWord[]): number | null => {
+  const numbers = rows.map(row => {
+    const label = words.find(
+      word =>
+        /^\s*\d{1,3}\s*$/.test(word.text) &&
+        word.x + word.w / 2 < row.x - row.w / 2 &&
+        Math.abs(word.y - row.y) < 0.7 * Math.max(word.h, row.h)
+    )
+
+    return label ? parseInt(label.text, 10) : null
+  })
+
+  return numbers.every((number, index) => number === index + 1) ? numbers.length : null
+}
+
+type UnitRowAnalysis = {
+  rows: OcrWord[]
+
+  /** The figure found on each row, or null where none was */
+  perRow: Array<number | null>
+
+  /** Where the column of figures sits, and the size of a cell in it */
+  columnX: number
+  cellWidth: number
+  cellHeight: number
+}
+
 /**
  * Jumia's transport manifests and handover sheets list one row per movable unit,
  * with that unit's package count at the right of the row and no printed total.
- * Take each unit row, find the column of figures the rows share, and add it up.
+ * Take each unit row, find the column of figures the rows share, and the figure
+ * each row has in it.
  */
-const fromUnitRows = (words: OcrWord[], lines: string[]): ManifestReading | null => {
+const analyseUnitRows = (words: OcrWord[]): UnitRowAnalysis | null => {
   const rows = words.filter(word => UNIT_ROW.test(word.text)).sort((a, b) => a.y - b.y)
 
   if (rows.length === 0) return null
@@ -377,30 +429,103 @@ const fromUnitRows = (words: OcrWord[], lines: string[]): ManifestReading | null
     }
   }
 
-  const figures = candidates
-    .map(list =>
+  const chosen = candidates.map(
+    list =>
       list
         .filter(c => Math.abs(c.word.x - columnX) < tolerance(c.word))
-        .sort((a, b) => Math.abs(a.word.x - columnX) - Math.abs(b.word.x - columnX))[0]
-    )
-    .filter(Boolean)
-    .map(c => c!.value)
+        .sort((a, b) => Math.abs(a.word.x - columnX) - Math.abs(b.word.x - columnX))[0] || null
+  )
+
+  // A cell is as tall as a row and wide enough for a three-digit figure and some slack
+  const found = chosen.filter(Boolean).map(c => c!.word)
+  const median = (values: number[]) => [...values].sort((a, b) => a - b)[values.length >> 1]
+  const rowHeight = median(rows.map(row => row.h))
+  const figureHeight = found.length ? median(found.map(word => word.h)) : rowHeight
+
+  return {
+    rows,
+    perRow: chosen.map(c => (c ? c.value : null)),
+    // Centred on the figures found, not on whichever one picked the column
+    columnX: found.length ? median(found.map(word => word.x)) : columnX,
+    cellWidth: Math.max(3 * figureHeight, 60),
+    cellHeight: Math.max(1.5 * rowHeight, 1.2 * figureHeight)
+  }
+}
+
+const fromUnitRows = (words: OcrWord[], lines: string[]): ManifestReading | null => {
+  const analysis = analyseUnitRows(words)
+
+  if (!analysis) return null
+
+  const { rows, perRow } = analysis
+  const figures = perRow.filter((value): value is number => value !== null)
 
   if (figures.length === 0) return null
 
-  const expected = declaredUnitCount(words, lines) ?? fromRowNumbers(lines)
+  const declared = declaredUnitCount(words, lines)
+  const expected = declared ?? fromRowNumbers(lines)
+
+  // Every unit the sheet declares has a row, and every row has its figure. When the
+  // declared count is too faint to read, the printed row numbers stand in for it.
+  const rowsCheckOut =
+    expected === rows.length ||
+    (declared === null &&
+      (highestUnitRowNumber(lines) === rows.length || numberedUnitRows(words, rows) === rows.length))
 
   return {
     totalPackages: figures.reduce((sum, value) => sum + value, 0),
     source: 'column',
-    // Every unit the sheet declares has a row, and every row has its figure.
-    confidence:
-      expected === rows.length && figures.length === rows.length && !hasStrayFigure(figures) ? 'high' : 'low',
+    confidence: rowsCheckOut && figures.length === rows.length && !hasStrayFigure(figures) ? 'high' : 'low',
     evidence:
       `Package figures: ${figures.join(' + ')}` +
       (expected ? ` (${figures.length} of ${expected} unit${expected === 1 ? '' : 's'})` : '')
   }
 }
+
+/** A small area of the page to read again, in the coordinates of the OCR words */
+export type OcrCell = { x: number; y: number; w: number; h: number }
+
+/**
+ * Where a figure should be but none was read: the package column, on each unit
+ * row that came back without one. A tick or handwritten note across a printed
+ * figure makes the OCR box them together and lose the figure; reading just that
+ * cell again usually recovers it (see the OCR service's /cells).
+ */
+export const cellsToReread = (words: OcrWord[], lines: string[]): OcrCell[] => {
+  const analysis = analyseUnitRows(words)
+
+  if (!analysis) return []
+
+  const cells = analysis.rows
+    .map((row, index) => ({ row, value: analysis.perRow[index] }))
+    .filter(({ value }) => value === null)
+    .map(({ row }) => ({ x: analysis.columnX, y: row.y, w: analysis.cellWidth, h: analysis.cellHeight }))
+
+  // The large, pale unit count printed above "NUMBER OF MOVABLE UNITS", when it was
+  // not read: it is what says whether every row was found
+  if (declaredUnitCount(words, lines) === null) {
+    const label = words.find(word => UNITS_LABEL.test(word.text))
+
+    if (label) cells.push({ x: label.x, y: label.y - 2 * label.h, w: 0.6 * label.w, h: 2.8 * label.h })
+  }
+
+  return cells
+}
+
+/**
+ * The figures read from those cells, as words the reader can place. Only a lone,
+ * confident number is kept: a half-read cell ("29y" for 20) is worse than none.
+ */
+export const wordsFromCells = (cells: OcrCell[], readings: Array<{ text: string; score: number }>): OcrWord[] =>
+  cells.flatMap((cell, index) => {
+    const reading = readings[index]
+    // A stray mark either side is a bit of tick the ink removal left ("-36", "45.")
+    const match = reading ? /^[\s\-.,·:;'`~_]*(\d{1,4})[\s\-.,·:;'`~_]*$/.exec(reading.text) : null
+
+    if (!match || reading.score < 0.8) return []
+
+    return [{ text: match[1], score: reading.score, x: cell.x, y: cell.y, w: Math.min(cell.w, cell.h * match[1].length), h: cell.h / 1.5 }]
+  })
 
 export const readManifestText = (rawLines: string[], words: OcrWord[] = []): ManifestReading => {
   const lines = rawLines.map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean)
